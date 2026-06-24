@@ -118,89 +118,131 @@ def pivot(rows, buckets, scan_map):
     out.sort(key=lambda r:(r["dong"],r["line"],r["style"]))
     return out
 
-# ---------- Excel: 원본 'BALANCE OUTGOING MARKET' 양식 그대로 ----------
+# ---------- Excel: 원본을 '스타일 템플릿'으로 사용해 100% 동일 양식 복제 ----------
+# 원본(2.3 BALANCE OUTGOING)의 IP0306 시트를 report_template.xlsx(스타일 도너)로 보관하고,
+# 각 셀의 폰트·채움·테두리·정렬·표시형식을 그대로 복사한다. 날짜의존 값(날짜/월/일/D오프셋)과
+# 본문 데이터만 새로 써넣는다. 색상범례는 원본 이미지를 그대로 잘라낸 legend.png 를 삽입한다.
+import os
+from copy import copy as _copy
+_HERE = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_XLSX = os.path.join(_HERE, "report_template.xlsx")
+LEGEND_PNG    = os.path.join(_HERE, "legend.png")
+
+# 템플릿 기준 행: 헤더 1~5, 대표 데이터행 6, 마지막 데이터행 70, GRAND TOTAL 71
+T_HDR=range(1,6); T_DATA=6; T_LASTDATA=70; T_GTOT=71; T_NCOL=27
+
+def _copy_style(src, dst):
+    if src.has_style:
+        dst.font=_copy(src.font); dst.fill=_copy(src.fill)
+        dst.border=_copy(src.border); dst.alignment=_copy(src.alignment)
+        dst.number_format=src.number_format; dst.protection=_copy(src.protection)
+
 def build_workbook(data_by_sheet, buckets, today, today_str):
+    import openpyxl
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import PatternFill
     from openpyxl.utils import get_column_letter
-    wb=Workbook()
-    thin=Side(style="thin",color="B7BFC9"); BD=Border(thin,thin,thin,thin)
-    HFILL=PatternFill("solid",fgColor="1F3A5F"); HF=Font(bold=True,color="FFFFFF",size=9)
-    SUB=PatternFill("solid",fgColor="E8EEF5"); TOTF=PatternFill("solid",fgColor="FCE9CF")
-    RED=PatternFill("solid",fgColor="F4B6AE"); AMB=PatternFill("solid",fgColor="FCE3B4"); GRN=PatternFill("solid",fgColor="CDEBD6")
-    cv=Alignment(horizontal="center",vertical="center"); cen=Alignment(horizontal="center",vertical="center",wrap_text=True)
-    lf=Alignment(horizontal="left",vertical="center"); F9=Font(size=9); F9B=Font(size=9,bold=True)
-    nb=len(buckets); C_J=10; C_T=9+nb; C_TOT=C_T+3+1; C_ISS=C_TOT+1; C_ZBEM=C_TOT+2; C_ADI=C_TOT+3; NCOL=C_ADI
-    months=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"]
-    month_lbl=f"{months[today.month-1]}'{today.strftime('%y')}"
-    first=True
+    NOFILL=PatternFill(fill_type=None)   # 데이터행은 흰색(원본의 수작업 강조색 제거)
+    if not os.path.exists(TEMPLATE_XLSX):
+        raise FileNotFoundError(f"양식 템플릿이 없습니다: {TEMPLATE_XLSX} (legend.png 와 함께 스크립트 폴더에 두세요)")
+    tplwb=openpyxl.load_workbook(TEMPLATE_XLSX)
+    tpl=tplwb[tplwb.sheetnames[0]]
+    nb=len(buckets); C_J=10; C_T=9+nb; GAP=(C_T+1,C_T+2,C_T+3)
+    C_TOT=C_T+4; C_ISS=C_TOT+1; C_ZBEM=C_TOT+2; C_ADI=C_TOT+3; NCOL=C_ADI
+    # 월 라벨(원본 형식: 'MARCH'26')
+    MONTHS=["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST",
+            "SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"]
+    month_lbl=f"{MONTHS[today.month-1]}'{today.strftime('%y')}"
+
+    def hdr_merges():
+        # 헤더(1~5행) 병합을 템플릿에서 그대로 가져옴
+        return [str(m) for m in tpl.merged_cells.ranges if m.min_row<=5]
+
+    wb=Workbook(); first=True
     for sheet_name,_fam in SHEETS:
         rows=data_by_sheet.get(sheet_name,[])
         ws=wb.active if first else wb.create_sheet(); first=False
         ws.title=sheet_name+"".join(today_str.split("-")[1:3])
-        # 제목줄 (A1:D2, X1:AA2)
-        ws.merge_cells(start_row=1,start_column=1,end_row=2,end_column=4)
-        t=ws.cell(1,1,"BALANCE OUTGOING MARKET"); t.font=Font(bold=True,size=12); t.alignment=lf
-        ws.merge_cells(start_row=1,start_column=C_TOT,end_row=2,end_column=C_ADI)
-        dc=ws.cell(1,C_TOT,today_str); dc.alignment=Alignment(horizontal="right",vertical="center"); dc.font=F9B
-        # 식별 헤더 A3:I5
-        for c,name in enumerate(["PLANT","ITEM CLASS","LINE","MODEL","STYLE","COLOR","IP SPRAY (BEM)","PAD PRINTING (BEP)","GEN"],start=1):
-            ws.merge_cells(start_row=3,start_column=c,end_row=5,end_column=c)
-            cc=ws.cell(3,c,name); cc.fill=HFILL; cc.font=HF; cc.alignment=cen; cc.border=BD
-        # 월 라벨 J3:T3
-        ws.merge_cells(start_row=3,start_column=C_J,end_row=3,end_column=C_T)
-        mc=ws.cell(3,C_J,month_lbl); mc.fill=HFILL; mc.font=HF; mc.alignment=cv; mc.border=BD
-        # 일자열 (4행=일, 5행=D offset)
+        # 열너비/숨김 복사
+        for c in range(1,NCOL+1):
+            cl=get_column_letter(c)
+            if cl in tpl.column_dimensions:
+                ws.column_dimensions[cl].width=tpl.column_dimensions[cl].width
+        # 행높이(헤더) 복사
+        for r in T_HDR:
+            if r in tpl.row_dimensions: ws.row_dimensions[r].height=tpl.row_dimensions[r].height
+
+        # ---- 헤더 1~5행: 스타일+값 그대로 복사 ----
+        for r in T_HDR:
+            for c in range(1,NCOL+1):
+                s=tpl.cell(r,c); d=ws.cell(r,c)
+                _copy_style(s,d)
+                if s.value is not None: d.value=s.value
+        # 병합 복사
+        for mr in hdr_merges():
+            try: ws.merge_cells(mr)
+            except Exception: pass
+        # 날짜 의존 값 덮어쓰기 (스타일은 유지)
+        ws.cell(1,C_TOT).value=today                 # X1: 날짜(표시형식은 템플릿=인니 long date)
+        ws.cell(3,C_J).value=month_lbl               # J3: 월 라벨
         for j,(label,_d,daynum,k) in enumerate(buckets):
-            c=C_J+j
-            for cc in (ws.cell(4,c,daynum), ws.cell(5,c,label)): cc.fill=HFILL; cc.font=HF; cc.alignment=cv; cc.border=BD
-        # 꼬리 헤더 (X/Y/Z/AA)
-        for c,name in [(C_TOT,"TOTAL"),(C_ISS,"ISSUE"),(C_ZBEM,"SCAN BEM/BEP"),(C_ADI,"SCAN DI CKP")]:
-            ws.merge_cells(start_row=3,start_column=c,end_row=5,end_column=c)
-            cc=ws.cell(3,c,name); cc.fill=HFILL; cc.font=HF; cc.alignment=cen; cc.border=BD
-        # 데이터
-        rr=6; grand=[0]*nb; gtot=0; run_start=rr; run_dong=None; merges=[]
+            ws.cell(4,C_J+j).value=daynum            # 4행: 일
+            ws.cell(5,C_J+j).value=label             # 5행: D오프셋(색은 템플릿 그대로)
+
+        # ---- 색상 범례 이미지 ----
+        try:
+            from openpyxl.drawing.image import Image as XLImage
+            if os.path.exists(LEGEND_PNG):
+                im=XLImage(LEGEND_PNG); im.width=130; im.height=30; ws.add_image(im,"E1")
+        except Exception:
+            pass
+
+        # ---- 데이터 ----
+        rr=6; grand=[0]*nb; gtot=0; run_start=rr; run_dong=None; pmerges=[]
         for row in rows:
+            donor = T_DATA  # 대표 데이터행 스타일(테두리·폰트·정렬·표시형식)
+            for c in range(1,NCOL+1):
+                _copy_style(tpl.cell(donor,c), ws.cell(rr,c)); ws.cell(rr,c).fill=NOFILL
             ws.cell(rr,1,row["dong"]); ws.cell(rr,2,row["ic"]); ws.cell(rr,3,row["line"])
             ws.cell(rr,4,row["model"]); ws.cell(rr,5,row["style"])
             ws.cell(rr,6,row["color"] or None); ws.cell(rr,7,row["spray"] or None); ws.cell(rr,8,row["pad"] or None)
             ws.cell(rr,9,row["gen"])
             for j,(_l,_d,_n,k) in enumerate(buckets):
-                v=row["cells"][j]; c=C_J+j; cell=ws.cell(rr,c, v if v else None)
-                if v: cell.fill = RED if k>=1 else (AMB if k==0 else GRN)
-                grand[j]+=v
-            ws.cell(rr,C_TOT,row["total"]).fill=TOTF
+                v=row["cells"][j]; ws.cell(rr,C_J+j, v if v else None); grand[j]+=v
+            ws.cell(rr,C_TOT,f"=SUM({get_column_letter(C_J)}{rr}:{get_column_letter(C_T+3)}{rr})")
             ws.cell(rr,C_ISS,row["issue"] or None)
             ws.cell(rr,C_ZBEM,row["scan_bem"] or None); ws.cell(rr,C_ADI,row["scan_di"] or None)
             gtot+=row["total"]
-            for c in range(1,NCOL+1):
-                cell=ws.cell(rr,c); cell.border=BD; cell.font=(F9B if c==C_TOT else F9)
-                cell.alignment = lf if c in (4,5,6,7,8) else cv
             if row["dong"]!=run_dong:
-                if run_dong is not None and rr-1>=run_start: merges.append((run_start,rr-1))
+                if run_dong is not None and rr-1>=run_start: pmerges.append((run_start,rr-1))
                 run_dong=row["dong"]; run_start=rr
             rr+=1
-        if run_dong is not None and rr-1>=run_start: merges.append((run_start,rr-1))
-        for s,e in merges:
-            if e>s: ws.merge_cells(start_row=s,start_column=1,end_row=e,end_column=1); ws.cell(s,1).alignment=cv
-        # GRAND TOTAL (A:I 병합)
-        ws.merge_cells(start_row=rr,start_column=1,end_row=rr,end_column=9)
-        gcell=ws.cell(rr,1,"GRAND TOTAL"); gcell.font=F9B; gcell.alignment=cv; gcell.fill=SUB
-        for j,g in enumerate(grand):
-            cc=ws.cell(rr,C_J+j, g or None); cc.font=F9B; cc.fill=SUB; cc.alignment=cv; cc.border=BD
-        gt=ws.cell(rr,C_TOT,gtot); gt.font=F9B; gt.fill=TOTF; gt.alignment=cv
-        for c in range(1,NCOL+1): ws.cell(rr,c).border=BD
-        # 열 너비 (원본 근사)
-        W={1:6.7,2:7,3:7.5,4:38,5:13,6:17,7:17.5,8:19,9:5}
+        if run_dong is not None and rr-1>=run_start: pmerges.append((run_start,rr-1))
+        # 마지막 데이터행은 하단 medium(표 박스 닫힘) 위해 row70 스타일로 덮기
+        if rr>6:
+            for c in range(1,NCOL+1):
+                _copy_style(tpl.cell(T_LASTDATA,c), ws.cell(rr-1,c)); ws.cell(rr-1,c).fill=NOFILL
+        # PLANT(동) 세로 병합
+        for s,e in pmerges:
+            if e>s:
+                ws.merge_cells(start_row=s,start_column=1,end_row=e,end_column=1)
+
+        # ---- GRAND TOTAL (템플릿 71행 스타일) ----
         for c in range(1,NCOL+1):
-            L=get_column_letter(c)
-            if c in W: ws.column_dimensions[L].width=W[c]
-            elif C_J<=c<=C_T: ws.column_dimensions[L].width=8
-            elif c in (C_T+1,C_T+2,C_T+3): ws.column_dimensions[L].width=3      # U,V,W 공백
-            elif c==C_TOT: ws.column_dimensions[L].width=10
-            elif c==C_ISS: ws.column_dimensions[L].width=22
-            else: ws.column_dimensions[L].width=12
+            _copy_style(tpl.cell(T_GTOT,c), ws.cell(rr,c))
+        ws.merge_cells(start_row=rr,start_column=1,end_row=rr,end_column=9)
+        ws.cell(rr,1,"GRAND TOTAL")
+        for j,g in enumerate(grand): ws.cell(rr,C_J+j, g or None)
+        ws.cell(rr,C_TOT,gtot)
+
+        ws.sheet_view.showGridLines=False
         ws.freeze_panes=ws.cell(6,C_J)
+        # ---- 페이지 설정(원본과 동일: landscape·A4·한 페이지 맞춤) ----
+        ws.page_setup.orientation="landscape"; ws.page_setup.paperSize=9
+        ws.page_setup.fitToWidth=1; ws.page_setup.fitToHeight=1
+        ws.sheet_properties.pageSetUpPr=openpyxl.worksheet.properties.PageSetupProperties(fitToPage=True)
+        ws.page_margins.left=ws.page_margins.right=ws.page_margins.top=ws.page_margins.bottom=1.0
+        ws.print_area=f"A1:{get_column_letter(NCOL)}{rr}"
     return wb
 
 def send_mail(cfg, xlsx_path, summary, today_str):
