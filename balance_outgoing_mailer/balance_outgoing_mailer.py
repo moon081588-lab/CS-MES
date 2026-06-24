@@ -209,7 +209,7 @@ def build_workbook(data_by_sheet, buckets, today, today_str):
             ws.cell(rr,9,row["gen"])
             for j,(_l,_d,_n,k) in enumerate(buckets):
                 v=row["cells"][j]; ws.cell(rr,C_J+j, v if v else None); grand[j]+=v
-            ws.cell(rr,C_TOT,f"=SUM({get_column_letter(C_J)}{rr}:{get_column_letter(C_T+3)}{rr})")
+            ws.cell(rr,C_TOT,row["total"])   # 수식 대신 계산값(모든 뷰어에서 숫자 표시)
             ws.cell(rr,C_ISS,row["issue"] or None)
             ws.cell(rr,C_ZBEM,row["scan_bem"] or None); ws.cell(rr,C_ADI,row["scan_di"] or None)
             gtot+=row["total"]
