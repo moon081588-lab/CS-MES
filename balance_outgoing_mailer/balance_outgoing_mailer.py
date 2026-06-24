@@ -14,7 +14,7 @@ X=TOTAL · Y=ISSUE · Z=SCAN BEM/BEP · AA=SCAN DI CKP, 동(棟) 세로병합, G
 필요 패키지:  pip install oracledb openpyxl
 사용:  python balance_outgoing_mailer.py [--dry-run | --test-db | --config 경로.ini]
 """
-import os, sys, ssl, re, smtplib, argparse, configparser, logging, datetime
+import os, sys, ssl, re, smtplib, argparse, configparser, logging, datetime, getpass
 from email.message import EmailMessage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -23,6 +23,30 @@ def load_config(path):
     cp = configparser.ConfigParser()
     if not cp.read(path, encoding="utf-8"): sys.exit(f"[설정오류] config 없음: {path}")
     return cp
+
+def save_password(path, section, value):
+    """config.ini의 [section] password 에 값을 저장하고 파일권한 600."""
+    cp=configparser.ConfigParser(); cp.read(path,encoding="utf-8")
+    if section not in cp: cp[section]={}
+    cp[section]["password"]=value
+    with open(path,"w",encoding="utf-8") as f: cp.write(f)
+    try: os.chmod(path,0o600)
+    except Exception: pass
+
+def ensure_password(cfg, path, section, label):
+    """비밀번호가 config에 있으면 그대로, 없으면 1회 숨김 입력받아 저장 후 반환."""
+    v=cfg.get(section,"password",fallback="").strip()
+    if v: return v
+    if not sys.stdin.isatty():
+        sys.exit(f"[설정] [{section}] password 가 비어 있습니다. 먼저 대화형으로 1회 실행해 저장하세요"
+                 f" (예: python3 {os.path.basename(__file__)} --setup).")
+    v=getpass.getpass(f"Enter {label} (saved once, hidden): ").strip()
+    if not v: sys.exit("[설정] 비밀번호가 비어 있어 중단합니다.")
+    if section not in cfg: cfg[section]={}
+    cfg[section]["password"]=v
+    save_password(path, section, v)
+    LOG.info(f"[{section}] 비밀번호를 {path} 에 저장했습니다 (다음부터 묻지 않음).")
+    return v
 
 def setup_log():
     log=logging.getLogger("bo"); log.setLevel(logging.INFO)
@@ -272,16 +296,66 @@ def send_mail(cfg, xlsx_path, summary, today_str):
             s.send_message(msg)
     LOG.info("메일 발송 완료")
 
+def _smtp_send(cfg, msg):
+    """[smtp] 설정으로 EmailMessage 발송 (공통)."""
+    host=cfg.get("smtp","host"); port=cfg.getint("smtp","port",fallback=587)
+    user=cfg.get("smtp","user",fallback="").strip(); pw=cfg.get("smtp","password",fallback="").strip()
+    use_tls=cfg.getboolean("smtp","use_tls",fallback=True)
+    LOG.info(f"SMTP 접속: {host}:{port} tls={use_tls} auth={'Y' if user else 'N'}")
+    with smtplib.SMTP(host,port,timeout=60) as s:
+        if use_tls: s.starttls(context=ssl.create_default_context())
+        if user: s.login(user,pw)
+        s.send_message(msg)
+
+def send_test_mail(cfg):
+    """DB 없이 SMTP 전송만 검증. 샘플 xlsx가 있으면 첨부."""
+    sender=cfg.get("smtp","from")
+    recips=[x.strip() for x in cfg.get("report","recipients").split(",") if x.strip()]
+    if not recips: sys.exit("[설정오류] [report] recipients 비어 있음")
+    now=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg=EmailMessage()
+    msg["Subject"]=f"[TEST] BALANCE OUTGOING mailer SMTP 점검 {now}"
+    msg["From"]=sender; msg["To"]=", ".join(recips)
+    msg.set_content(f"SMTP 전송 테스트 메일입니다. (생성시각 {now})\n\n"
+                    "이 메일이 도착했다면 메일 전송기 설정이 정상입니다.\n"
+                    "— balance_outgoing_mailer.py --test-mail")
+    # 같은 폴더에 샘플이 있으면 첨부(첨부 동작까지 확인)
+    for fn in sorted(os.listdir(HERE)):
+        if fn.startswith("SAMPLE_BALANCE_OUTGOING") and fn.endswith(".xlsx"):
+            with open(os.path.join(HERE,fn),"rb") as f:
+                msg.add_attachment(f.read(),maintype="application",
+                    subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",filename=fn)
+            LOG.info(f"테스트 첨부: {fn}"); break
+    LOG.info(f"테스트 메일 발송 → {recips}")
+    _smtp_send(cfg,msg)
+    LOG.info("테스트 메일 발송 완료")
+    print(f"OK: 테스트 메일을 {', '.join(recips)} 로 보냈습니다. 받은편지함을 확인하세요.")
+
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument("--config",default=os.path.join(HERE,"config.ini"))
     ap.add_argument("--dry-run",action="store_true"); ap.add_argument("--test-db",action="store_true")
+    ap.add_argument("--test-mail",action="store_true",help="DB 없이 SMTP 전송만 점검")
+    ap.add_argument("--setup",action="store_true",help="비밀번호 1회 입력·저장(이후 무인 실행)")
     a=ap.parse_args(); cfg=load_config(a.config)
+    if a.setup:
+        ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
+        if cfg.get("db","dsn",fallback="").strip():
+            ensure_password(cfg,a.config,"db","Oracle DB password")
+        print("설정 저장 완료. 이제 'python3 balance_outgoing_mailer.py' 한 줄로 실행됩니다.")
+        return
+    if a.test_mail:
+        ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
+        try: send_test_mail(cfg)
+        except Exception as e: LOG.error(f"테스트 메일 실패: {e}"); sys.exit(4)
+        return
     today=datetime.date.today(); today_str=today.strftime("%Y-%m-%d")
     before=cfg.getint("report","window_before",fallback=3); after=cfg.getint("report","window_after",fallback=7)
     plants=[x.strip() for x in cfg.get("report","plants").split(",") if x.strip()]
     buckets=build_buckets(today,before,after)
     d_from=min(b[1] for b in buckets); d_to=max(b[1] for b in buckets)
     LOG.info(f"=== 시작 {today_str} 창 {d_from}~{d_to} plants={plants} ===")
+    ensure_password(cfg,a.config,"db","Oracle DB password")
+    if not a.dry_run: ensure_password(cfg,a.config,"smtp","SMTP(메일) password")  # 발송 전 미리 확보
     try: conn=db_connect(cfg)
     except Exception as e: LOG.error(f"DB 접속 실패: {e}"); sys.exit(2)
     if a.test_db:
