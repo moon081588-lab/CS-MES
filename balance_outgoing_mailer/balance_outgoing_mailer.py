@@ -381,6 +381,24 @@ def build_body_summary(data):
                          f" (동 {r.get('dong','')}, {r.get('line','')})")
     return "\n".join(lines)
 
+def make_demo_data(buckets):
+    """DB 없이 전체 흐름을 시연하기 위한 샘플 데이터(실제 양식 그대로)."""
+    nb=len(buckets)
+    def row(dong,ic,line,model,style,gen,vals,scan):
+        cells=[0]*nb
+        for idx,v in vals:
+            if 0<=idx<nb: cells[idx]=v
+        return {"dong":dong,"ic":ic,"line":line,"model":model,"style":style,"color":"","spray":"","pad":"",
+                "gen":gen,"cells":cells,"total":sum(cells),"issue":"","scan_bem":scan,"scan_di":""}
+    return {
+      "IP":[row("A","IP01","FGA04","AIR MAX 2017 (M)","849559-405","ME",[(1,180)],0),
+            row("A","II01","FGA05","AIR MAX 90 LTR (TD)","CD6868-100","TD",[(2,128)],0)],
+      "PH":[row("B","PH01","FGB10","PEGASUS 41 (W)","FD2723-100","WO",[(3,640),(4,320)],500),
+            row("B","CP02","FGB12","INVINCIBLE 3 (M)","DR2615-001","ME",[(0,210)],0)],
+      "OS":[row("C","OS01","FGC07","METCON 9 (M)","IH7446-001","ME",[(3,1540)],1200),
+            row("C","OS01","FGC08","VAPORFLY 3 (W)","FD6556-100","WO",[(5,300)],0)],
+    }
+
 def send_failure_mail(cfg, err_text, when_str):
     """파이프라인 실패 시 원인을 담아 best-effort 로 알림 발송."""
     try:
@@ -494,6 +512,7 @@ def main():
     ap.add_argument("--install-schedule",action="store_true",help="매일 08:00 자동 실행 등록")
     ap.add_argument("--uninstall-schedule",action="store_true",help="자동 실행 해제")
     ap.add_argument("--date",help="특정 날짜로 생성·발송 (YYYY-MM-DD)")
+    ap.add_argument("--demo",action="store_true",help="DB 없이 샘플 데이터로 리포트 생성+메일 발송(전 과정 시연)")
     ap.add_argument("--version",action="store_true",help="버전 표시")
     a=ap.parse_args()
     if a.version: print(f"CS-MES balance_outgoing_mailer v{VERSION}"); return
@@ -514,6 +533,22 @@ def main():
         ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
         try: send_test_mail(cfg)
         except Exception as e: LOG.error(f"테스트 메일 실패: {e}"); sys.exit(4)
+        return
+    if a.demo:
+        # DB 없이 전 과정 시연: 샘플 데이터 → 실제 양식 엑셀 → 메일 발송
+        before=cfg.getint("report","window_before",fallback=3); after=cfg.getint("report","window_after",fallback=7)
+        today=datetime.date.today(); today_str=today.strftime("%Y-%m-%d")
+        buckets=build_buckets(today,before,after)
+        data=make_demo_data(buckets)
+        body="[DEMO 데이터] DB 미연동 상태에서 전체 흐름(리포트 생성→메일 발송)을 시연합니다.\n\n"+build_body_summary(data)
+        wb=build_workbook(data,buckets,today,today_str)
+        out=os.path.join(HERE,f"BALANCE_OUTGOING_DEMO_{today.strftime('%Y%m%d')}.xlsx"); wb.save(out)
+        LOG.info(f"DEMO Excel 생성: {out}"); print(body)
+        if a.dry_run: print("\n--dry-run: 발송 생략 (엑셀만 생성)"); return
+        ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
+        try: retry(lambda: send_mail(cfg,out,body,today_str+" (DEMO)"), tries=3, delay=10, label="DEMO 메일 발송")
+        except Exception as e: LOG.error(f"DEMO 메일 발송 실패: {e}"); sys.exit(3)
+        print("OK: DEMO 리포트를 메일로 보냈습니다. 받은편지함을 확인하세요.")
         return
     # 날짜 결정 (--date 우선)
     if a.date:
