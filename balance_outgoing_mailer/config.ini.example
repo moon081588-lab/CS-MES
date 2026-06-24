@@ -1,0 +1,30 @@
+; ============================================================
+;  BALANCE OUTGOING 자동발송 설정파일  (balance_outgoing_mailer.py 와 같은 폴더에 둘 것)
+;  값만 채워 넣으면 됩니다. 코드 수정 불필요.
+; ============================================================
+
+[db]
+; --- Oracle 접속정보 ---
+user            = ADMIN
+password        = <DB비밀번호>
+; OCI Autonomous DB(월렛) 사용 시: dsn = TNS별칭(예: changshinincaipoc_medium), wallet_dir 지정
+; 사내망/직접접속 사용 시: dsn = host:port/service_name 형태(easy connect), wallet_dir 비워둠
+dsn             = changshinincaipoc_medium
+wallet_dir      = C:\changshin\wallet     ; 월렛 zip 푼 폴더 경로 (직접접속이면 비워둠)
+wallet_password =                          ; 월렛 비밀번호(있으면)
+
+[smtp]
+; --- 사내 SMTP 서버 ---
+host     = smtp.changshininc.com
+port     = 587
+use_tls  = true
+user     =                  ; SMTP 인증 계정(필요 없으면 비워둠)
+password =
+from     = balance-outgoing@changshininc.com
+
+[report]
+; --- 리포트 범위·수신자 ---
+plants         = 3110,3120,3210      ; 포함할 공장 코드 (쉼표구분)
+window_before  = 3                    ; D+3 (납기 경과 며칠까지)
+window_after   = 7                    ; D-7 (선행 며칠까지)
+recipients     = name1@changshininc.com, name2@changshininc.com   ; 받는사람 (쉼표구분, 여러 명 가능)
