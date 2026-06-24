@@ -14,10 +14,24 @@ X=TOTAL · Y=ISSUE · Z=SCAN BEM/BEP · AA=SCAN DI CKP, 동(棟) 세로병합, G
 필요 패키지:  pip install oracledb openpyxl
 사용:  python balance_outgoing_mailer.py [--dry-run | --test-db | --config 경로.ini]
 """
-import os, sys, ssl, re, smtplib, argparse, configparser, logging, datetime, getpass
+import os, sys, ssl, re, smtplib, argparse, configparser, logging, datetime, getpass, time, platform, subprocess
 from email.message import EmailMessage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+VERSION = "1.1"
+
+def retry(fn, tries=3, delay=5, label="작업"):
+    """일시 오류(DB/SMTP) 대비 재시도. 마지막 시도까지 실패하면 예외 재발생."""
+    last=None
+    for i in range(1,tries+1):
+        try:
+            return fn()
+        except Exception as e:
+            last=e
+            if i<tries:
+                LOG.warning(f"{label} 실패({i}/{tries}): {e} → {delay}초 후 재시도")
+                time.sleep(delay)
+    raise last
 
 def load_config(path):
     cp = configparser.ConfigParser(interpolation=None)   # 비밀번호의 % 등 특수문자 안전
@@ -88,12 +102,32 @@ def dong(wcg):
 
 def db_connect(cfg):
     import oracledb
-    kw={"user":cfg.get("db","user"),"password":cfg.get("db","password"),"dsn":cfg.get("db","dsn")}
+    mode=cfg.get("db","mode",fallback="thin").strip().lower()       # thin(기본) | thick(자동로그인)
     wdir=cfg.get("db","wallet_dir",fallback="").strip(); wpw=cfg.get("db","wallet_password",fallback="").strip()
+    if mode=="thick":
+        # Oracle Instant Client 로 cwallet.sso 자동로그인 사용 → 월렛 비번 불필요
+        lib=cfg.get("db","oracle_client_lib",fallback="").strip() or None
+        try:
+            oracledb.init_oracle_client(lib_dir=lib)
+        except Exception as e:
+            if "already" not in str(e).lower():
+                raise RuntimeError("Oracle Instant Client 가 필요합니다(thick/자동로그인). "
+                                   "설치: brew tap InstantClientTap/instantclient && brew install instantclient-basic "
+                                   f"(csmes.sh 가 자동 시도). 원오류: {e}")
+    kw={"user":cfg.get("db","user"),"password":cfg.get("db","password"),"dsn":cfg.get("db","dsn")}
     if wdir:
-        kw["config_dir"]=wdir; kw["wallet_location"]=wdir
-        if wpw: kw["wallet_password"]=wpw
-    LOG.info(f"DB 접속: dsn={kw['dsn']} wallet={'Y' if wdir else 'N'}")
+        kw["config_dir"]=wdir
+        if mode=="thin":
+            kw["wallet_location"]=wdir
+            if wpw:
+                kw["wallet_password"]=wpw
+            elif os.path.exists(os.path.join(wdir,"ewallet.pem")):
+                raise RuntimeError(
+                    "[thin 모드] 월렛 비밀번호(PEM pass phrase)가 필요합니다.\n"
+                    "  · 자동로그인(월렛 비번 불필요)으로 쓰려면 config.ini [db] mode=thick 로 바꾸고 "
+                    "Oracle Instant Client 를 설치하세요(csmes.sh 가 자동 처리).")
+        # thick: sqlnet.ora 의 WALLET_LOCATION(=cwallet.sso) 로 자동로그인. wallet_password 불필요.
+    LOG.info(f"DB 접속: mode={mode} dsn={kw['dsn']} wallet={'Y' if wdir else 'N'}")
     return oracledb.connect(**kw)
 
 def fetch_sheet(conn, families, plants, d_from, d_to):
@@ -331,53 +365,213 @@ def send_test_mail(cfg):
     LOG.info("테스트 메일 발송 완료")
     print(f"OK: 테스트 메일을 {', '.join(recips)} 로 보냈습니다. 받은편지함을 확인하세요.")
 
+def build_body_summary(data):
+    """메일 본문용 요약: 시트별 총잔량 + 전체 부족 TOP5."""
+    lines=[]; grand=0; allrows=[]
+    for name,_f in SHEETS:
+        rows=data.get(name,[]); t=sum(r["total"] for r in rows); grand+=t
+        lines.append(f"· {name}: {len(rows)}개 스타일 / 잔량 {t:,}족")
+        for r in rows: allrows.append((name,r))
+    lines.append(f"· 합계: 잔량 {grand:,}족")
+    top=sorted(allrows,key=lambda x:x[1]['total'],reverse=True)[:5]
+    if top:
+        lines.append(""); lines.append("[부족 TOP5]")
+        for i,(nm,r) in enumerate(top,1):
+            lines.append(f"  {i}. [{nm}] {r.get('model','')} / {r.get('style','')} — {r['total']:,}족"
+                         f" (동 {r.get('dong','')}, {r.get('line','')})")
+    return "\n".join(lines)
+
+def send_failure_mail(cfg, err_text, when_str):
+    """파이프라인 실패 시 원인을 담아 best-effort 로 알림 발송."""
+    try:
+        sender=cfg.get("smtp","from",fallback="").strip()
+        recips=[x.strip() for x in cfg.get("report","recipients",fallback="").split(",") if x.strip()]
+        if not (sender and recips): LOG.error("실패 알림 생략(SMTP/수신자 미설정)"); return
+        msg=EmailMessage()
+        msg["Subject"]=f"[BALANCE OUTGOING 실패] {when_str} 리포트 작업 오류"
+        msg["From"]=sender; msg["To"]=", ".join(recips)
+        msg.set_content(f"{when_str} BALANCE OUTGOING 자동 작업이 실패했습니다.\n\n"
+                        f"[원인]\n{err_text}\n\n로그: {os.path.join(HERE,'balance_outgoing.log')}\n"
+                        "자동 발송된 실패 알림입니다.")
+        _smtp_send(cfg,msg); LOG.info("실패 알림 메일 발송 완료")
+    except Exception as e:
+        LOG.error(f"실패 알림 메일도 실패: {e}")
+
+def run_doctor(cfg, path):
+    """라이브러리/템플릿/config/DB/SMTP 일괄 점검 → ✅/❌."""
+    ok=True
+    def line(name, good, detail=""):
+        nonlocal ok
+        if not good: ok=False
+        print(("✅ " if good else "❌ ")+name+(f" — {detail}" if detail else ""))
+    print(f"=== CS-MES doctor (v{VERSION}) ===")
+    try: import oracledb; line("oracledb 설치", True, getattr(oracledb,'__version__',''))
+    except Exception as e: line("oracledb 설치", False, str(e))
+    try: import openpyxl; line("openpyxl 설치", True, getattr(openpyxl,'__version__',''))
+    except Exception as e: line("openpyxl 설치", False, str(e))
+    line("report_template.xlsx", os.path.exists(TEMPLATE_XLSX), TEMPLATE_XLSX)
+    line("legend.png", os.path.exists(LEGEND_PNG), LEGEND_PNG)
+    for sec,key in [("db","dsn"),("smtp","host"),("smtp","from"),("report","recipients"),("report","plants")]:
+        v=cfg.get(sec,key,fallback="").strip(); line(f"config [{sec}] {key}", bool(v), v or "비어있음")
+    for sec in ("db","smtp"):
+        has=bool(cfg.get(sec,"password",fallback="").strip())
+        line(f"config [{sec}] password", has, "저장됨" if has else "미저장 → --setup")
+    try:
+        conn=db_connect(cfg); cur=conn.cursor(); cur.execute("SELECT 1 FROM DUAL"); cur.fetchone(); conn.close()
+        line("DB 접속(SELECT 1)", True)
+    except Exception as e: line("DB 접속(SELECT 1)", False, str(e)[:120])
+    try:
+        host=cfg.get("smtp","host"); port=cfg.getint("smtp","port",fallback=587)
+        user=cfg.get("smtp","user",fallback="").strip(); pw=cfg.get("smtp","password",fallback="").strip()
+        use_tls=cfg.getboolean("smtp","use_tls",fallback=True)
+        with smtplib.SMTP(host,port,timeout=30) as s:
+            if use_tls: s.starttls(context=ssl.create_default_context())
+            if user: s.login(user,pw)
+        line("SMTP 접속/로그인", True)
+    except Exception as e: line("SMTP 접속/로그인", False, str(e)[:120])
+    print("="*32)
+    print("전체 정상 ✅ — 'csmes' 로 실행하세요" if ok else "문제 발견 ❌ — 위 ❌ 항목을 확인하세요")
+    return 0 if ok else 1
+
+SCHED_LABEL="com.changshin.balanceoutgoing"
+def _runner():
+    sh=os.path.join(HERE,"csmes.sh")
+    return ("/bin/bash", sh) if os.path.exists(sh) else (sys.executable, os.path.join(HERE,os.path.basename(__file__)))
+
+def install_schedule(hour=8, minute=0):
+    sysname=platform.system(); prog,arg=_runner(); logp=os.path.join(HERE,"cron.log")
+    if sysname=="Darwin":
+        plist=os.path.expanduser(f"~/Library/LaunchAgents/{SCHED_LABEL}.plist")
+        os.makedirs(os.path.dirname(plist),exist_ok=True)
+        xml=f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>{SCHED_LABEL}</string>
+  <key>ProgramArguments</key><array><string>{prog}</string><string>{arg}</string></array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>{hour}</integer><key>Minute</key><integer>{minute}</integer></dict>
+  <key>StandardOutPath</key><string>{logp}</string>
+  <key>StandardErrorPath</key><string>{logp}</string>
+  <key>WorkingDirectory</key><string>{HERE}</string>
+</dict></plist>'''
+        open(plist,"w").write(xml)
+        subprocess.run(["launchctl","unload",plist],capture_output=True)
+        r=subprocess.run(["launchctl","load",plist],capture_output=True,text=True)
+        print(f"✅ 등록 완료(macOS launchd): 매일 {hour:02d}:{minute:02d}\n   {plist}" if r.returncode==0
+              else f"❌ launchctl load 실패: {r.stderr}\n   plist 생성됨: {plist}")
+    elif sysname=="Linux":
+        cmd=f'{prog} "{arg}" >> "{logp}" 2>&1'
+        cur=subprocess.run(["crontab","-l"],capture_output=True,text=True).stdout
+        keep="\n".join(l for l in cur.splitlines() if SCHED_LABEL not in l)
+        new=(keep.strip()+"\n" if keep.strip() else "")+f"{minute} {hour} * * * {cmd}  # {SCHED_LABEL}\n"
+        p=subprocess.run(["crontab","-"],input=new,text=True)
+        print(f"✅ 등록 완료(cron): 매일 {hour:02d}:{minute:02d}" if p.returncode==0 else "❌ crontab 등록 실패")
+    else:
+        print(f"이 OS({sysname})는 자동 등록 미지원 — Windows는 작업 스케줄러로 등록하세요(README 참고).")
+
+def uninstall_schedule():
+    sysname=platform.system()
+    if sysname=="Darwin":
+        plist=os.path.expanduser(f"~/Library/LaunchAgents/{SCHED_LABEL}.plist")
+        subprocess.run(["launchctl","unload",plist],capture_output=True)
+        if os.path.exists(plist): os.remove(plist)
+        print("✅ 자동 실행 해제 완료(macOS launchd)")
+    elif sysname=="Linux":
+        cur=subprocess.run(["crontab","-l"],capture_output=True,text=True).stdout
+        keep="\n".join(l for l in cur.splitlines() if SCHED_LABEL not in l)
+        subprocess.run(["crontab","-"],input=keep+"\n",text=True)
+        print("✅ 자동 실행 해제 완료(cron)")
+    else:
+        print(f"이 OS({sysname})는 자동 해제 미지원.")
+
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--config",default=os.path.join(HERE,"config.ini"))
-    ap.add_argument("--dry-run",action="store_true"); ap.add_argument("--test-db",action="store_true")
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--config",default=os.path.join(HERE,"config.ini"))
+    ap.add_argument("--dry-run",action="store_true",help="엑셀만 생성(발송 X)")
+    ap.add_argument("--test-db",action="store_true",help="DB 접속만 확인")
     ap.add_argument("--test-mail",action="store_true",help="DB 없이 SMTP 전송만 점검")
     ap.add_argument("--setup",action="store_true",help="비밀번호 1회 입력·저장(이후 무인 실행)")
-    a=ap.parse_args(); cfg=load_config(a.config)
+    ap.add_argument("--doctor",action="store_true",help="라이브러리/템플릿/config/DB/SMTP 일괄 점검")
+    ap.add_argument("--install-schedule",action="store_true",help="매일 08:00 자동 실행 등록")
+    ap.add_argument("--uninstall-schedule",action="store_true",help="자동 실행 해제")
+    ap.add_argument("--date",help="특정 날짜로 생성·발송 (YYYY-MM-DD)")
+    ap.add_argument("--version",action="store_true",help="버전 표시")
+    a=ap.parse_args()
+    if a.version: print(f"CS-MES balance_outgoing_mailer v{VERSION}"); return
+    if a.install_schedule:   install_schedule();   return
+    if a.uninstall_schedule: uninstall_schedule(); return
+    cfg=load_config(a.config)
     if a.setup:
         ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
         if cfg.get("db","dsn",fallback="").strip():
             ensure_password(cfg,a.config,"db","Oracle DB password")
-            # Autonomous 월렛은 thin 모드에서 월렛 비밀번호가 필요한 경우가 있음(없으면 그냥 Enter)
             if cfg.get("db","wallet_dir",fallback="").strip() and not cfg.get("db","wallet_password",fallback="").strip() and sys.stdin.isatty():
                 wp=getpass.getpass("Enter wallet password (Autonomous 월렛 비번 / 없으면 Enter): ").strip()
                 cfg["db"]["wallet_password"]=wp; save_password(a.config,"db",wp,key="wallet_password")
         print("설정 저장 완료. 이제 'csmes' 한 줄로 실행됩니다.")
         return
+    if a.doctor: sys.exit(run_doctor(cfg,a.config))
     if a.test_mail:
         ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
         try: send_test_mail(cfg)
         except Exception as e: LOG.error(f"테스트 메일 실패: {e}"); sys.exit(4)
         return
-    today=datetime.date.today(); today_str=today.strftime("%Y-%m-%d")
+    # 날짜 결정 (--date 우선)
+    if a.date:
+        try: today=datetime.datetime.strptime(a.date,"%Y-%m-%d").date()
+        except ValueError: sys.exit("[옵션오류] --date 형식은 YYYY-MM-DD")
+    else:
+        today=datetime.date.today()
+    today_str=today.strftime("%Y-%m-%d")
     before=cfg.getint("report","window_before",fallback=3); after=cfg.getint("report","window_after",fallback=7)
     plants=[x.strip() for x in cfg.get("report","plants").split(",") if x.strip()]
     buckets=build_buckets(today,before,after)
     d_from=min(b[1] for b in buckets); d_to=max(b[1] for b in buckets)
-    LOG.info(f"=== 시작 {today_str} 창 {d_from}~{d_to} plants={plants} ===")
+    LOG.info(f"=== 시작 v{VERSION} {today_str} 창 {d_from}~{d_to} plants={plants} ===")
     ensure_password(cfg,a.config,"db","Oracle DB password")
-    if not a.dry_run: ensure_password(cfg,a.config,"smtp","SMTP(메일) password")  # 발송 전 미리 확보
-    try: conn=db_connect(cfg)
-    except Exception as e: LOG.error(f"DB 접속 실패: {e}"); sys.exit(2)
-    if a.test_db:
-        cur=conn.cursor(); cur.execute("SELECT 1 FROM DUAL"); print("DB OK:",cur.fetchone()); conn.close(); return
-    data={}; summ=[]
+    if not a.dry_run: ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
+    notify = not (a.dry_run or a.test_db)   # 실패 알림 발송 여부
+    # --- DB 접속(재시도) ---
     try:
+        conn=retry(lambda: db_connect(cfg), tries=3, delay=5, label="DB 접속")
+    except Exception as e:
+        LOG.error(f"DB 접속 실패: {e}")
+        if notify: send_failure_mail(cfg,f"DB 접속 실패: {e}",today_str)
+        sys.exit(2)
+    if a.test_db:
+        try:
+            cur=conn.cursor(); cur.execute("SELECT 1 FROM DUAL"); print("DB OK:",cur.fetchone())
+        finally: conn.close()
+        return
+    # --- 조회·집계 ---
+    try:
+        data={}
         sm=fetch_scan_bembep(conn,plants,d_from,d_to)
         for name,fams in SHEETS:
             pv=pivot(fetch_sheet(conn,fams,plants,d_from,d_to),buckets,sm); data[name]=pv
-            tot=sum(r["total"] for r in pv); summ.append(f"· {name}: {len(pv)}개 스타일 / 잔량 {tot:,}족"); LOG.info(f"{name}: {len(pv)}행 잔량 {tot:,}")
-    finally: conn.close()
-    summary="\n".join(summ)
-    wb=build_workbook(data,buckets,today,today_str)
-    out=os.path.join(HERE,f"BALANCE_OUTGOING_{today.strftime('%Y%m%d')}.xlsx"); wb.save(out)
-    LOG.info(f"Excel 생성: {out}"); print(summary)
+            LOG.info(f"{name}: {len(pv)}행 잔량 {sum(r['total'] for r in pv):,}")
+    except Exception as e:
+        LOG.error(f"조회/집계 실패: {e}")
+        if notify: send_failure_mail(cfg,f"조회/집계 실패: {e}",today_str)
+        sys.exit(5)
+    finally:
+        try: conn.close()
+        except Exception: pass
+    body=build_body_summary(data)
+    # --- 엑셀 생성 ---
+    try:
+        wb=build_workbook(data,buckets,today,today_str)
+        out=os.path.join(HERE,f"BALANCE_OUTGOING_{today.strftime('%Y%m%d')}.xlsx"); wb.save(out)
+    except Exception as e:
+        LOG.error(f"엑셀 생성 실패: {e}")
+        if notify: send_failure_mail(cfg,f"엑셀 생성 실패: {e}",today_str)
+        sys.exit(6)
+    LOG.info(f"Excel 생성: {out}"); print(body)
     if a.dry_run: LOG.info("--dry-run: 발송 생략"); return
-    try: send_mail(cfg,out,summary,today_str)
-    except Exception as e: LOG.error(f"메일 발송 실패: {e}"); sys.exit(3)
+    # --- 메일 발송(재시도) ---
+    try:
+        retry(lambda: send_mail(cfg,out,body,today_str), tries=3, delay=10, label="메일 발송")
+    except Exception as e:
+        LOG.error(f"메일 발송 실패: {e}"); send_failure_mail(cfg,f"메일 발송 실패: {e}",today_str); sys.exit(3)
     LOG.info("=== 완료 ===")
 
 if __name__=="__main__": main()
