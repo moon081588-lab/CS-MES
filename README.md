@@ -25,6 +25,23 @@ CS-MES/
 
 ---
 
+## ⚠️ 데이터 한계 — 현재 Oracle DB에 없는 항목
+
+원본 BALANCE OUTGOING 리포트에는 있으나, **현재 우리가 보유한 Oracle DB(OCI)에는 아래 정보 자체가 들어있지 않습니다.**
+그래서 이 컬럼들은 리포트에 **자리만 만들고 빈칸**으로 출력됩니다. 추후 해당 데이터 소스가 확보되면
+코드의 `color_specs()` / `scan_di_ckp()` **한 곳만** 채우면 자동 반영되도록 설계해 두었습니다.
+
+| 빈칸(데이터 없음) | 비고 |
+|---|---|
+| **COLOR** | 제품 컬러웨이. 색상 마스터(`MSBS_ITEM`/`MSBS_ITEM_STYLE`)가 공란 |
+| **IP SPRAY (BEM)** | 미드솔 스프레이 색상 스펙 — 소스 미발견 |
+| **PAD PRINTING (BEP)** | 패드 프린팅 색상 스펙 — 소스 미발견 |
+| **SCAN DI CKP** | DI 체크포인트 스캔 — 현재 스캔 데이터에 DI 식별자 없음 |
+
+> 정상 출력 항목: PLANT(동 A·B·C…), ITEM CLASS, LINE, MODEL, STYLE, GEN, 일자버킷(D+3~D-7, 색상강조), TOTAL, GRAND TOTAL, SCAN BEM/BEP.
+
+---
+
 ## 1. 설치 (대상 PC/서버에서 1회)
 
 ```bash
