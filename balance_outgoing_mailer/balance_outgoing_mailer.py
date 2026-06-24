@@ -20,15 +20,15 @@ from email.message import EmailMessage
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 def load_config(path):
-    cp = configparser.ConfigParser()
+    cp = configparser.ConfigParser(interpolation=None)   # 비밀번호의 % 등 특수문자 안전
     if not cp.read(path, encoding="utf-8"): sys.exit(f"[설정오류] config 없음: {path}")
     return cp
 
-def save_password(path, section, value):
-    """config.ini의 [section] password 에 값을 저장하고 파일권한 600."""
-    cp=configparser.ConfigParser(); cp.read(path,encoding="utf-8")
+def save_password(path, section, value, key="password"):
+    """config.ini의 [section] key 에 값을 저장하고 파일권한 600."""
+    cp=configparser.ConfigParser(interpolation=None); cp.read(path,encoding="utf-8")
     if section not in cp: cp[section]={}
-    cp[section]["password"]=value
+    cp[section][key]=value
     with open(path,"w",encoding="utf-8") as f: cp.write(f)
     try: os.chmod(path,0o600)
     except Exception: pass
@@ -341,7 +341,11 @@ def main():
         ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
         if cfg.get("db","dsn",fallback="").strip():
             ensure_password(cfg,a.config,"db","Oracle DB password")
-        print("설정 저장 완료. 이제 'python3 balance_outgoing_mailer.py' 한 줄로 실행됩니다.")
+            # Autonomous 월렛은 thin 모드에서 월렛 비밀번호가 필요한 경우가 있음(없으면 그냥 Enter)
+            if cfg.get("db","wallet_dir",fallback="").strip() and not cfg.get("db","wallet_password",fallback="").strip() and sys.stdin.isatty():
+                wp=getpass.getpass("Enter wallet password (Autonomous 월렛 비번 / 없으면 Enter): ").strip()
+                cfg["db"]["wallet_password"]=wp; save_password(a.config,"db",wp,key="wallet_password")
+        print("설정 저장 완료. 이제 'csmes' 한 줄로 실행됩니다.")
         return
     if a.test_mail:
         ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
