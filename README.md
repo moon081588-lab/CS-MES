@@ -52,12 +52,18 @@ python3 balance_outgoing_mailer.py
 ### 자주 쓰는 명령
 
 ```bash
-python3 balance_outgoing_mailer.py --setup       # 비밀번호 1회 입력·저장
-python3 balance_outgoing_mailer.py --test-mail   # DB 없이 메일 전송만 점검
-python3 balance_outgoing_mailer.py --test-db     # DB 접속만 확인
-python3 balance_outgoing_mailer.py --dry-run     # 엑셀만 생성(발송 X)
-python3 balance_outgoing_mailer.py               # 전체 실행 (평소 이 한 줄)
+csmes --setup              # 비밀번호 1회 입력·저장
+csmes --doctor             # 라이브러리·월렛·DB·SMTP·템플릿 일괄 점검 (✅/❌)
+csmes --install-schedule   # 매일 08:00 자동 실행 등록 (해제: --uninstall-schedule)
+csmes --test-mail          # DB 없이 메일 전송만 점검
+csmes --dry-run            # 엑셀만 생성(발송 X)
+csmes --date 2026-06-23    # 특정 날짜로 다시 생성·발송
+csmes                      # 전체 실행 (평소 이 한 줄)
+csmes --version            # 버전 표시
 ```
+
+> `csmes` 별칭이 없으면 `python3 balance_outgoing_mailer.py [옵션]` 으로 동일하게 동작합니다.
+> 자동 실행이 실패하면 원인을 담은 **실패 알림 메일**이 수신자에게 발송되고, DB/SMTP 일시 오류는 **자동 재시도(최대 3회)** 합니다.
 
 **한 단어 별칭(선택)** — 어느 폴더에서나 `csmes` 로 실행:
 
@@ -98,8 +104,8 @@ source ~/.zshrc
 | 레포트 생성기 (Excel) | ✅ 완성 | 원본 양식 100% 복제(템플릿 방식) |
 | 메일 전송기 (SMTP) | ✅ 완성·검증 | `send_mail()` — TLS + 첨부. **Gmail 테스트 발송 성공** |
 | config.ini (설정) | ⚙️ 진행중 | SMTP·수신자 입력완료, **DB 접속(dsn·월렛·계정) 미입력** |
-| 로그/오류 처리 | ✅ 완성 | 파일로그 + 단계별 try/except |
-| OS 스케줄러 (08:00 발송) | ⚙️ 미등록 | 코드는 단발 실행 준비완료. 스케줄 등록은 대상 PC에서 1회(아래 6장) |
+| 로그/오류 처리 | ✅ 완성 | 파일로그 + 단계별 try/except + **실패 알림 메일** + **자동 재시도(3회)** |
+| OS 스케줄러 (08:00 발송) | ✅ 자동등록 | `csmes --install-schedule` 한 줄(해제 `--uninstall-schedule`). 대상 PC에서 1회 |
 
 ---
 
