@@ -50,10 +50,16 @@ def _sheet_sql(families, plants, d_from, d_to):
     """원본 fetch_sheet 의 SQL을 리터럴로 인라인 (sqlcl 에 그대로 실행)."""
     return (
         "SELECT NVL(w.wc_group_cd,' ') wcg, r.plant_cd, r.item_class, r.fa_wc_cd, "
-        "NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, r.style_cd, r.fa_date, SUM(r.pcard_qty) qty "
+        "NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, r.style_cd, r.fa_date, SUM(r.pcard_qty) qty, "
+        "MAX(cc.mcs_color_cd) color "
         "FROM OCI.MSPD_PCARD_RESULT r "
         "LEFT JOIN OCI.MSBS_ITEM_STYLE  i ON i.style_cd=r.style_cd "
         "LEFT JOIN OCI.MSBS_WORK_CENTER w ON w.plant_cd=r.plant_cd AND w.wc_cd=r.fa_wc_cd "
+        "LEFT JOIN (SELECT style_cd, mcs_color_cd FROM ("
+        "  SELECT style_cd, mcs_color_cd, ROW_NUMBER() OVER (PARTITION BY style_cd "
+        "    ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn "
+        "  FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL GROUP BY style_cd, mcs_color_cd"
+        ") WHERE rn=1) cc ON cc.style_cd=r.style_cd "
         "WHERE r.prod_move_type='PROD' AND r.end_routing_yn='Y' AND r.out_date='19991231' "
         f"AND r.item_class_type IN ({_inlist(families)}) AND r.plant_cd IN ({_inlist(plants)}) "
         f"AND r.fa_date BETWEEN '{d_from}' AND '{d_to}' "
@@ -101,7 +107,7 @@ def _rows(s):
         out.append((
             (d.get("WCG") or " "), d.get("PLANT_CD"), d.get("ITEM_CLASS"), d.get("FA_WC_CD"),
             (d.get("MODEL") or " "), (d.get("GEN") or " "), d.get("STYLE_CD"),
-            str(d.get("FA_DATE") or ""), _num(d.get("QTY")),
+            str(d.get("FA_DATE") or ""), _num(d.get("QTY")), d.get("COLOR"),
         ))
     return out
 

@@ -125,20 +125,19 @@ source ~/.zshrc
 
 ---
 
-## 3. ⚠️ 아직 DB에 없는(빈칸으로 출력되는) 항목
+## 3. ⚠️ 컬럼별 데이터 출처 / 빈칸 현황
 
-원본 리포트에는 있으나 **현재 우리 Oracle DB(OCI)에는 데이터가 없어** 아래 칸은 **빈칸**으로 나옵니다.
-나머지 항목은 모두 정상 출력됩니다. 추후 소스가 확보되면 코드의 `color_specs()` / `scan_di_ckp()`
-**한 곳만** 채우면 자동 반영되도록 설계해 두었습니다.
+| 컬럼 | 상태 | 출처 / 사유 |
+|---|---|---|
+| PLANT(동)·ITEM CLASS·LINE·MODEL·STYLE·GEN | ✅ 출력 | MSPD_PCARD_RESULT + MSBS_ITEM_STYLE |
+| 일자버킷(D+3~D-7)·TOTAL·GRAND TOTAL | ✅ 출력 | 패스카드 실적 집계 |
+| SCAN BEM/BEP | ✅ 출력 | POP_PCARD_SCAN |
+| **COLOR** | ✅ 출력 | **`MSPD_BATCH_PLAN.MCS_COLOR_CD`** (style별 대표색, 약 99% 커버). `ITEM`/`ITEM_STYLE`의 COLOR_CD·COLOR_NAME은 0%(공란)이라 미사용 |
+| **IP SPRAY (BEM)** | ❌ **빈칸** | 미드솔 스프레이 색상 스펙 — **DB 소스 미발견** |
+| **PAD PRINTING (BEP)** | ❌ **빈칸** | 패드 프린팅 색상 스펙 — **DB 소스 미발견** |
+| **SCAN DI CKP** | ❌ **빈칸** | DI 체크포인트 스캔 — 현재 스캔 데이터에 DI 식별자 없음 |
 
-| 빈칸(데이터 없음) | 설명 |
-|---|---|
-| **COLOR** | 제품 컬러웨이 — 색상 마스터 미보유 |
-| **IP SPRAY (BEM)** | 미드솔 스프레이 색상 스펙 — 소스 미발견 |
-| **PAD PRINTING (BEP)** | 패드 프린팅 색상 스펙 — 소스 미발견 |
-| **SCAN DI CKP** | DI 체크포인트 스캔 — 현재 스캔 데이터에 DI 식별자 없음 |
-
-> ✅ 정상 출력: PLANT(동) · ITEM CLASS · LINE · MODEL · STYLE · GEN · 일자버킷(D+3~D-7, 색상강조) · TOTAL · GRAND TOTAL · SCAN BEM/BEP
+> ⚠️ **아직 비어 있는 칸: IP SPRAY (BEM) · PAD PRINTING (BEP) · SCAN DI CKP** — DB에서 해당 데이터 소스를 아직 찾지 못해 빈칸으로 출력됩니다. 소스가 확보되면 코드의 `color_specs()`(spray/pad) / `scan_di_ckp()` 한 곳만 채우면 자동 반영되도록 설계돼 있습니다.
 
 ---
 
@@ -147,7 +146,7 @@ source ~/.zshrc
 | 워크플로우 단계 | 상태 | 비고 |
 |---|---|---|
 | 창신 MES Oracle DB 접속 | ✅ 완성 | `db_connect()` — 월렛(OCI)·직접DSN 둘 다, `--test-db` 점검 |
-| 데이터 분석 모듈 (조회·집계) | ✅ 완성·검증 | 미출고 판정·일자버킷·피벗. **단** COLOR / IP SPRAY / PAD PRINTING / SCAN DI CKP 는 DB에 데이터 없어 빈칸(hook 대기) |
+| 데이터 분석 모듈 (조회·집계) | ✅ 완성·검증 | 미출고 판정·일자버킷·피벗·COLOR(BATCH_PLAN). **단** IP SPRAY / PAD PRINTING / SCAN DI CKP 는 DB 소스 미발견으로 빈칸(hook 대기) |
 | 레포트 생성기 (Excel) | ✅ 완성 | 원본 양식 100% 복제(템플릿 방식) |
 | 메일 전송기 (SMTP) | ✅ 완성·검증 | `send_mail()` — TLS + 첨부. **Gmail 테스트 발송 성공** |
 | config.ini (설정) | ⚙️ 진행중 | SMTP·수신자 입력완료, **DB 접속(dsn·월렛·계정) 미입력** |

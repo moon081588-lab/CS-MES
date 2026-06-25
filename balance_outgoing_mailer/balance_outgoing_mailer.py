@@ -141,10 +141,20 @@ def fetch_sheet(conn, families, plants, d_from, d_to):
     fam=",".join(f":f{i}" for i in range(len(families))); pl=",".join(f":p{i}" for i in range(len(plants)))
     sql=f"""
       SELECT NVL(w.wc_group_cd,' ') wcg, r.plant_cd, r.item_class, r.fa_wc_cd,
-             NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, r.style_cd, r.fa_date, SUM(r.pcard_qty) qty
+             NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, r.style_cd, r.fa_date, SUM(r.pcard_qty) qty,
+             MAX(cc.mcs_color_cd) color
       FROM OCI.MSPD_PCARD_RESULT r
       LEFT JOIN OCI.MSBS_ITEM_STYLE  i ON i.style_cd=r.style_cd
       LEFT JOIN OCI.MSBS_WORK_CENTER w ON w.plant_cd=r.plant_cd AND w.wc_cd=r.fa_wc_cd
+      LEFT JOIN (   /* style_cd 별 대표색(NONE 제외 최빈) — BATCH_PLAN.MCS_COLOR_CD */
+        SELECT style_cd, mcs_color_cd FROM (
+          SELECT style_cd, mcs_color_cd,
+                 ROW_NUMBER() OVER (PARTITION BY style_cd
+                     ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn
+          FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL
+          GROUP BY style_cd, mcs_color_cd
+        ) WHERE rn=1
+      ) cc ON cc.style_cd=r.style_cd
       WHERE r.prod_move_type='PROD' AND r.end_routing_yn='Y' AND r.out_date='19991231'
         AND r.item_class_type IN ({fam}) AND r.plant_cd IN ({pl})
         AND r.fa_date BETWEEN :d_from AND :d_to
@@ -165,18 +175,27 @@ def fetch_scan_bembep(conn, plants, d_from, d_to):
     b={f"p{i}":v for i,v in enumerate(plants)}; b.update({"d_from":d_from,"d_to":d_to})
     cur=conn.cursor(); cur.execute(sql,b); d={(p,w,s):(q or 0) for p,w,s,q in cur.fetchall()}; cur.close(); return d
 
+def _clean_color(raw):
+    """'OBSIDIAN(45B)' → 'OBSIDIAN', 'NONE'·공란 → ''."""
+    c=(raw or "").split("(")[0].strip()
+    return "" if c.upper()=="NONE" else c
+
 def pivot(rows, buckets, scan_map):
-    bdates=[b[1] for b in buckets]; table={}
-    for wcg,plant,ic,line,model,gen,style,fa,qty in rows:
+    bdates=[b[1] for b in buckets]; table={}; colors={}
+    for row in rows:
+        wcg,plant,ic,line,model,gen,style,fa,qty = row[:9]
+        color = row[9] if len(row)>9 else None      # 10번째 컬럼=대표색(있으면)
         dng=dong(wcg) or plant
         key=(dng,plant,ic,line,(model or " ").strip(),(gen or " ").strip(),style)
         table.setdefault(key,{})[fa]=table.setdefault(key,{}).get(fa,0)+(qty or 0)
+        if color and style not in colors: colors[style]=color
     out=[]
     for key,dd in table.items():
         cells=[dd.get(bd,0) for bd in bdates]; total=sum(cells)
         if total<=0: continue
         dng,plant,ic,line,model,gen,style=key
-        color,spray,pad=color_specs(plant,style,ic)
+        _c,spray,pad=color_specs(plant,style,ic)     # spray/pad 는 아직 빈칸(후크)
+        color=_clean_color(colors.get(style))
         out.append({"dong":dng,"ic":ic,"line":line,"model":model,"style":style,"color":color,
                     "spray":spray,"pad":pad,"gen":gen,"cells":cells,"total":total,"issue":"",
                     "scan_bem":scan_map.get((plant,line,style),0),"scan_di":scan_di_ckp(plant,line,style)})
