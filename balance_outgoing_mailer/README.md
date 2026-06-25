@@ -1,14 +1,61 @@
 # CS-MES · BALANCE OUTGOING 일일 자동발송
 
 창신 MES(Oracle DB)에서 **밑창 미드솔(IP·PH) + 아웃솔(OS)의 "출고 부족분(BALANCE OUTGOING)"** 을
-매일 아침 자동으로 조회하여, **원본 엑셀 리포트와 똑같은 양식**으로 만들어 **사내/지정 메일로 자동 발송**하는
-독립 실행형 프로그램입니다.
+조회하여 **원본 엑셀 리포트와 똑같은 양식**으로 만들어 **메일로 발송**합니다.
 
-> 순수 Python이라 **Claude·특정 계정과 무관**합니다. 어느 PC/서버든 올려서 OS 스케줄러로 매일 돌리면 됩니다.
+**두 가지 사용 경로가 있습니다:**
+- 🅰 **Claude Desktop (권장·현직자용)** — 챗에 "오늘 outgoing 리포트 보내줘" 한마디. 로컬 MCP 서버 + sqlcl + Zapier로 동작. **터미널·SMTP·월렛 비번 불필요.** → 아래 0장.
+- 🅱 **무인 서버/스케줄러** — 순수 Python(SMTP)으로 매일 08:00 자동발송. → 1장 이하.
 
 ---
 
-## 1. 동작 흐름 (Workflow)
+## 0. Claude Desktop에서 쓰기 (권장)
+
+DB 접속은 Claude Desktop에 이미 연결된 **sqlcl MCP**(자동로그인 월렛)가 맡고,
+**리포트 생성 MCP 서버**(`report_only_mcp.py`)가 원본 양식 엑셀만 만듭니다(메일 발송 안 함).
+발송은 **Zapier(Gmail)** 로 합니다. → python-oracledb·월렛 비번·Instant Client·SMTP 전부 불필요.
+
+```mermaid
+flowchart LR
+    U["챗: 오늘 리포트 보내줘"] --> Q["report MCP: outgoing_query_plan"]
+    Q --> S["sqlcl MCP: SQL 실행(CSV/JSON)"]
+    S --> B["report MCP: build_outgoing_report<br/>→ report/ 저장 + 공유링크"]
+    B --> Z["Zapier(Gmail): 요약 + 링크 발송"]
+```
+
+**MCP 서버 3개 툴:** `outgoing_query_plan`(날짜창 SQL) · `build_outgoing_report`(sqlcl 결과→엑셀) · `make_demo_report`(DB 없이 데모).
+
+**설치 (1회):**
+
+```bash
+# (1) 리포트 생성기용 가상환경 + 라이브러리 (DB 불필요: openpyxl, mcp 만)
+cd "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/CS-MES/balance_outgoing_mailer"
+rm -rf .venv && python3 -m venv .venv
+.venv/bin/python -m pip install -q --upgrade pip
+.venv/bin/python -m pip install -q openpyxl mcp
+```
+
+**(2) Claude Desktop에 MCP 서버 등록** — 설정 → 개발자 → 설정 편집(`claude_desktop_config.json`)에 추가:
+
+```json
+{
+  "mcpServers": {
+    "balance-outgoing": {
+      "command": "/Users/nicklee/Library/CloudStorage/OneDrive-postech.ac.kr/CS-MES/balance_outgoing_mailer/.venv/bin/python",
+      "args": ["/Users/nicklee/Library/CloudStorage/OneDrive-postech.ac.kr/CS-MES/balance_outgoing_mailer/report_only_mcp.py"]
+    }
+  }
+}
+```
+
+**(3) Claude Desktop 재시작** → sqlcl·Zapier도 연결돼 있으면 끝. 챗에 **"오늘 outgoing 리포트 만들어서 메일 보내줘"** 하면:
+`query_plan → sqlcl 실행 → build_outgoing_report(엑셀 `report/` 저장) → Zapier Gmail 발송(요약+공유링크)` 순으로 진행됩니다.
+
+> 리포트는 OneDrive `report/` 폴더에 쌓이고, 메일 본문엔 공유 링크(`config.ini [report] share_link`)가 들어갑니다.
+
+---
+
+## 1. 동작 흐름 (Workflow) — 무인 서버 경로(SMTP)
 
 ```mermaid
 flowchart TD

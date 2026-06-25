@@ -100,6 +100,13 @@ def dong(wcg):
     m=re.match(r"[A-Za-z]+",(wcg or "").strip())
     return m.group(0) if m else (wcg or "").strip()
 
+def report_dir(cfg):
+    """생성된 리포트 저장 폴더. 기본 = 스크립트 상위의 report/ (OneDrive 공유 폴더)."""
+    d=cfg.get("report","output_dir",fallback="").strip()
+    d=os.path.abspath(d) if d else os.path.abspath(os.path.join(HERE,"..","report"))
+    os.makedirs(d,exist_ok=True)
+    return d
+
 def db_connect(cfg):
     import oracledb
     mode=cfg.get("db","mode",fallback="thin").strip().lower()       # thin(기본) | thick(자동로그인)
@@ -311,8 +318,11 @@ def send_mail(cfg, xlsx_path, summary, today_str):
     if not recips: sys.exit("[설정오류] recipients 비어 있음")
     msg=EmailMessage(); msg["Subject"]=f"[BALANCE OUTGOING] {today_str} 밑창 출고 부족분 (미드솔·아웃솔)"
     msg["From"]=sender; msg["To"]=", ".join(recips)
+    link=cfg.get("report","share_link",fallback="").strip()
+    link_line=f"\n📎 리포트 폴더(엑셀 다운로드): {link}\n" if link else ""
     msg.set_content("안녕하십니까.\n\n"
         f"{today_str} 기준 밑창 출고 부족분(BALANCE OUTGOING)을 첨부드립니다. (라이브 DB 자동생성)\n\n{summary}\n"
+        f"{link_line}"
         "· 시트: IP(미드솔 IP사출) / PH(미드솔 파일론) / OS(아웃솔)\n"
         "· COLOR / IP SPRAY / PAD PRINTING / SCAN DI CKP 는 현재 DB에 데이터가 없어 빈칸입니다.\n\n자동 발송 메일입니다.\n")
     with open(xlsx_path,"rb") as f:
@@ -542,7 +552,7 @@ def main():
         data=make_demo_data(buckets)
         body="[DEMO 데이터] DB 미연동 상태에서 전체 흐름(리포트 생성→메일 발송)을 시연합니다.\n\n"+build_body_summary(data)
         wb=build_workbook(data,buckets,today,today_str)
-        out=os.path.join(HERE,f"BALANCE_OUTGOING_DEMO_{today.strftime('%Y%m%d')}.xlsx"); wb.save(out)
+        out=os.path.join(report_dir(cfg),f"BALANCE_OUTGOING_DEMO_{today.strftime('%Y%m%d')}.xlsx"); wb.save(out)
         LOG.info(f"DEMO Excel 생성: {out}"); print(body)
         if a.dry_run: print("\n--dry-run: 발송 생략 (엑셀만 생성)"); return
         ensure_password(cfg,a.config,"smtp","SMTP(메일) password")
@@ -595,7 +605,7 @@ def main():
     # --- 엑셀 생성 ---
     try:
         wb=build_workbook(data,buckets,today,today_str)
-        out=os.path.join(HERE,f"BALANCE_OUTGOING_{today.strftime('%Y%m%d')}.xlsx"); wb.save(out)
+        out=os.path.join(report_dir(cfg),f"BALANCE_OUTGOING_{today.strftime('%Y%m%d')}.xlsx"); wb.save(out)
     except Exception as e:
         LOG.error(f"엑셀 생성 실패: {e}")
         if notify: send_failure_mail(cfg,f"엑셀 생성 실패: {e}",today_str)

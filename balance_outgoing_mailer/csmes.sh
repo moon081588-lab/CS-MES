@@ -16,11 +16,11 @@ PY="$DIR/.venv/bin/python"
 if [ ! -x "$PY" ]; then echo "[setup] 가상환경(.venv) 생성..."; python3 -m venv "$DIR/.venv" 2>/dev/null || true; fi
 if [ -x "$PY" ]; then PIPFLAGS=""; else PY="python3"; PIPFLAGS="--break-system-packages --user"; fi
 
-# 2) 라이브러리
-if ! "$PY" -c "import oracledb, openpyxl" 2>/dev/null; then
-  echo "[setup] 라이브러리 설치 (oracledb, openpyxl)..."
+# 2) 라이브러리 (oracledb=SMTP경로 / openpyxl=엑셀 / mcp=Claude Desktop MCP서버)
+if ! "$PY" -c "import oracledb, openpyxl, mcp" 2>/dev/null; then
+  echo "[setup] 라이브러리 설치 (oracledb, openpyxl, mcp)..."
   "$PY" -m pip install --quiet --upgrade pip $PIPFLAGS 2>/dev/null || true
-  "$PY" -m pip install --quiet $PIPFLAGS oracledb openpyxl
+  "$PY" -m pip install --quiet $PIPFLAGS oracledb openpyxl mcp
 fi
 
 # 3) Oracle Instant Client (thick 자동로그인) — 없으면 brew 로 설치, lib 경로 탐지
@@ -79,6 +79,8 @@ c["smtp"].setdefault("user","moon081588@gmail.com"); c["smtp"].setdefault("passw
 c["report"].setdefault("plants","3110,3120,3210")
 c["report"].setdefault("window_before","3"); c["report"].setdefault("window_after","7")
 c["report"].setdefault("recipients","moon081588@gmail.com, idea.seahsteel@gmail.com")
+c["report"].setdefault("output_dir","")   # 비우면 코드 기본값 ../report (=CS-MES/report) 사용
+c["report"].setdefault("share_link","https://postechackr-my.sharepoint.com/:f:/g/personal/nicklee100_postech_ac_kr/IgCe7BW9lHo3TIFhzzd6zFlcASay4Xr5YJBD-pv0uvV3VrY?e=dDpxts")
 with open(p,"w",encoding="utf-8") as f: c.write(f)
 try: os.chmod(p,0o600)
 except Exception: pass

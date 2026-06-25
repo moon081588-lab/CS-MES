@@ -1,0 +1,9 @@
+report/
+balance_outgoing_mailer/wallet/
+balance_outgoing_mailer/config.ini
+balance_outgoing_mailer/.venv/
+balance_outgoing_mailer/*.log
+balance_outgoing_mailer/BALANCE_OUTGOING_*.xlsx
+**/__pycache__/
+.DS_Store
+**/.DS_Store
