@@ -36,6 +36,13 @@ def retry(fn, tries=3, delay=5, label="작업"):
 def load_config(path):
     cp = configparser.ConfigParser(interpolation=None)   # 비밀번호의 % 등 특수문자 안전
     if not cp.read(path, encoding="utf-8"): sys.exit(f"[설정오류] config 없음: {path}")
+    # 값 뒤에 붙은 인라인 주석(;) 자동 제거 → 'window_before = 3   ; 설명' 같은 입력도 OK.
+    # 단 비밀번호 계열은 값에 ;가 포함될 수 있어 건드리지 않음.
+    KEEP = {"password", "wallet_password"}
+    for sec in cp.sections():
+        for k, v in cp[sec].items():
+            if k not in KEEP and v and ";" in v:
+                cp[sec][k] = v.split(";", 1)[0].strip()
     return cp
 
 def save_password(path, section, value, key="password"):
