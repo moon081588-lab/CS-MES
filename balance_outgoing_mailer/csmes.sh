@@ -80,6 +80,9 @@ c["report"].setdefault("plants","3110,3120,3210")
 c["report"].setdefault("window_before","3"); c["report"].setdefault("window_after","7")
 c["report"].setdefault("recipients","moon081588@gmail.com, idea.seahsteel@gmail.com")
 c["report"].setdefault("output_dir","")   # 비우면 코드 기본값 ../report (=CS-MES/report) 사용
+# 미출고 판정: false=임시(OCI 미동기화 대비, 데이터 나옴) / true=GMES 정식(엄격 closing+MOVE EXISTS).
+# OCI에 MOVE 실적 + MSPD_PROD_GROUP 동기화 완료되면 true 로 바꿀 것.
+c["report"].setdefault("strict_outgoing","false")
 c["report"].setdefault("share_link","https://postechackr-my.sharepoint.com/:f:/g/personal/nicklee100_postech_ac_kr/IgCe7BW9lHo3TIFhzzd6zFlcASay4Xr5YJBD-pv0uvV3VrY?e=dDpxts")
 with open(p,"w",encoding="utf-8") as f: c.write(f)
 try: os.chmod(p,0o600)

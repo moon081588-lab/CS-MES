@@ -144,31 +144,75 @@ def db_connect(cfg):
     LOG.info(f"DB 접속: mode={mode} dsn={kw['dsn']} wallet={'Y' if wdir else 'N'}")
     return oracledb.connect(**kw)
 
-def fetch_sheet(conn, families, plants, d_from, d_to):
-    fam=",".join(f":f{i}" for i in range(len(families))); pl=",".join(f":p{i}" for i in range(len(plants)))
-    sql=f"""
-      SELECT NVL(w.wc_group_cd,' ') wcg, r.plant_cd, r.item_class, r.fa_wc_cd,
-             NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, r.style_cd, r.fa_date, SUM(r.pcard_qty) qty,
-             MAX(cc.mcs_color_cd) color
-      FROM OCI.MSPD_PCARD_RESULT r
-      LEFT JOIN OCI.MSBS_ITEM_STYLE  i ON i.style_cd=r.style_cd
-      LEFT JOIN OCI.MSBS_WORK_CENTER w ON w.plant_cd=r.plant_cd AND w.wc_cd=r.fa_wc_cd
-      LEFT JOIN (   /* style_cd 별 대표색(NONE 제외 최빈) — BATCH_PLAN.MCS_COLOR_CD */
-        SELECT style_cd, mcs_color_cd FROM (
-          SELECT style_cd, mcs_color_cd,
-                 ROW_NUMBER() OVER (PARTITION BY style_cd
-                     ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn
-          FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL
-          GROUP BY style_cd, mcs_color_cd
-        ) WHERE rn=1
-      ) cc ON cc.style_cd=r.style_cd
-      WHERE r.prod_move_type='PROD' AND r.end_routing_yn='Y' AND r.out_date='19991231'
-        AND r.item_class_type IN ({fam}) AND r.plant_cd IN ({pl})
-        AND r.fa_date BETWEEN :d_from AND :d_to
-        AND NOT EXISTS (SELECT 1 FROM OCI.MSPD_PROD_GROUP g
-                         WHERE g.prod_group_no=r.prod_group_no AND g.plant_cd=r.plant_cd AND g.closing_yn='Y')
-      GROUP BY w.wc_group_cd, r.plant_cd, r.item_class, r.fa_wc_cd, i.model_name, i.gender, r.style_cd, r.fa_date
+_COLOR_JOIN = (   # style_cd 별 대표색(NONE 제외 최빈) — BATCH_PLAN.MCS_COLOR_CD
+    "LEFT JOIN (SELECT style_cd, mcs_color_cd FROM ("
+    "  SELECT style_cd, mcs_color_cd, ROW_NUMBER() OVER (PARTITION BY style_cd"
+    "    ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn"
+    "  FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL GROUP BY style_cd, mcs_color_cd"
+    ") WHERE rn=1) cc ON cc.style_cd=o.style_cd"
+)
+
+def fetch_sheet(conn, families, plants, d_from, d_to, strict=True):
+    """미출고 부족분 조회.
+    strict=True  : GMES 정식 프로시저 P_MSPD90000S_Q_V14 'O'(Outgoing) 분기와 동일 로직
+                   (엄격 CLOSING_YN='N' + '다른 창고로 나가는 MOVE 존재' EXISTS). OCI 동기화 전제.
+    strict=False : OCI 미동기화 임시용(느슨한 마감, EXISTS 생략). 데이터가 덜 동기화돼도 산출.
+    반환: (wcg, plant, item_class, fa_wc, model, gen, style, fa_date, qty, color)
     """
+    fam=",".join(f":f{i}" for i in range(len(families))); pl=",".join(f":p{i}" for i in range(len(plants)))
+    if strict:
+        sql=f"""
+          SELECT NVL(w2.wc_group_cd,' ') wcg, o.plant_cd, o.item_class, o.fa_wc_cd,
+                 NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, o.style_cd, o.fa_date,
+                 SUM(o.out_qty) qty, MAX(cc.mcs_color_cd) color
+          FROM (
+            SELECT R.FA_WC_CD, R.ITEM_CLASS, R.FA_DATE, R.STYLE_CD, R.PLANT_CD,
+                   R.PLAN_PROD_WC_CD, R.PROD_GROUP_NO, SUM(R.PCARD_QTY) out_qty
+            FROM OCI.MSPD_PCARD_RESULT R
+            WHERE R.FA_DATE BETWEEN :d_from AND :d_to
+              AND R.PLANT_CD IN ({pl}) AND R.PROD_MOVE_TYPE='PROD'
+              AND R.ITEM_CLASS_TYPE IN ({fam})
+              AND R.PROD_GROUP_NO IN (SELECT PROD_GROUP_NO FROM OCI.MSPD_PROD_GROUP WHERE CLOSING_YN='N')
+              AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231'
+            GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PLAN_PROD_WC_CD,R.PROD_GROUP_NO
+            HAVING SUM(R.PCARD_QTY)>0
+          ) o
+          JOIN OCI.MSBS_WORK_CENTER w  ON o.plant_cd=w.plant_cd AND o.plan_prod_wc_cd=w.wc_cd
+          LEFT JOIN OCI.MSBS_ITEM_STYLE i ON i.style_cd=o.style_cd
+          LEFT JOIN OCI.MSBS_WORK_CENTER w2 ON w2.plant_cd=o.plant_cd AND w2.wc_cd=o.fa_wc_cd
+          {_COLOR_JOIN}
+          WHERE EXISTS (SELECT 1 FROM OCI.MSPD_PCARD_RESULT I
+                          JOIN OCI.MSBS_WORK_CENTER WC ON I.PLANT_CD=WC.PLANT_CD AND I.PLAN_PROD_WC_CD=WC.WC_CD
+                         WHERE I.PROD_GROUP_NO=o.PROD_GROUP_NO AND I.ITEM_CLASS=o.ITEM_CLASS
+                           AND I.PROD_MOVE_TYPE='MOVE' AND I.END_ROUTING_YN='Y'
+                           AND WC.BASE_WH_CD<>w.BASE_WH_CD)
+          GROUP BY NVL(w2.wc_group_cd,' '), o.plant_cd, o.item_class, o.fa_wc_cd,
+                   NVL(i.model_name,' '), NVL(i.gender,' '), o.style_cd, o.fa_date
+        """
+    else:
+        sql=f"""
+          SELECT NVL(w.wc_group_cd,' ') wcg, o.plant_cd, o.item_class, o.fa_wc_cd,
+                 NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, o.style_cd, o.fa_date,
+                 SUM(o.out_qty) qty, MAX(cc.mcs_color_cd) color
+          FROM (
+            SELECT R.FA_WC_CD, R.ITEM_CLASS, R.FA_DATE, R.STYLE_CD, R.PLANT_CD, R.PROD_GROUP_NO,
+                   SUM(R.PCARD_QTY) out_qty
+            FROM OCI.MSPD_PCARD_RESULT R
+            WHERE R.FA_DATE BETWEEN :d_from AND :d_to
+              AND R.PLANT_CD IN ({pl}) AND R.PROD_MOVE_TYPE='PROD'
+              AND R.ITEM_CLASS_TYPE IN ({fam})
+              AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231'
+              AND NOT EXISTS (SELECT 1 FROM OCI.MSPD_PROD_GROUP g
+                               WHERE g.prod_group_no=R.prod_group_no AND g.plant_cd=R.plant_cd AND g.closing_yn='Y')
+            GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PROD_GROUP_NO
+            HAVING SUM(R.PCARD_QTY)>0
+          ) o
+          LEFT JOIN OCI.MSBS_ITEM_STYLE i ON i.style_cd=o.style_cd
+          LEFT JOIN OCI.MSBS_WORK_CENTER w ON w.plant_cd=o.plant_cd AND w.wc_cd=o.fa_wc_cd
+          {_COLOR_JOIN}
+          GROUP BY NVL(w.wc_group_cd,' '), o.plant_cd, o.item_class, o.fa_wc_cd,
+                   NVL(i.model_name,' '), NVL(i.gender,' '), o.style_cd, o.fa_date
+        """
     b={f"f{i}":v for i,v in enumerate(families)}; b.update({f"p{i}":v for i,v in enumerate(plants)})
     b.update({"d_from":d_from,"d_to":d_to})
     cur=conn.cursor(); cur.execute(sql,b); rows=cur.fetchall(); cur.close(); return rows
@@ -614,11 +658,13 @@ def main():
         finally: conn.close()
         return
     # --- 조회·집계 ---
+    strict=cfg.getboolean("report","strict_outgoing",fallback=True)   # 정식 GMES 로직(엄격) / OCI 동기화 전제
+    LOG.info(f"미출고 판정: {'정식(strict)' if strict else '임시(loose)'}")
     try:
         data={}
         sm=fetch_scan_bembep(conn,plants,d_from,d_to)
         for name,fams in SHEETS:
-            pv=pivot(fetch_sheet(conn,fams,plants,d_from,d_to),buckets,sm); data[name]=pv
+            pv=pivot(fetch_sheet(conn,fams,plants,d_from,d_to,strict=strict),buckets,sm); data[name]=pv
             LOG.info(f"{name}: {len(pv)}행 잔량 {sum(r['total'] for r in pv):,}")
     except Exception as e:
         LOG.error(f"조회/집계 실패: {e}")

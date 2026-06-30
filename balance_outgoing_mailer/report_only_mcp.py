@@ -46,26 +46,53 @@ def _today(s):
 def _inlist(vals):
     return ",".join("'" + v + "'" for v in vals)
 
-def _sheet_sql(families, plants, d_from, d_to):
-    """원본 fetch_sheet 의 SQL을 리터럴로 인라인 (sqlcl 에 그대로 실행)."""
+_COLOR_JOIN = (
+    "LEFT JOIN (SELECT style_cd, mcs_color_cd FROM ("
+    " SELECT style_cd, mcs_color_cd, ROW_NUMBER() OVER (PARTITION BY style_cd "
+    " ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn "
+    " FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL GROUP BY style_cd, mcs_color_cd"
+    ") WHERE rn=1) cc ON cc.style_cd=o.style_cd"
+)
+
+def _sheet_sql(families, plants, d_from, d_to, strict=True):
+    """GMES P_MSPD90000S_Q_V14 'O'(Outgoing) 분기 로직을 리터럴 인라인.
+    strict=True: 엄격 CLOSING_YN='N' + '다른 창고 MOVE 존재' EXISTS (정식, OCI 동기화 전제).
+    strict=False: 느슨한 마감·EXISTS 생략(OCI 미동기화 임시)."""
+    F=_inlist(families); P=_inlist(plants)
+    if strict:
+        return (
+            "SELECT NVL(w2.wc_group_cd,' ') wcg, o.plant_cd, o.item_class, o.fa_wc_cd, "
+            "NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, o.style_cd, o.fa_date, "
+            "SUM(o.out_qty) qty, MAX(cc.mcs_color_cd) color "
+            "FROM (SELECT R.FA_WC_CD, R.ITEM_CLASS, R.FA_DATE, R.STYLE_CD, R.PLANT_CD, R.PLAN_PROD_WC_CD, R.PROD_GROUP_NO, SUM(R.PCARD_QTY) out_qty "
+            "FROM OCI.MSPD_PCARD_RESULT R "
+            f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD IN ({P}) AND R.PROD_MOVE_TYPE='PROD' "
+            f"AND R.ITEM_CLASS_TYPE IN ({F}) "
+            "AND R.PROD_GROUP_NO IN (SELECT PROD_GROUP_NO FROM OCI.MSPD_PROD_GROUP WHERE CLOSING_YN='N') "
+            "AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231' "
+            "GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PLAN_PROD_WC_CD,R.PROD_GROUP_NO HAVING SUM(R.PCARD_QTY)>0) o "
+            "JOIN OCI.MSBS_WORK_CENTER w ON o.plant_cd=w.plant_cd AND o.plan_prod_wc_cd=w.wc_cd "
+            "LEFT JOIN OCI.MSBS_ITEM_STYLE i ON i.style_cd=o.style_cd "
+            "LEFT JOIN OCI.MSBS_WORK_CENTER w2 ON w2.plant_cd=o.plant_cd AND w2.wc_cd=o.fa_wc_cd "
+            + _COLOR_JOIN + " "
+            "WHERE EXISTS (SELECT 1 FROM OCI.MSPD_PCARD_RESULT I JOIN OCI.MSBS_WORK_CENTER WC ON I.PLANT_CD=WC.PLANT_CD AND I.PLAN_PROD_WC_CD=WC.WC_CD "
+            "WHERE I.PROD_GROUP_NO=o.PROD_GROUP_NO AND I.ITEM_CLASS=o.ITEM_CLASS AND I.PROD_MOVE_TYPE='MOVE' AND I.END_ROUTING_YN='Y' AND WC.BASE_WH_CD<>w.BASE_WH_CD) "
+            "GROUP BY NVL(w2.wc_group_cd,' '), o.plant_cd, o.item_class, o.fa_wc_cd, NVL(i.model_name,' '), NVL(i.gender,' '), o.style_cd, o.fa_date"
+        )
     return (
-        "SELECT NVL(w.wc_group_cd,' ') wcg, r.plant_cd, r.item_class, r.fa_wc_cd, "
-        "NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, r.style_cd, r.fa_date, SUM(r.pcard_qty) qty, "
-        "MAX(cc.mcs_color_cd) color "
-        "FROM OCI.MSPD_PCARD_RESULT r "
-        "LEFT JOIN OCI.MSBS_ITEM_STYLE  i ON i.style_cd=r.style_cd "
-        "LEFT JOIN OCI.MSBS_WORK_CENTER w ON w.plant_cd=r.plant_cd AND w.wc_cd=r.fa_wc_cd "
-        "LEFT JOIN (SELECT style_cd, mcs_color_cd FROM ("
-        "  SELECT style_cd, mcs_color_cd, ROW_NUMBER() OVER (PARTITION BY style_cd "
-        "    ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn "
-        "  FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL GROUP BY style_cd, mcs_color_cd"
-        ") WHERE rn=1) cc ON cc.style_cd=r.style_cd "
-        "WHERE r.prod_move_type='PROD' AND r.end_routing_yn='Y' AND r.out_date='19991231' "
-        f"AND r.item_class_type IN ({_inlist(families)}) AND r.plant_cd IN ({_inlist(plants)}) "
-        f"AND r.fa_date BETWEEN '{d_from}' AND '{d_to}' "
-        "AND NOT EXISTS (SELECT 1 FROM OCI.MSPD_PROD_GROUP g "
-        "WHERE g.prod_group_no=r.prod_group_no AND g.plant_cd=r.plant_cd AND g.closing_yn='Y') "
-        "GROUP BY w.wc_group_cd, r.plant_cd, r.item_class, r.fa_wc_cd, i.model_name, i.gender, r.style_cd, r.fa_date"
+        "SELECT NVL(w.wc_group_cd,' ') wcg, o.plant_cd, o.item_class, o.fa_wc_cd, "
+        "NVL(i.model_name,' ') model, NVL(i.gender,' ') gen, o.style_cd, o.fa_date, "
+        "SUM(o.out_qty) qty, MAX(cc.mcs_color_cd) color "
+        "FROM (SELECT R.FA_WC_CD, R.ITEM_CLASS, R.FA_DATE, R.STYLE_CD, R.PLANT_CD, R.PROD_GROUP_NO, SUM(R.PCARD_QTY) out_qty "
+        "FROM OCI.MSPD_PCARD_RESULT R "
+        f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD IN ({P}) AND R.PROD_MOVE_TYPE='PROD' "
+        f"AND R.ITEM_CLASS_TYPE IN ({F}) AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231' "
+        "AND NOT EXISTS (SELECT 1 FROM OCI.MSPD_PROD_GROUP g WHERE g.prod_group_no=R.prod_group_no AND g.plant_cd=R.plant_cd AND g.closing_yn='Y') "
+        "GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PROD_GROUP_NO HAVING SUM(R.PCARD_QTY)>0) o "
+        "LEFT JOIN OCI.MSBS_ITEM_STYLE i ON i.style_cd=o.style_cd "
+        "LEFT JOIN OCI.MSBS_WORK_CENTER w ON w.plant_cd=o.plant_cd AND w.wc_cd=o.fa_wc_cd "
+        + _COLOR_JOIN + " "
+        "GROUP BY NVL(w.wc_group_cd,' '), o.plant_cd, o.item_class, o.fa_wc_cd, NVL(i.model_name,' '), NVL(i.gender,' '), o.style_cd, o.fa_date"
     )
 
 def _scan_sql(plants, d_from, d_to):
@@ -128,6 +155,7 @@ def outgoing_query_plan(date: str = "") -> str:
     date: 'YYYY-MM-DD'(생략 시 오늘). 버킷은 작업일 기준 D+3 … DD … D-7.
     """
     cp, plants, before, after = _settings()
+    strict = cp.getboolean("report", "strict_outgoing", fallback=True)
     today = _today(date)
     buckets = bo.build_buckets(today, before, after)
     d_from = min(b[1] for b in buckets); d_to = max(b[1] for b in buckets)
@@ -136,10 +164,12 @@ def outgoing_query_plan(date: str = "") -> str:
         "date": today.isoformat(),
         "window": {"d_from": d_from, "d_to": d_to, "buckets": [b[0] + ":" + b[1] for b in buckets]},
         "plants": plants,
+        "selection": ("strict(정식 GMES 로직: 엄격 CLOSING_YN='N' + 다른창고 MOVE EXISTS)" if strict
+                      else "loose(OCI 미동기화 임시)"),
         "queries": {
-            "IP":   _sheet_sql(fams["IP"], plants, d_from, d_to),
-            "PH":   _sheet_sql(fams["PH"], plants, d_from, d_to),
-            "OS":   _sheet_sql(fams["OS"], plants, d_from, d_to),
+            "IP":   _sheet_sql(fams["IP"], plants, d_from, d_to, strict),
+            "PH":   _sheet_sql(fams["PH"], plants, d_from, d_to, strict),
+            "OS":   _sheet_sql(fams["OS"], plants, d_from, d_to, strict),
             "SCAN": _scan_sql(plants, d_from, d_to),
         },
         "next": ("각 SQL을 sqlcl 로 실행(권장: run-sqlcl 에 'set sqlformat csv' 붙여 CSV; JSON도 됨). "

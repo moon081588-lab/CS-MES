@@ -141,6 +141,23 @@ source ~/.zshrc
 
 ---
 
+## 3-1. 미출고 판정 로직 (GMES 정식 vs 임시) — `config [report] strict_outgoing`
+
+GMES 정식 프로시저 `P_MSPD90000S_Q_V14`의 'O'(Outgoing) 분기 로직을 그대로 반영했습니다.
+
+| 모드 | 조건 | 사용 시점 |
+|---|---|---|
+| `strict_outgoing = true` (정식) | 미출고(`OUT_DATE='19991231'`)+`END_ROUTING_YN='Y'`+엄격 `CLOSING_YN='N'` **+ "같은 group·class의 MOVE 실적이 다른 창고(BASE_WH_CD)로 존재"** EXISTS, 색상 `MCS_COLOR` | **OCI 스키마 동기화 완료 후** — GMES 리포트와 정확히 일치 |
+| `strict_outgoing = false` (임시·기본) | 미출고+`END_ROUTING_YN='Y'`+느슨한 마감(닫힌 그룹만 제외) | 동기화 전 임시 — 데이터는 나오지만 다소 과다 집계 |
+
+> ⚠️ **`strict_outgoing = true` 를 쓰려면 OCI 스키마에 아래 2가지가 동기화되어야 합니다** (현재 미동기화 → true 로 두면 0건 출력):
+> 1. **MOVE 실적** — `MSPD_PCARD_RESULT` 의 `PROD_MOVE_TYPE='MOVE'` 행 (현재 최근 분 0건)
+> 2. **`MSPD_PROD_GROUP`** — 최근 생산그룹 + `CLOSING_YN` (현재 최근 그룹 미반영)
+>
+> (참고: `PLAN_PROD_WC_CD`·`MSBS_WORK_CENTER.BASE_WH_CD` 는 이미 정상.) IT/현업에 위 2개 동기화 요청 → 완료되면 `config.ini` 에서 `strict_outgoing = true` 한 줄만 바꾸면 GMES와 동일해집니다.
+
+---
+
 ## 4. 현재 구현 상태
 
 | 워크플로우 단계 | 상태 | 비고 |
