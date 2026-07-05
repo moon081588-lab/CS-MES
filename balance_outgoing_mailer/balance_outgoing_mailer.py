@@ -8,8 +8,9 @@ Changshin GMES — BALANCE OUTGOING 일일 자동발송 (독립 실행형)
 X=TOTAL · Y=ISSUE · Z=SCAN BEM/BEP · AA=SCAN DI CKP, 동(棟) 세로병합, GRAND TOTAL) 생성하여
 사내 SMTP로 발송한다. Claude/계정 무관 순수 Python. OS 스케줄러로 매일 08:00 실행.
 
-[데이터 한계] COLOR / IP SPRAY(BEM) / PAD PRINTING(BEP) / SCAN DI CKP 는 현재 Oracle DB(OCI)에
-데이터가 없어 빈칸으로 출력된다. 소스 확보 시 color_specs()/scan_di_ckp() 한 곳만 채우면 자동 반영.
+[채움 상태] COLOR = OCI.MSPD_BATCH_PLAN.MCS_COLOR_CD, SCAN BEM/BEP = OCI.POP_PCARD_SCAN(op BEM/BEP)
+로 자동 채워진다. IP SPRAY(BEM) / PAD PRINTING(BEP) / SCAN DI CKP 는 소스(조인키) 미확인으로 아직
+빈칸이며, 확인되면 color_specs()/scan_di_ckp() 한 곳만 채우면 자동 반영된다.
 
 필요 패키지:  pip install oracledb openpyxl
 사용:  python balance_outgoing_mailer.py [--dry-run | --test-db | --config 경로.ini]
@@ -172,7 +173,7 @@ def fetch_sheet(conn, families, plants, d_from, d_to, strict=True):
             WHERE R.FA_DATE BETWEEN :d_from AND :d_to
               AND R.PLANT_CD IN ({pl}) AND R.PROD_MOVE_TYPE='PROD'
               AND R.ITEM_CLASS_TYPE IN ({fam})
-              AND R.PROD_GROUP_NO IN (SELECT PROD_GROUP_NO FROM OCI.MSPD_PROD_GROUP WHERE CLOSING_YN='N')
+              AND (R.PROD_GROUP_NO, R.PLANT_CD) IN (SELECT PROD_GROUP_NO, PLANT_CD FROM OCI.MSPD_PROD_GROUP WHERE CLOSING_YN='N')
               AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231'
             GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PLAN_PROD_WC_CD,R.PROD_GROUP_NO
             HAVING SUM(R.PCARD_QTY)>0
@@ -394,7 +395,7 @@ def send_mail(cfg, xlsx_path, summary, today_str):
         f"{today_str} 기준 밑창 출고 부족분(BALANCE OUTGOING)을 첨부드립니다. (라이브 DB 자동생성)\n\n{summary}\n"
         f"{link_line}"
         "· 시트: IP(미드솔 IP사출) / PH(미드솔 파일론) / OS(아웃솔)\n"
-        "· COLOR / IP SPRAY / PAD PRINTING / SCAN DI CKP 는 현재 DB에 데이터가 없어 빈칸입니다.\n\n자동 발송 메일입니다.\n")
+        "· COLOR·SCAN BEM/BEP 는 자동 채움. IP SPRAY / PAD PRINTING / SCAN DI CKP 는 소스 확인 전이라 빈칸입니다.\n\n자동 발송 메일입니다.\n")
     with open(xlsx_path,"rb") as f:
         msg.add_attachment(f.read(),maintype="application",
             subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",filename=os.path.basename(xlsx_path))

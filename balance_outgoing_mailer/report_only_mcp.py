@@ -68,7 +68,7 @@ def _sheet_sql(families, plants, d_from, d_to, strict=True):
             "FROM OCI.MSPD_PCARD_RESULT R "
             f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD IN ({P}) AND R.PROD_MOVE_TYPE='PROD' "
             f"AND R.ITEM_CLASS_TYPE IN ({F}) "
-            "AND R.PROD_GROUP_NO IN (SELECT PROD_GROUP_NO FROM OCI.MSPD_PROD_GROUP WHERE CLOSING_YN='N') "
+            "AND (R.PROD_GROUP_NO, R.PLANT_CD) IN (SELECT PROD_GROUP_NO, PLANT_CD FROM OCI.MSPD_PROD_GROUP WHERE CLOSING_YN='N') "
             "AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231' "
             "GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PLAN_PROD_WC_CD,R.PROD_GROUP_NO HAVING SUM(R.PCARD_QTY)>0) o "
             "JOIN OCI.MSBS_WORK_CENTER w ON o.plant_cd=w.plant_cd AND o.plan_prod_wc_cd=w.wc_cd "
