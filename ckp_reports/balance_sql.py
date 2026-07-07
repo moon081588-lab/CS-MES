@@ -99,13 +99,15 @@ def shortage_bydate_sql(ict_list, div, d_from, d_to, loose=True):
     )
 
 # 공식 번호 → (설명, 함수, ICT, DIV)
+# [원본 item class 범위 검증 2026-07-07] 원본 시트 Item Class 계열 대조 결과 반영:
+#   IP Prod(#7)=II만, IP Outgoing(#8)=II+IP, CMP(#11)=CP, Outgoing PH(#12)=PH+PP, PH in Market(#15)=PH+PP.
 REPORTS = {
-    "2":  ("3-1. Balance IP Production",       shortage_bydate_sql, ["II", "IP"],       "Production"),
-    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II", "IP"],       "Production"),
-    "4":  ("3-2. Balance IP Outgoing by size", shortage_bysize_sql, ["II", "IP"],       "Outgoing"),
-    "7":  ("3-1. Balance CMP",                 shortage_bydate_sql, ["CP"],             "Production"),
-    "8":  ("3-1. Balance Outgoing PH",         shortage_bydate_sql, ["PH", "PP"],       "Outgoing"),
-    "11": ("3-2. Balance PH in Market PH by",  shortage_bysize_sql, ["PH", "PP", "CP"], "Production"),
+    "2":  ("3-1. Balance IP Production",       shortage_bydate_sql, ["II"],       "Production"),
+    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II"],       "Production"),
+    "4":  ("3-2. Balance IP Outgoing by size", shortage_bysize_sql, ["II", "IP"], "Outgoing"),
+    "7":  ("3-1. Balance CMP",                 shortage_bydate_sql, ["CP"],       "Production"),
+    "8":  ("3-1. Balance Outgoing PH",         shortage_bydate_sql, ["PH", "PP"], "Outgoing"),
+    "11": ("3-2. Balance PH in Market PH by",  shortage_bysize_sql, ["PH", "PP"], "Production"),
 }
 # No.5 (3-3. Balance IP Outgoing Market) 의 SQL 은 balance_outgoing_mailer.fetch_sheet /
 # report_only_mcp._sheet_sql 에 있음(동일 엔진, 동(棟)·라인·일자버킷 양식).
