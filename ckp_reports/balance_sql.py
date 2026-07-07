@@ -81,9 +81,9 @@ def shortage_bysize_sql(ict_list, div, d_from, d_to, loose=True):
     return (
         "WITH " + _filt(ict_list, div, d_from, d_to, loose, with_size=True) + ", " + _COLOR_CTES + " "
         "SELECT F.FA_WC_CD LINE,S.MODEL_NAME,F.STYLE_CD,F.ITEM_CLASS," + _COLOR_EXPR + " MCS_COLOR,"
-        f"F.FA_DATE,'{div}' DIV,F.SIZE_CD,SUM(F.PCARD_QTY) QTY "
+        f"F.FA_DATE,'{div}' DIV,NVL(S.GENDER,' ') GEN,F.SIZE_CD,SUM(F.PCARD_QTY) QTY "
         "FROM FILT F LEFT JOIN OCI.MSBS_ITEM_STYLE S ON S.STYLE_CD=F.STYLE_CD " + _COLOR_JOINS + " "
-        "GROUP BY F.FA_WC_CD,S.MODEL_NAME,F.STYLE_CD,F.ITEM_CLASS," + _COLOR_EXPR + ",F.FA_DATE,F.SIZE_CD "
+        "GROUP BY F.FA_WC_CD,S.MODEL_NAME,F.STYLE_CD,F.ITEM_CLASS," + _COLOR_EXPR + ",F.FA_DATE,NVL(S.GENDER,' '),F.SIZE_CD "
         "HAVING SUM(F.PCARD_QTY)>0 ORDER BY LINE,STYLE_CD,ITEM_CLASS,FA_DATE,SIZE_CD"
     )
 

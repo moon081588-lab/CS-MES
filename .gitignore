@@ -11,3 +11,6 @@ balance_outgoing_mailer/BALANCE_OUTGOING_*.xlsx
 # CKP 리포트 데이터(커밋 제외, 코드만 관리)
 ckp_reports/*.csv
 ckp_reports/*.xlsx
+
+# 생성 SQL/CSV(코드에서 재생성)
+ckp_reports/sql/
