@@ -34,11 +34,12 @@ PLANT = "3120"  # CKP 고정
 def _inlist(vals):
     return ",".join("'" + v + "'" for v in vals)
 
-def _date_pred(div):
-    # DIV=Production → 미생산(PROD_DATE), Outgoing → 미출고(OUT_DATE). 둘 다 END_ROUTING='Y'.
+def _date_pred(div, er="Y"):
+    # DIV=Production → 미생산(PROD_DATE), Outgoing → 미출고(OUT_DATE).
+    # er = END_ROUTING_YN: 'Y'=AFTER SCAN UV(마지막공정), 'N'=BEFORE UV(공정 진행중, 예: PHYLON PRESS).
     if div == "Outgoing":
-        return "R.OUT_DATE='19991231' AND R.END_ROUTING_YN='Y'"
-    return "R.PROD_DATE='19991231' AND R.END_ROUTING_YN='Y'"
+        return f"R.OUT_DATE='19991231' AND R.END_ROUTING_YN='{er}'"
+    return f"R.PROD_DATE='19991231' AND R.END_ROUTING_YN='{er}'"
 
 def _closing_pred(loose):
     if loose:
@@ -65,21 +66,21 @@ _COLOR_EXPR = ("CASE WHEN SUBSTR(F.ITEM_CLASS,1,2)='FS' THEN NULL "
 _COLOR_JOINS = ("LEFT JOIN GC_EXACT E ON E.PROD_GROUP_NO=F.PROD_GROUP_NO AND E.PARENT_ITEM_CD=F.ITEM_CD "
                 "LEFT JOIN GC_STYLE ST ON ST.STYLE_NOHYPHEN=REPLACE(F.STYLE_CD,'-','')")
 
-def _filt(ict_list, div, d_from, d_to, loose, with_size):
+def _filt(ict_list, div, d_from, d_to, loose, with_size, er="Y"):
     cols = "R.FA_WC_CD,R.STYLE_CD,R.ITEM_CD,R.PROD_GROUP_NO,R.ITEM_CLASS,R.ITEM_CLASS_TYPE,R.FA_DATE,R.PCARD_QTY"
     if with_size:
         cols = "R.FA_WC_CD,R.STYLE_CD,R.ITEM_CD,R.PROD_GROUP_NO,R.ITEM_CLASS,R.ITEM_CLASS_TYPE,R.FA_DATE,R.SIZE_CD,R.PCARD_QTY"
     return (
         f"FILT AS (SELECT {cols} FROM OCI.MSPD_PCARD_RESULT R "
         f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD='{PLANT}' "
-        f"AND R.PROD_MOVE_TYPE='PROD' AND {_date_pred(div)} "
+        f"AND R.PROD_MOVE_TYPE='PROD' AND {_date_pred(div, er)} "
         f"AND R.ITEM_CLASS_TYPE IN ({_inlist(ict_list)}) AND {_closing_pred(loose)})"
     )
 
-def shortage_bysize_sql(ict_list, div, d_from, d_to, loose=True):
+def shortage_bysize_sql(ict_list, div, d_from, d_to, loose=True, er="Y"):
     """No.3/4/11 — 사이즈별(by size). 반환: LINE,MODEL_NAME,STYLE_CD,ITEM_CLASS,MCS_COLOR,FA_DATE,DIV,SIZE_CD,QTY"""
     return (
-        "WITH " + _filt(ict_list, div, d_from, d_to, loose, with_size=True) + ", " + _COLOR_CTES + " "
+        "WITH " + _filt(ict_list, div, d_from, d_to, loose, with_size=True, er=er) + ", " + _COLOR_CTES + " "
         "SELECT F.FA_WC_CD LINE,S.MODEL_NAME,F.STYLE_CD,F.ITEM_CLASS," + _COLOR_EXPR + " MCS_COLOR,"
         f"F.FA_DATE,'{div}' DIV,NVL(S.GENDER,' ') GEN,F.SIZE_CD,SUM(F.PCARD_QTY) QTY "
         "FROM FILT F LEFT JOIN OCI.MSBS_ITEM_STYLE S ON S.STYLE_CD=F.STYLE_CD " + _COLOR_JOINS + " "
@@ -87,10 +88,10 @@ def shortage_bysize_sql(ict_list, div, d_from, d_to, loose=True):
         "HAVING SUM(F.PCARD_QTY)>0 ORDER BY LINE,STYLE_CD,ITEM_CLASS,FA_DATE,SIZE_CD"
     )
 
-def shortage_bydate_sql(ict_list, div, d_from, d_to, loose=True):
-    """No.2/7/8 — 날짜별(by date). 반환: ITEM_CLASS,FA_WC,STYLE_CD,STYLE_NAME,MCS_COLOR,FA_DATE,QTY"""
+def shortage_bydate_sql(ict_list, div, d_from, d_to, loose=True, er="Y"):
+    """No.2/7/8/9/10 — 날짜별(by date). 반환: ITEM_CLASS,FA_WC,STYLE_CD,STYLE_NAME,MCS_COLOR,FA_DATE,QTY"""
     return (
-        "WITH " + _filt(ict_list, div, d_from, d_to, loose, with_size=False) + ", " + _COLOR_CTES + " "
+        "WITH " + _filt(ict_list, div, d_from, d_to, loose, with_size=False, er=er) + ", " + _COLOR_CTES + " "
         "SELECT F.ITEM_CLASS,F.FA_WC_CD FA_WC,F.STYLE_CD,S.MODEL_NAME STYLE_NAME," + _COLOR_EXPR + " MCS_COLOR,"
         "F.FA_DATE,SUM(F.PCARD_QTY) QTY "
         "FROM FILT F LEFT JOIN OCI.MSBS_ITEM_STYLE S ON S.STYLE_CD=F.STYLE_CD " + _COLOR_JOINS + " "
@@ -101,20 +102,23 @@ def shortage_bydate_sql(ict_list, div, d_from, d_to, loose=True):
 # 공식 번호 → (설명, 함수, ICT, DIV)
 # [원본 item class 범위 검증 2026-07-07] 원본 시트 Item Class 계열 대조 결과 반영:
 #   IP Prod(#7)=II만, IP Outgoing(#8)=II+IP, CMP(#11)=CP, Outgoing PH(#12)=PH+PP, PH in Market(#15)=PH+PP.
+# 튜플: (이름, 함수, ICT, DIV, END_ROUTING). before UV=END_ROUTING 'N'(공정중), after UV/기타='Y'.
 REPORTS = {
-    "2":  ("3-1. Balance IP Production",       shortage_bydate_sql, ["II"],       "Production"),
-    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II"],       "Production"),
-    "4":  ("3-2. Balance IP Outgoing by size", shortage_bysize_sql, ["II", "IP"], "Outgoing"),
-    "7":  ("3-1. Balance CMP",                 shortage_bydate_sql, ["CP"],       "Production"),
-    "8":  ("3-1. Balance Outgoing PH",         shortage_bydate_sql, ["PH", "PP"], "Outgoing"),
-    "11": ("3-2. Balance PH in Market PH by",  shortage_bysize_sql, ["PH", "PP"], "Production"),
+    "2":  ("3-1. Balance IP Production",       shortage_bydate_sql, ["II"],       "Production", "Y"),
+    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II"],       "Production", "Y"),
+    "4":  ("3-2. Balance IP Outgoing by size", shortage_bysize_sql, ["II", "IP"], "Outgoing",   "Y"),
+    "7":  ("3-1. Balance CMP",                 shortage_bydate_sql, ["CP"],       "Production", "Y"),
+    "8":  ("3-1. Balance Outgoing PH",         shortage_bydate_sql, ["PH", "PP"], "Outgoing",   "Y"),
+    "9":  ("3-1. Balance PH before UV",        shortage_bydate_sql, ["PH", "PP"], "Production", "N"),
+    "10": ("3-1. Balance PH after UV",         shortage_bydate_sql, ["PH", "PP"], "Production", "Y"),
+    "11": ("3-2. Balance PH in Market PH by",  shortage_bysize_sql, ["PH", "PP"], "Production", "Y"),
 }
 # No.5 (3-3. Balance IP Outgoing Market) 의 SQL 은 balance_outgoing_mailer.fetch_sheet /
 # report_only_mcp._sheet_sql 에 있음(동일 엔진, 동(棟)·라인·일자버킷 양식).
 
 def build(report_no, d_from, d_to, loose=True):
-    name, fn, ict, div = REPORTS[report_no]
-    return name, fn(ict, div, d_from, d_to, loose=loose)
+    name, fn, ict, div, er = REPORTS[report_no]
+    return name, fn(ict, div, d_from, d_to, loose=loose, er=er)
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
