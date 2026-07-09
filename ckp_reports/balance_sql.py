@@ -166,6 +166,40 @@ def osnd_balance_sql(d_from, d_to, plant=PLANT):
         "HAVING SUM(CASE WHEN I_SCN_DT IS NULL THEN OSND_EX_QTY ELSE 0 END)>0 ORDER BY LINE,STYLE"
     )
 
+# ===== No.5 3-3. Balance IP Outgoing Market (동·라인·일자버킷 양식) =====
+_OM_COLOR_JOIN = (
+    "LEFT JOIN (SELECT style_cd, mcs_color_cd FROM (SELECT style_cd, mcs_color_cd, "
+    "ROW_NUMBER() OVER (PARTITION BY style_cd ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn "
+    "FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL GROUP BY style_cd, mcs_color_cd) WHERE rn=1) cc ON cc.style_cd=o.style_cd"
+)
+OM_FAMILIES = {"IP": ["II", "IP"], "PH": ["PH", "PP", "CP"], "OS": ["OS"]}
+
+def outgoing_market_sheet_sql(families, plants, d_from, d_to):
+    """No.5 시트(IP/PH/OS)용 미출고 SQL(loose). 반환 10컬럼: WCG,PLANT_CD,ITEM_CLASS,FA_WC_CD,MODEL,GEN,STYLE_CD,FA_DATE,QTY,COLOR."""
+    F = _inlist(families); P = _inlist(plants)
+    return (
+        "SELECT NVL(w.wc_group_cd,' ') wcg, o.plant_cd, o.item_class, o.fa_wc_cd, NVL(i.model_name,' ') model, "
+        "NVL(i.gender,' ') gen, o.style_cd, o.fa_date, SUM(o.out_qty) qty, MAX(cc.mcs_color_cd) color "
+        "FROM (SELECT R.FA_WC_CD, R.ITEM_CLASS, R.FA_DATE, R.STYLE_CD, R.PLANT_CD, R.PROD_GROUP_NO, SUM(R.PCARD_QTY) out_qty "
+        "FROM OCI.MSPD_PCARD_RESULT R "
+        f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD IN ({P}) AND R.PROD_MOVE_TYPE='PROD' "
+        f"AND R.ITEM_CLASS_TYPE IN ({F}) AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231' "
+        "AND NOT EXISTS (SELECT 1 FROM OCI.MSPD_PROD_GROUP g WHERE g.prod_group_no=R.prod_group_no AND g.plant_cd=R.plant_cd AND g.closing_yn='Y') "
+        "GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PROD_GROUP_NO HAVING SUM(R.PCARD_QTY)>0) o "
+        "LEFT JOIN OCI.MSBS_ITEM_STYLE i ON i.style_cd=o.style_cd "
+        "LEFT JOIN OCI.MSBS_WORK_CENTER w ON w.plant_cd=o.plant_cd AND w.wc_cd=o.fa_wc_cd " + _OM_COLOR_JOIN + " "
+        "GROUP BY NVL(w.wc_group_cd,' '), o.plant_cd, o.item_class, o.fa_wc_cd, NVL(i.model_name,' '), NVL(i.gender,' '), o.style_cd, o.fa_date"
+    )
+
+def outgoing_market_scan_sql(plants, d_from, d_to):
+    """No.5 SCAN BEM/BEP. 반환: PLANT_CD,FA_WC_CD,STYLE_CD,Q."""
+    return (
+        "SELECT plant_cd, fa_wc_cd, style_cd, SUM(prod_qty) q FROM OCI.POP_PCARD_SCAN "
+        "WHERE op_cd IN ('BEM','BEP') AND NVL(cancel_flag,'N')<>'Y' "
+        f"AND plant_cd IN ({_inlist(plants)}) AND scan_ymd BETWEEN '{d_from}' AND '{d_to}' GROUP BY plant_cd, fa_wc_cd, style_cd"
+    )
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print("usage: python balance_sql.py <No(2,3,4,7,8,11)> <YYYYMMDD from> <YYYYMMDD to> [--strict]")
