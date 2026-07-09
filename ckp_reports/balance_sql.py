@@ -120,6 +120,52 @@ def build(report_no, d_from, d_to, loose=True):
     name, fn, ict, div, er = REPORTS[report_no]
     return name, fn(ict, div, d_from, d_to, loose=loose, er=er)
 
+
+# ===== No.1 DAILY REPORT SCAN (PHH 파일론 스캔) =====
+def scan_daily_sql(dates, plant=PLANT):
+    """No.1 — POP_PCARD_SCAN op_cd='PHH' NORMAL 을 날짜별 피벗.
+    dates=YYYYMMDD 리스트. 반환: LINE,MODELV,COLORV,STYLE,MCS,N1..Nk,WTOT (Nk=날짜별 NORMAL)."""
+    dlist = _inlist(dates)
+    ncols = ",".join(f"SUM(CASE WHEN scan_ymd='{d}' THEN prod_qty ELSE 0 END) N{i+1}" for i, d in enumerate(dates))
+    return (
+        "WITH SC AS (SELECT s.fa_wc_cd LINE, s.style_cd STYLE, s.scan_ymd, s.prod_qty "
+        f"FROM OCI.POP_PCARD_SCAN s WHERE s.op_cd='PHH' AND NVL(s.cancel_flag,'N')<>'Y' AND s.plant_cd='{plant}' "
+        f"AND s.scan_ymd IN ({dlist})) "
+        "SELECT sc.LINE, NVL(it.model_name,' ') MODELV, NVL(cc.color,' ') COLORV, sc.STYLE, NVL(cc.mcs,' ') MCS, "
+        + ncols + ", SUM(prod_qty) WTOT "
+        "FROM SC LEFT JOIN OCI.MSBS_ITEM_STYLE it ON it.style_cd=sc.STYLE "
+        "LEFT JOIN (SELECT style_cd, MAX(mcs_cd) mcs, MAX(mcs_color_cd) color FROM OCI.MSPD_BATCH_PLAN "
+        "WHERE mcs_color_cd NOT IN ('NONE',' ') AND mcs_color_cd IS NOT NULL GROUP BY style_cd) cc ON cc.style_cd=sc.STYLE "
+        "GROUP BY sc.LINE, it.model_name, cc.color, sc.STYLE, cc.mcs HAVING SUM(prod_qty)>0 ORDER BY sc.LINE, sc.STYLE"
+    )
+
+
+# ===== No.6 External OS&D Balance by size =====
+OSND_SIZES = ["1","1T","2","2T","3","3T","4","4T","5","5T","6","6T","7","7T","8","8T","9","9T",
+              "10","10T","11","11T","12","12T","13","13T","14","14T","15","15T","16","16T","17"]  # 원본 3-4 고정 33
+def osnd_balance_sql(d_from, d_to, plant=PLANT):
+    """No.6 — MSPQ_EX_OSND BALANCE(I_SCN_DT IS NULL=미입고) 를 스타일 단위 사이즈 피벗.
+    반환: LINE,DT,CMP,MODEL,STYLE,COLORV,TYPE,SUP,STATUSV,TOT,Z1..Z33."""
+    zc = ",".join(f"SUM(CASE WHEN SIZE_CD='{s}' AND I_SCN_DT IS NULL THEN OSND_EX_QTY ELSE 0 END)/2 Z{i+1}"
+                  for i, s in enumerate(OSND_SIZES))
+    win = f"{d_from[4:6]}/{d_from[6:8]}-{d_to[4:6]}/{d_to[6:8]}"
+    return (
+        "WITH BASE AS (SELECT IP.SUB_WC_CD LINE, SUBSTR(OS.SUPPLY_OP_CD,1,2) CMP, NVL(S.MODEL_NAME,' ') MODEL, "
+        "OS.STYLE_CD||' / '||OS.ITEM_CLASS STYLE_DISP, OS.COLOR_CD, NVL(CM.CODE_NAME,OS.OSND_TYPE) TYPE, "
+        "NVL(PN.PLANT_NAME,OS.SUPPLY_PLANT_CD) SUPPLY_PLANT, OS.SIZE_CD, OS.OSND_EX_QTY, OS.I_SCN_DT "
+        "FROM OCI.MSPQ_EX_OSND OS "
+        "LEFT JOIN OCI.MSBS_CODE_MASTER CM ON CM.CODE_CLASS_CD='PQ_OSND_TYPE' AND CM.SUB_CODE=OS.OSND_TYPE "
+        "LEFT JOIN OCI.MSBS_PLANT PN ON PN.PLANT_CD=OS.SUPPLY_PLANT_CD "
+        "LEFT JOIN OCI.MSPQ_INSPECT_POINT IP ON IP.PLANT_CD=OS.PLANT_CD AND IP.INSPECT_POINT_ID=OS.INSPECT_POINT_ID "
+        "LEFT JOIN OCI.MSBS_ITEM_STYLE S ON S.STYLE_CD=OS.STYLE_CD "
+        f"WHERE OS.CANCEL_YN='N' AND OS.CFM_DT IS NOT NULL AND OS.SUPPLY_PLANT_CD='{plant}' "
+        f"AND OS.OSND_DATE BETWEEN '{d_from}' AND '{d_to}') "
+        f"SELECT LINE, '{win}' DT, CMP, MODEL, STYLE_DISP STYLE, COLOR_CD COLORV, TYPE, SUPPLY_PLANT SUP, 'BALANCE' STATUSV, "
+        "SUM(CASE WHEN I_SCN_DT IS NULL THEN OSND_EX_QTY ELSE 0 END)/2 TOT, " + zc + " "
+        "FROM BASE GROUP BY LINE,CMP,MODEL,STYLE_DISP,COLOR_CD,TYPE,SUPPLY_PLANT "
+        "HAVING SUM(CASE WHEN I_SCN_DT IS NULL THEN OSND_EX_QTY ELSE 0 END)>0 ORDER BY LINE,STYLE"
+    )
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print("usage: python balance_sql.py <No(2,3,4,7,8,11)> <YYYYMMDD from> <YYYYMMDD to> [--strict]")
