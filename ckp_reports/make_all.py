@@ -31,6 +31,9 @@ import balance_outgoing_mailer as BO
 OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
 SQLDIR = os.path.join(HERE, "sql")
 SQLCL = os.environ.get("SQLCL", "sql")
+# SQLcl 가 지갑(tnsnames.ora)을 찾도록 TNS_ADMIN·JAVA_HOME 보장(env 로 오면 그걸, 없으면 알려진 경로).
+WALLET_TNS = os.environ.get("TNS_ADMIN") or "/Users/nicklee/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여/Wallet_CHANGSHININCAIPOC"
+JAVA_HOME_ = os.environ.get("JAVA_HOME") or "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
 DEFAULT_SRC = "/Users/nicklee/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (공유)/Google Drive Files/현업 Report Sample/CKP Manual Report (종합).xlsx"
 
 BAL_SIZE = {  # no → (모드, 파일명, 시트명)
@@ -61,7 +64,11 @@ def working_days(end, n):
 def sqlcl_csv(sql, out_csv, conn):
     script = (f"connect -name {conn}\nset sqlformat csv\nset feedback off\nset pagesize 0\nset echo off\n"
               + sql.rstrip().rstrip(";") + ";\nexit\n")
-    p = subprocess.run([SQLCL, "-S", "/nolog"], input=script, capture_output=True, text=True)
+    env = dict(os.environ)
+    env["TNS_ADMIN"] = env.get("TNS_ADMIN") or WALLET_TNS
+    env["JAVA_HOME"] = env.get("JAVA_HOME") or JAVA_HOME_
+    env["PATH"] = os.path.join(env["JAVA_HOME"], "bin") + os.pathsep + env.get("PATH", "/usr/bin:/bin")
+    p = subprocess.run([SQLCL, "-S", "/nolog"], input=script, capture_output=True, text=True, env=env)
     rows=[]; started=False
     for l in p.stdout.splitlines():
         if "ORA-" in l or l.strip().startswith("Error"):
