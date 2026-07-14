@@ -28,3 +28,7 @@ plants         = 3110,3120,3210      ; 포함할 공장 코드 (쉼표구분)
 window_before  = 3                    ; D+3 (납기 경과 며칠까지)
 window_after   = 7                    ; D-7 (선행 며칠까지)
 recipients     = name1@changshininc.com, name2@changshininc.com   ; 받는사람 (쉼표구분, 여러 명 가능)
+strict_outgoing = false               ; OCI 동기화 완료 후 true (GMES 정식 미출고 로직)
+; --- CKP Manual Report(make_all.py) 전용 ---
+src_workbook   =                      ; No.2 존(zone) 양식 템플릿용 원본 "CKP Manual Report (종합).xlsx" 전체경로
+                                       ; (비우면 --src 인자 또는 ckp_reports 상위 폴더 후보경로 사용)

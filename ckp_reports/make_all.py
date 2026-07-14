@@ -31,10 +31,20 @@ import balance_outgoing_mailer as BO
 OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
 SQLDIR = os.path.join(HERE, "sql")
 SQLCL = os.environ.get("SQLCL", "sql")
-# SQLcl 가 지갑(tnsnames.ora)을 찾도록 TNS_ADMIN·JAVA_HOME 보장(env 로 오면 그걸, 없으면 알려진 경로).
-WALLET_TNS = os.environ.get("TNS_ADMIN") or "/Users/nicklee/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여/Wallet_CHANGSHININCAIPOC"
-JAVA_HOME_ = os.environ.get("JAVA_HOME") or "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
-DEFAULT_SRC = "/Users/nicklee/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (공유)/Google Drive Files/현업 Report Sample/CKP Manual Report (종합).xlsx"
+# 지갑(TNS_ADMIN)·자바(JAVA_HOME): 환경변수 우선. 없으면 main()에서 config.ini [db] wallet_dir 로 보완.
+# (Claude Desktop 경로에서는 config env 로 주입됨. 터미널 경로에서는 export 하거나 config wallet_dir 사용.)
+TNS_ADMIN = os.environ.get("TNS_ADMIN") or None
+JAVA_HOME = os.environ.get("JAVA_HOME") or None
+# No.2 원본 워크북(존 양식 템플릿): 우선순위  --src  >  env CKP_SRC  >  config [report] src_workbook  >  후보경로
+DEFAULT_SRC = os.environ.get("CKP_SRC", "")
+_SRC_CANDIDATES = [
+    os.path.join(HERE, "..", "CKP Manual Report (종합).xlsx"),
+    os.path.join(HERE, "..", "report", "CKP Manual Report (종합).xlsx"),
+]
+def _find_src():
+    for c in _SRC_CANDIDATES:
+        if os.path.exists(c): return c
+    return ""
 
 BAL_SIZE = {  # no → (모드, 파일명, 시트명)
     "3":  ("ip", "3-2. Balance IP Prod. by size",    "IP Prod by size"),
@@ -65,9 +75,10 @@ def sqlcl_csv(sql, out_csv, conn):
     script = (f"connect -name {conn}\nset sqlformat csv\nset feedback off\nset pagesize 0\nset echo off\n"
               + sql.rstrip().rstrip(";") + ";\nexit\n")
     env = dict(os.environ)
-    env["TNS_ADMIN"] = env.get("TNS_ADMIN") or WALLET_TNS
-    env["JAVA_HOME"] = env.get("JAVA_HOME") or JAVA_HOME_
-    env["PATH"] = os.path.join(env["JAVA_HOME"], "bin") + os.pathsep + env.get("PATH", "/usr/bin:/bin")
+    if TNS_ADMIN: env["TNS_ADMIN"] = TNS_ADMIN
+    if JAVA_HOME:
+        env["JAVA_HOME"] = JAVA_HOME
+        env["PATH"] = os.path.join(JAVA_HOME, "bin") + os.pathsep + env.get("PATH", "/usr/bin:/bin")
     p = subprocess.run([SQLCL, "-S", "/nolog"], input=script, capture_output=True, text=True, env=env)
     rows=[]; started=False
     for l in p.stdout.splitlines():
@@ -125,6 +136,10 @@ def main():
     BUILD = (mode != "plan")
 
     cfg = BO.load_config(os.path.join(BOM_DIR, "config.ini"))
+    # 이식성: TNS_ADMIN 미설정이면 config 의 지갑 폴더로, 원본 워크북 미지정이면 config/후보로 보완
+    global TNS_ADMIN
+    if not TNS_ADMIN: TNS_ADMIN = cfg.get("db", "wallet_dir", fallback="").strip() or None
+    if not src: src = cfg.get("report", "src_workbook", fallback="").strip() or _find_src()
     bal_b = BD.build_buckets(today, BAL_MAX_BEFORE, BAL_MAX_AFTER)
     d_from, d_to = bal_b[0][1], bal_b[-1][1]
     om_buckets = BO.build_buckets(today, cfg.getint("report","window_before",fallback=3),
