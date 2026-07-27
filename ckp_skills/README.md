@@ -30,3 +30,16 @@
 
 만든 `.skill` 파일을 Claude 에 전달해 설치한다. 설치 후에는 `SKILL.md` 의
 변경 이력 첫 줄로 어느 버전이 깔려 있는지 확인할 수 있다.
+
+## 제약 조건 (설치 시 거부되는 조건)
+
+- `SKILL.md` frontmatter 의 `description` 은 **1024자 이하**여야 한다.
+  넘으면 설치가 `field 'description' in SKILL.md must be at most 1024 characters` 로 거부된다.
+  2026-07-27 v12.2 최초 패키징이 1135자로 걸렸다. 현재 900자.
+  확인:
+
+      python3 -c "s=open('ckp_skills/SKILL.md',encoding='utf-8').read(); \
+      print(max(len(l[13:]) for l in s.split(chr(10)) if l.startswith('description: ')))"
+
+- 트리거 키워드는 description 안에 있어야 하므로, 길이를 줄일 때는 **키워드가 아니라 설명 문장**을 줄인다.
+- `name` 은 바꾸지 말 것. 바꾸면 기존 스킬을 갱신하는 대신 **새 스킬**이 하나 더 생긴다.
