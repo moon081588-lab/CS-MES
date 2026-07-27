@@ -30,7 +30,18 @@ import balance_outgoing_mailer as BO
 
 OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
 SQLDIR = os.path.join(HERE, "sql")
-SQLCL = os.environ.get("SQLCL", "sql")
+def _find_sqlcl():
+    """SQLcl 실행파일. env SQLCL 우선. Windows 는 sql.exe / sql.bat / sql.cmd 를 PATH 에서 찾는다."""
+    import shutil
+    v = os.environ.get("SQLCL")
+    if v: return v
+    names = ["sql.exe", "sql.bat", "sql.cmd", "sql"] if os.name == "nt" else ["sql"]
+    for n in names:
+        p = shutil.which(n)
+        if p: return p
+    return "sql"   # 못 찾으면 그대로 시도 → 실패 시 아래에서 안내 메시지
+
+SQLCL = _find_sqlcl()
 # 지갑(TNS_ADMIN)·자바(JAVA_HOME): 환경변수 우선. 없으면 main()에서 config.ini [db] wallet_dir 로 보완.
 # (Claude Desktop 경로에서는 config env 로 주입됨. 터미널 경로에서는 export 하거나 config wallet_dir 사용.)
 TNS_ADMIN = os.environ.get("TNS_ADMIN") or None
@@ -71,15 +82,74 @@ def working_days(end, n):
         d -= datetime.timedelta(days=1)
     return sorted(out)
 
-def sqlcl_csv(sql, out_csv, conn):
-    script = (f"connect -name {conn}\nset sqlformat csv\nset feedback off\nset pagesize 0\nset echo off\n"
-              + sql.rstrip().rstrip(";") + ";\nexit\n")
+def _sqlcl_env():
     env = dict(os.environ)
     if TNS_ADMIN: env["TNS_ADMIN"] = TNS_ADMIN
     if JAVA_HOME:
         env["JAVA_HOME"] = JAVA_HOME
         env["PATH"] = os.path.join(JAVA_HOME, "bin") + os.pathsep + env.get("PATH", "/usr/bin:/bin")
-    p = subprocess.run([SQLCL, "-S", "/nolog"], input=script, capture_output=True, text=True, env=env)
+    return env
+
+def _sqlcl_run(script):
+    try:
+        return subprocess.run([SQLCL, "-S", "/nolog"], input=script, capture_output=True,
+                              text=True, env=_sqlcl_env(), shell=(os.name == "nt" and SQLCL.lower().endswith((".bat", ".cmd"))))
+    except FileNotFoundError:
+        raise RuntimeError(
+            f"SQLcl 실행파일을 찾을 수 없습니다 (시도: {SQLCL}).\n"
+            "  · SQLcl 설치 후 bin 폴더를 PATH 에 추가하거나,\n"
+            "  · 환경변수 SQLCL 에 실행파일 전체 경로를 지정하세요.\n"
+            "    (Windows 예: setx SQLCL \"C:\\sqlcl\\bin\\sql.exe\")")
+
+_CONN_CACHE = {"name": None}
+
+def resolve_conn(prefer=""):
+    """SQLcl 저장 연결 이름을 결정한다. 이름을 코드에 박지 않는다.
+      우선순위: --conn / env CKP_CONN / config [db] sqlcl_conn  >  등록된 연결 목록에서 패턴 매칭
+      매칭 우선순위: changshinincaipoc  >  *changshinincaipoc_medium*  >  csi*  >  *_medium
+      제외: lmes 계열(다른 레거시 DB — OCI 테이블 없음)
+    """
+    if _CONN_CACHE["name"]: return _CONN_CACHE["name"]
+    if prefer:
+        _CONN_CACHE["name"] = prefer
+        return prefer
+    listing = ""
+    for cmd in ("connmgr list", "show connections"):
+        try:
+            r = _sqlcl_run(cmd + "\nexit\n")
+            if r.returncode == 0 and r.stdout.strip():
+                listing = r.stdout
+                break
+        except Exception:
+            break
+    rows = []          # (연결이름, 그 줄 전체) — 접속문자열이 같은 줄에 오는 표 형식도 매칭되도록
+    for l in listing.splitlines():
+        parts = l.split()
+        t = parts[0].strip('"').strip("'").strip(",") if parts else ""
+        if t and not t.startswith(("SQL>", "-", "=", "Name", "NAME", "USER", "Connection")) \
+               and "lmes" not in l.lower():
+            rows.append((t, l.lower()))
+    names = [t for t, _ in rows]
+    def pick(pred):
+        for t, line in rows:
+            if pred(t.lower(), line): return t
+        return None
+    chosen = (pick(lambda t, l: t == "changshinincaipoc")
+              or pick(lambda t, l: "changshinincaipoc" in t)
+              or pick(lambda t, l: "changshinincaipoc" in l)      # 이름은 달라도 접속문자열이 맞는 경우
+              or pick(lambda t, l: t.startswith("csi"))
+              or pick(lambda t, l: t.endswith(("_medium", "_high", "_low"))))
+    chosen = chosen or "changshinincaipoc"     # 목록을 못 읽으면 표준 이름으로 시도
+    if names:
+        print(f"[conn] 사용할 SQLcl 연결: {chosen}  (후보 {len(names)}개 중 선택)")
+    _CONN_CACHE["name"] = chosen
+    return chosen
+
+def sqlcl_csv(sql, out_csv, conn):
+    conn = resolve_conn(conn)
+    script = (f"connect -name {conn}\nset sqlformat csv\nset feedback off\nset pagesize 0\nset echo off\n"
+              + sql.rstrip().rstrip(";") + ";\nexit\n")
+    p = _sqlcl_run(script)
     rows=[]; started=False
     for l in p.stdout.splitlines():
         if "ORA-" in l or l.strip().startswith("Error"):
@@ -124,7 +194,7 @@ def _read_scan_map(csvp):
     return m
 
 def main():
-    a=list(sys.argv[1:]); src=DEFAULT_SRC; conn="changshinincaipoc"; mode="sqlcl"
+    a=list(sys.argv[1:]); src=DEFAULT_SRC; conn=os.environ.get("CKP_CONN","").strip(); mode="sqlcl"
     if "--src" in a:   i=a.index("--src");   src=a[i+1];  del a[i:i+2]
     if "--conn" in a:  i=a.index("--conn");  conn=a[i+1]; del a[i:i+2]
     if "--plan" in a:  mode="plan";  a.remove("--plan")
@@ -138,8 +208,12 @@ def main():
     cfg = BO.load_config(os.path.join(BOM_DIR, "config.ini"))
     # 이식성: TNS_ADMIN 미설정이면 config 의 지갑 폴더로, 원본 워크북 미지정이면 config/후보로 보완
     global TNS_ADMIN
-    if not TNS_ADMIN: TNS_ADMIN = cfg.get("db", "wallet_dir", fallback="").strip() or None
+    if not TNS_ADMIN: TNS_ADMIN = BO.wallet_dir(cfg) or None      # config 비어 있으면 mailer 폴더의 wallet/ 자동
+    if not conn: conn = cfg.get("db", "sqlcl_conn", fallback="").strip()
     if not src: src = cfg.get("report", "src_workbook", fallback="").strip() or _find_src()
+    if src and not os.path.exists(src):
+        print(f"[주의] src_workbook 경로가 존재하지 않습니다 → 후보경로로 대체 시도: {src}")
+        src = _find_src()
     bal_b = BD.build_buckets(today, BAL_MAX_BEFORE, BAL_MAX_AFTER)
     d_from, d_to = bal_b[0][1], bal_b[-1][1]
     om_buckets = BO.build_buckets(today, cfg.getint("report","window_before",fallback=3),

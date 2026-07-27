@@ -115,35 +115,94 @@ def report_dir(cfg):
     os.makedirs(d,exist_ok=True)
     return d
 
+def wallet_dir(cfg):
+    """월렛 폴더. config 값이 비어 있으면 스크립트와 같은 폴더의 wallet/ 을 쓴다.
+    (절대경로를 config 에 박지 않아야 폴더를 옮기거나 다른 PC 로 배포해도 그대로 동작한다.)"""
+    d=cfg.get("db","wallet_dir",fallback="").strip()
+    if not d:
+        cand=os.path.join(HERE,"wallet")
+        d=cand if os.path.isdir(cand) else ""
+    return os.path.abspath(d) if d else ""
+
+def sync_sqlnet_ora(wdir):
+    """wallet/sqlnet.ora 의 WALLET_LOCATION DIRECTORY 를 현재 실제 경로로 교정.
+    다른 PC(또는 다른 폴더)에서 복사해 온 월렛은 남의 절대경로가 박혀 있어
+    ORA-12154 / ORA-28759 / ORA-29024 를 일으킨다. 매 실행마다 조용히 맞춰준다."""
+    p=os.path.join(wdir,"sqlnet.ora")
+    if not (wdir and os.path.isfile(p)): return
+    try:
+        s=open(p,encoding="utf-8").read()
+        new=re.sub(r'DIRECTORY\s*=\s*"[^"]*"', 'DIRECTORY="%s"' % wdir.replace("\\","\\\\"), s)
+        if new!=s:
+            open(p,"w",encoding="utf-8").write(new)
+            LOG.info(f"sqlnet.ora WALLET_LOCATION 교정 → {wdir}")
+    except Exception as e:
+        LOG.warning(f"sqlnet.ora 교정 실패(무시하고 진행): {e}")
+
+def _ic_hint():
+    """Instant Client 설치 안내 — OS 별로 다르게."""
+    s=platform.system()
+    if s=="Windows":
+        return ("Windows: https://www.oracle.com/database/technology/instant-client-downloads.html 에서 "
+                "'Basic Package (ZIP, x64)' 를 받아 C:\\oracle\\instantclient 에 풀고, "
+                "config.ini [db] oracle_client_lib 에 그 폴더 경로를 적으세요.")
+    if s=="Darwin":
+        return "macOS: brew tap InstantClientTap/instantclient && brew install instantclient-basic (csmes.sh 가 자동 시도)"
+    return "Linux: oracle-instantclient-basic 패키지 설치 후 config.ini [db] oracle_client_lib 지정"
+
 def db_connect(cfg):
+    """접속 모드 3 종.
+      thick — Instant Client + cwallet.sso 자동로그인 (월렛 비번 불필요)
+      thin  — Instant Client 불필요, 대신 월렛 비번(PEM pass phrase) 필요
+      auto  — thick 먼저 시도, 실패하면 thin 으로 폴백 (기본값·배포 권장)
+    """
     import oracledb
-    mode=cfg.get("db","mode",fallback="thin").strip().lower()       # thin(기본) | thick(자동로그인)
-    wdir=cfg.get("db","wallet_dir",fallback="").strip(); wpw=cfg.get("db","wallet_password",fallback="").strip()
-    if mode=="thick":
-        # Oracle Instant Client 로 cwallet.sso 자동로그인 사용 → 월렛 비번 불필요
+    mode=cfg.get("db","mode",fallback="auto").strip().lower()
+    if mode not in ("thick","thin","auto"): mode="auto"
+    wdir=wallet_dir(cfg); wpw=cfg.get("db","wallet_password",fallback="").strip()
+    sync_sqlnet_ora(wdir)
+    base={"user":cfg.get("db","user"),"password":cfg.get("db","password"),"dsn":cfg.get("db","dsn")}
+
+    def _try_thick():
         lib=cfg.get("db","oracle_client_lib",fallback="").strip() or None
         try:
             oracledb.init_oracle_client(lib_dir=lib)
         except Exception as e:
             if "already" not in str(e).lower():
-                raise RuntimeError("Oracle Instant Client 가 필요합니다(thick/자동로그인). "
-                                   "설치: brew tap InstantClientTap/instantclient && brew install instantclient-basic "
-                                   f"(csmes.sh 가 자동 시도). 원오류: {e}")
-    kw={"user":cfg.get("db","user"),"password":cfg.get("db","password"),"dsn":cfg.get("db","dsn")}
-    if wdir:
-        kw["config_dir"]=wdir
-        if mode=="thin":
-            kw["wallet_location"]=wdir
-            if wpw:
-                kw["wallet_password"]=wpw
+                raise RuntimeError(f"Oracle Instant Client 를 찾지 못했습니다(thick). {_ic_hint()} / 원오류: {e}")
+        kw=dict(base)
+        if wdir: kw["config_dir"]=wdir      # sqlnet.ora 의 WALLET_LOCATION 으로 자동로그인
+        LOG.info(f"DB 접속 시도: mode=thick dsn={kw['dsn']} wallet={'Y' if wdir else 'N'}")
+        return oracledb.connect(**kw)
+
+    def _try_thin():
+        kw=dict(base)
+        if wdir:
+            kw["config_dir"]=wdir; kw["wallet_location"]=wdir
+            if wpw: kw["wallet_password"]=wpw
             elif os.path.exists(os.path.join(wdir,"ewallet.pem")):
                 raise RuntimeError(
                     "[thin 모드] 월렛 비밀번호(PEM pass phrase)가 필요합니다.\n"
-                    "  · 자동로그인(월렛 비번 불필요)으로 쓰려면 config.ini [db] mode=thick 로 바꾸고 "
-                    "Oracle Instant Client 를 설치하세요(csmes.sh 가 자동 처리).")
-        # thick: sqlnet.ora 의 WALLET_LOCATION(=cwallet.sso) 로 자동로그인. wallet_password 불필요.
-    LOG.info(f"DB 접속: mode={mode} dsn={kw['dsn']} wallet={'Y' if wdir else 'N'}")
-    return oracledb.connect(**kw)
+                    "  · config.ini [db] wallet_password 에 넣거나,\n"
+                    f"  · mode=thick 로 바꾸고 Instant Client 를 설치하세요. {_ic_hint()}")
+        LOG.info(f"DB 접속 시도: mode=thin dsn={kw['dsn']} wallet={'Y' if wdir else 'N'}")
+        return oracledb.connect(**kw)
+
+    if mode=="thick": return _try_thick()
+    if mode=="thin":  return _try_thin()
+    try:
+        return _try_thick()
+    except Exception as e:
+        LOG.warning(f"thick 실패 → thin 으로 재시도: {str(e)[:160]}")
+        try:
+            return _try_thin()
+        except Exception as e2:
+            raise RuntimeError(
+                "DB 접속 실패 (thick·thin 모두).\n"
+                f"  · thick: {str(e)[:200]}\n"
+                f"  · thin : {str(e2)[:200]}\n"
+                f"  · 월렛 폴더: {wdir or '(미설정)'}\n"
+                f"  · {_ic_hint()}")
 
 _COLOR_JOIN = (   # style_cd 별 대표색(NONE 제외 최빈) — BATCH_PLAN.MCS_COLOR_CD
     "LEFT JOIN (SELECT style_cd, mcs_color_cd FROM ("
@@ -534,6 +593,11 @@ def run_doctor(cfg, path):
 
 SCHED_LABEL="com.changshin.balanceoutgoing"
 def _runner():
+    """OS 별 실행 래퍼. Windows 는 csmes.sh(bash) 를 쓸 수 없으므로 csmes.bat → python 순."""
+    if platform.system()=="Windows":
+        bat=os.path.join(HERE,"csmes.bat")
+        if os.path.exists(bat): return ("cmd.exe", bat)
+        return (sys.executable, os.path.join(HERE,os.path.basename(__file__)))
     sh=os.path.join(HERE,"csmes.sh")
     return ("/bin/bash", sh) if os.path.exists(sh) else (sys.executable, os.path.join(HERE,os.path.basename(__file__)))
 
@@ -564,8 +628,19 @@ def install_schedule(hour=8, minute=0):
         new=(keep.strip()+"\n" if keep.strip() else "")+f"{minute} {hour} * * * {cmd}  # {SCHED_LABEL}\n"
         p=subprocess.run(["crontab","-"],input=new,text=True)
         print(f"✅ 등록 완료(cron): 매일 {hour:02d}:{minute:02d}" if p.returncode==0 else "❌ crontab 등록 실패")
+    elif sysname=="Windows":
+        # 작업 스케줄러(schtasks) 등록. 래퍼가 .bat 이면 cmd /c 로, .py 면 python 으로 실행.
+        if prog=="cmd.exe": tr=f'cmd.exe /c ""{arg}" >> "{logp}" 2>&1"'
+        else:               tr=f'cmd.exe /c ""{prog}" "{arg}" >> "{logp}" 2>&1"'
+        r=subprocess.run(["schtasks","/Create","/F","/SC","DAILY","/TN",SCHED_LABEL,
+                          "/ST",f"{hour:02d}:{minute:02d}","/TR",tr],
+                         capture_output=True,text=True)
+        print(f"✅ 등록 완료(Windows 작업 스케줄러): 매일 {hour:02d}:{minute:02d}\n   작업 이름: {SCHED_LABEL}"
+              if r.returncode==0 else
+              f"❌ schtasks 등록 실패: {(r.stderr or r.stdout).strip()[:300]}\n"
+              f"   → 관리자 권한 명령 프롬프트에서 다시 실행하거나, 작업 스케줄러 GUI 로 아래를 등록하세요:\n   {tr}")
     else:
-        print(f"이 OS({sysname})는 자동 등록 미지원 — Windows는 작업 스케줄러로 등록하세요(README 참고).")
+        print(f"이 OS({sysname})는 자동 등록 미지원 — 수동으로 등록하세요.")
 
 def uninstall_schedule():
     sysname=platform.system()
@@ -579,6 +654,10 @@ def uninstall_schedule():
         keep="\n".join(l for l in cur.splitlines() if SCHED_LABEL not in l)
         subprocess.run(["crontab","-"],input=keep+"\n",text=True)
         print("✅ 자동 실행 해제 완료(cron)")
+    elif sysname=="Windows":
+        r=subprocess.run(["schtasks","/Delete","/F","/TN",SCHED_LABEL],capture_output=True,text=True)
+        print("✅ 자동 실행 해제 완료(Windows 작업 스케줄러)" if r.returncode==0
+              else f"❌ schtasks 삭제 실패(이미 없을 수 있음): {(r.stderr or r.stdout).strip()[:200]}")
     else:
         print(f"이 OS({sysname})는 자동 해제 미지원.")
 

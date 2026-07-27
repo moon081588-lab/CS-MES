@@ -44,6 +44,9 @@ fi
 # 4) 월렛(접속 지갑) 로컬 사본 — git 제외
 if [ ! -f "$DIR/wallet/tnsnames.ora" ]; then
   for W in \
+    "$DIR/../../Wallet_CHANGSHININCAIPOC" \
+    "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (2026-여름학기)/Wallet_CHANGSHININCAIPOC" \
+    "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (2026-여름학기)/연구참여 (공유)/Google Drive Files/AI 툴/Wallet_CHANGSHININCAIPOC" \
     "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (공유)/Google Drive Files/AI 툴/Wallet_CHANGSHININCAIPOC" \
     "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여/Google Drive Files/AI 툴/Wallet_CHANGSHININCAIPOC" ; do
     [ -f "$W/tnsnames.ora" ] && { echo "[setup] 월렛 복사: $W"; mkdir -p "$DIR/wallet"; cp -R "$W/." "$DIR/wallet/"; break; }
@@ -69,8 +72,9 @@ c=configparser.ConfigParser(interpolation=None); c.read(p, encoding="utf-8")
 for s in ("db","smtp","report"): c.setdefault(s,{})
 c["db"].setdefault("user","ADMIN")
 c["db"]["dsn"]="changshinincaipoc_medium"
-c["db"]["wallet_dir"]=os.path.join(DIR,"wallet")
-c["db"]["mode"]="thick"                       # 자동로그인(월렛 비번 불필요)
+c["db"]["wallet_dir"]=""                      # 비워둠 = 코드가 스크립트 폴더의 wallet/ 을 자동 사용(이식성)
+c["db"].setdefault("mode","auto")             # auto = thick 먼저, 실패 시 thin 폴백
+c["db"].setdefault("sqlcl_conn","")           # 비우면 make_all.py 가 SQLcl 연결을 자동 탐색
 if IC: c["db"]["oracle_client_lib"]=IC
 c["db"].setdefault("oracle_client_lib","")
 c["db"].setdefault("password",""); c["db"].setdefault("wallet_password","")

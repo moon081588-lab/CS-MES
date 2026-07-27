@@ -4,13 +4,30 @@
 CKP Manual Report — Claude Desktop용 로컬 MCP 서버
 ===================================================
 Claude Desktop이 "CKP 리포트 만들어줘 / 메일 보내줘" 한마디로 11개를 생성·발송하게 한다.
-서버가 Mac 위에서 make_all.py / mail_reports.py 를 그대로 실행하므로,
+서버가 이 PC 위에서 make_all.py / mail_reports.py 를 그대로 실행하므로,
 대용량 CSV가 Claude 컨텍스트를 지나가지 않는다(= 안정적). DB 조회는 make_all 이 내부에서
-저장된 SQLcl 연결(changshinincaipoc)로 처리 → Claude 는 SQL 을 나르지 않는다.
+저장된 SQLcl 연결로 처리 → Claude 는 SQL 을 나르지 않는다.
+연결 이름은 고정이 아니다: --conn > env CKP_CONN > config.ini [db] sqlcl_conn > 자동 탐색.
 
-필요: pip install mcp openpyxl  /  이 PC에 SQLcl(`sql`) + 'changshinincaipoc' 연결 저장.
-claude_desktop_config.json 에 아래처럼 등록:
-  "ckp-reports": { "command": ".../.venv/bin/python", "args": [".../ckp_reports/ckp_mcp.py"] }
+필요: pip install mcp openpyxl  /  이 PC 에 SQLcl(`sql`) 설치 + OCI ADB 연결 1개 저장.
+
+claude_desktop_config.json 등록 예 (경로는 실제 설치 위치로 바꿀 것):
+
+  macOS / Linux
+    "ckp-reports": {
+      "command": "/path/to/CS-MES/balance_outgoing_mailer/.venv/bin/python",
+      "args":    ["/path/to/CS-MES/ckp_reports/ckp_mcp.py"]
+    }
+
+  Windows  ※ .venv\\Scripts\\python.exe 이고, JSON 이라 역슬래시는 두 번 씁니다
+    "ckp-reports": {
+      "command": "C:\\\\CS-MES\\\\balance_outgoing_mailer\\\\.venv\\\\Scripts\\\\python.exe",
+      "args":    ["C:\\\\CS-MES\\\\ckp_reports\\\\ckp_mcp.py"],
+      "env":     { "TNS_ADMIN": "C:\\\\CS-MES\\\\balance_outgoing_mailer\\\\wallet" }
+    }
+  설정 파일 위치 — Windows: %APPDATA%\\Claude\\claude_desktop_config.json
+                   macOS  : ~/Library/Application Support/Claude/claude_desktop_config.json
+  수정 후 Claude Desktop 을 완전히 종료(트레이 아이콘까지)했다가 재시작해야 반영됩니다.
 """
 import os, sys, subprocess, datetime
 
