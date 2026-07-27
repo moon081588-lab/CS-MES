@@ -106,7 +106,7 @@ _CONN_CACHE = {"name": None}
 def resolve_conn(prefer=""):
     """SQLcl 저장 연결 이름을 결정한다. 이름을 코드에 박지 않는다.
       우선순위: --conn / env CKP_CONN / config [db] sqlcl_conn  >  등록된 연결 목록에서 패턴 매칭
-      매칭 우선순위: changshinincaipoc  >  *changshinincaipoc_medium*  >  csi*  >  *_medium
+      매칭 우선순위: changshinincaipoc > *changshinincaipoc* > 접속문자열 일치 > *_medium > csi*
       제외: lmes 계열(다른 레거시 DB — OCI 테이블 없음)
     """
     if _CONN_CACHE["name"]: return _CONN_CACHE["name"]
@@ -142,11 +142,13 @@ def resolve_conn(prefer=""):
         for t, line in rows:
             if pred(t.lower(), line): return t
         return None
+    # csi* 보다 *_medium 을 먼저 본다. csi 계열에는 비밀번호가 저장되지 않은 연결
+    # (csi_ok / csi)이 섞여 있어 먼저 고르면 비대화형 실행이 조용히 실패한다.
     chosen = (pick(lambda t, l: t == "changshinincaipoc")
               or pick(lambda t, l: "changshinincaipoc" in t)
               or pick(lambda t, l: "changshinincaipoc" in l)      # 이름은 달라도 접속문자열이 맞는 경우
-              or pick(lambda t, l: t.startswith("csi"))
-              or pick(lambda t, l: t.endswith(("_medium", "_high", "_low"))))
+              or pick(lambda t, l: t.endswith(("_medium", "_high", "_low")))
+              or pick(lambda t, l: t.startswith("csi")))
     chosen = chosen or "changshinincaipoc"     # 목록을 못 읽으면 표준 이름으로 시도
     if names:
         print(f"[conn] 사용할 SQLcl 연결: {chosen}  (후보 {len(names)}개 중 선택)")

@@ -43,12 +43,14 @@ fi
 
 # 4) 월렛(접속 지갑) 로컬 사본 — git 제외
 if [ ! -f "$DIR/wallet/tnsnames.ora" ]; then
+  # 개인 PC 절대경로를 박지 않는다. 다른 위치면 CSMES_WALLET 환경변수로 알려준다.
+  #   예)  CSMES_WALLET="/path/to/Wallet_CHANGSHININCAIPOC" ./csmes.sh
   for W in \
+    "${CSMES_WALLET:-/nonexistent}" \
     "$DIR/../../Wallet_CHANGSHININCAIPOC" \
-    "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (2026-여름학기)/Wallet_CHANGSHININCAIPOC" \
-    "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (2026-여름학기)/연구참여 (공유)/Google Drive Files/AI 툴/Wallet_CHANGSHININCAIPOC" \
-    "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여 (공유)/Google Drive Files/AI 툴/Wallet_CHANGSHININCAIPOC" \
-    "$HOME/Library/CloudStorage/OneDrive-postech.ac.kr/연구참여/Google Drive Files/AI 툴/Wallet_CHANGSHININCAIPOC" ; do
+    "$DIR/../Wallet_CHANGSHININCAIPOC" \
+    "$HOME/oracle/wallet/changshinincaipoc" \
+    "$HOME/Wallet_CHANGSHININCAIPOC" ; do
     [ -f "$W/tnsnames.ora" ] && { echo "[setup] 월렛 복사: $W"; mkdir -p "$DIR/wallet"; cp -R "$W/." "$DIR/wallet/"; break; }
   done
   [ -f "$DIR/wallet/tnsnames.ora" ] || echo "[주의] 월렛 미발견 — $DIR/wallet 에 월렛 파일을 넣으세요."
@@ -71,7 +73,7 @@ DIR=os.environ["DIR"]; IC=os.environ.get("ICDIR",""); p=os.path.join(DIR,"config
 c=configparser.ConfigParser(interpolation=None); c.read(p, encoding="utf-8")
 for s in ("db","smtp","report"): c.setdefault(s,{})
 c["db"].setdefault("user","ADMIN")
-c["db"]["dsn"]="changshinincaipoc_medium"
+c["db"].setdefault("dsn","changshinincaipoc_medium")   # 이미 있으면 보존(사내망 easy-connect 대비)
 c["db"]["wallet_dir"]=""                      # 비워둠 = 코드가 스크립트 폴더의 wallet/ 을 자동 사용(이식성)
 c["db"].setdefault("mode","auto")             # auto = thick 먼저, 실패 시 thin 폴백
 c["db"].setdefault("sqlcl_conn","")           # 비우면 make_all.py 가 SQLcl 연결을 자동 탐색
@@ -79,15 +81,15 @@ if IC: c["db"]["oracle_client_lib"]=IC
 c["db"].setdefault("oracle_client_lib","")
 c["db"].setdefault("password",""); c["db"].setdefault("wallet_password","")
 c["smtp"].setdefault("host","smtp.gmail.com"); c["smtp"].setdefault("port","587"); c["smtp"].setdefault("use_tls","true")
-c["smtp"].setdefault("user","moon081588@gmail.com"); c["smtp"].setdefault("password",""); c["smtp"].setdefault("from","moon081588@gmail.com")
+c["smtp"].setdefault("user",""); c["smtp"].setdefault("password",""); c["smtp"].setdefault("from","")
 c["report"].setdefault("plants","3110,3120,3210")
 c["report"].setdefault("window_before","3"); c["report"].setdefault("window_after","7")
-c["report"].setdefault("recipients","moon081588@gmail.com, idea.seahsteel@gmail.com")
+c["report"].setdefault("recipients","")            # 설치 PC 담당자가 config.ini 에 직접 입력
 c["report"].setdefault("output_dir","")   # 비우면 코드 기본값 ../report (=CS-MES/report) 사용
 # 미출고 판정: false=임시(OCI 미동기화 대비, 데이터 나옴) / true=GMES 정식(엄격 closing+MOVE EXISTS).
 # OCI에 MOVE 실적 + MSPD_PROD_GROUP 동기화 완료되면 true 로 바꿀 것.
 c["report"].setdefault("strict_outgoing","false")
-c["report"].setdefault("share_link","https://postechackr-my.sharepoint.com/:f:/g/personal/nicklee100_postech_ac_kr/IgCe7BW9lHo3TIFhzzd6zFlcASay4Xr5YJBD-pv0uvV3VrY?e=dDpxts")
+c["report"].setdefault("share_link","")            # 조직별 공유 폴더 링크(선택)
 with open(p,"w",encoding="utf-8") as f: c.write(f)
 try: os.chmod(p,0o600)
 except Exception: pass

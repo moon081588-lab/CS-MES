@@ -32,7 +32,9 @@ mode            = auto
 oracle_client_lib =
 
 ; CKP Manual Report(make_all.py)가 쓰는 SQLcl 저장 연결 이름.
-; **비워두면 등록된 연결 목록에서 자동 탐색**합니다(changshinincaipoc → *_medium → csi*).
+; **비워두면 등록된 연결 목록에서 자동 탐색**합니다.
+; 순서: changshinincaipoc > 이름에 changshinincaipoc 포함 > 접속문자열 일치 > *_medium > csi*
+; (csi_ok / csi 처럼 비밀번호가 저장 안 된 연결을 먼저 고르지 않도록 csi* 를 마지막에 둡니다)
 ; PC 마다 연결 이름이 달라도 되므로 특별한 이유가 없으면 비워 두세요.
 sqlcl_conn      =
 

@@ -14,14 +14,30 @@ OCI 재현. 색상은 MSPD_BATCH_PLAN BOM 인라인(EXACT + STYLE fallback).
   loose=True  : NOT EXISTS(CLOSING_YN='Y')  — OCI 미동기화 임시(현재 운영값).
   loose=False : (PROD_GROUP_NO,PLANT_CD) IN (CLOSING_YN='N') — GMES 정식(동기화 후).
 
-공식 번호 매핑 (완료 7종):
-  No.2  3-1. Balance IP Production        = by-date  ICT(II,IP)  DIV=Production
-  No.3  3-2. Balance IP Prod. by size     = by-size  ICT(II,IP)  DIV=Production
-  No.4  3-2. Balance IP Outgoing by size  = by-size  ICT(II,IP)  DIV=Outgoing
-  No.5  3-3. Balance IP Outgoing Market   = balance_outgoing_mailer.fetch_sheet / report_only_mcp._sheet_sql
-  No.7  3-1. Balance CMP                  = by-date  ICT(CP)     DIV=Production
-  No.8  3-1. Balance Outgoing PH          = by-date  ICT(PH,PP)  DIV=Outgoing
-  No.11 3-2. Balance PH in Market PH by   = by-size  ICT(PH,PP,CP) DIV=Production
+공식 번호 매핑  ※ 아래 표는 이 파일의 REPORTS 딕셔너리와 반드시 일치시킬 것.
+   (2026-07-27: 이 주석이 REPORTS 와 어긋나 있어 "No.3 필터가 비대칭이라 버그"라는
+    오판을 유발했다. 진실의 출처는 REPORTS 표이고, 주석은 그 사본일 뿐이다.)
+
+  No.  리포트                            생성기     ITEM_CLASS_TYPE  DIV         END_ROUTING
+  ---- --------------------------------- ---------- ---------------- ----------- -----------
+  2    3-1. Balance IP Production        by-date    II               Production  Y
+  3    3-2. Balance IP Prod. by size     by-size    II               Production  Y
+  4    3-2. Balance IP Outgoing by size  by-size    II, IP           Outgoing    Y
+  7    3-1. Balance CMP                  by-date    CP               Production  Y
+  8    3-1. Balance Outgoing PH          by-date    PH, PP           Outgoing    Y
+  9    3-1. Balance PH before UV         by-date    PH, PP           Production  N  ← 공정 진행중
+  10   3-1. Balance PH after UV          by-date    PH, PP           Production  Y
+  11   3-2. Balance PH in Market PH by   by-size    PH, PP           Production  Y
+
+  ICT 범위는 2026-07-07 에 원본 수기 시트의 Item Class 계열과 대조해 확정한 값이다.
+  No.3 이 II 만 쓰고 No.4 가 II+IP 를 쓰는 것은 의도된 차이다(둘은 DIV 도 다르다 —
+  Production 은 PROD_DATE, Outgoing 은 OUT_DATE 로 미완료를 판정).
+
+  이 파일 밖에서 만드는 리포트:
+  No.1  1. DAILY REPORT SCAN             = scan_daily_sql()          (POP_PCARD_SCAN, PHH)
+  No.5  3-3. Balance IP Outgoing Market  = outgoing_market_sheet_sql() / balance_outgoing_mailer.fetch_sheet
+  No.6  3-4. Balance External OS&D IPPH  = osnd_balance_sql()        (MSPQ_EX_OSND)
+  No.2 의 존(zone) 양식은 no2_zone.py 가 원본 워크북에서 복사(DB 불필요).
 
 사용:
   python balance_sql.py 3 20260628 20260709          # No.3 SQL 출력
@@ -99,9 +115,9 @@ def shortage_bydate_sql(ict_list, div, d_from, d_to, loose=True, er="Y"):
         "HAVING SUM(F.PCARD_QTY)>0 ORDER BY FA_WC,STYLE_CD,F.FA_DATE"
     )
 
-# 공식 번호 → (설명, 함수, ICT, DIV)
-# [원본 item class 범위 검증 2026-07-07] 원본 시트 Item Class 계열 대조 결과 반영:
-#   IP Prod(#7)=II만, IP Outgoing(#8)=II+IP, CMP(#11)=CP, Outgoing PH(#12)=PH+PP, PH in Market(#15)=PH+PP.
+# 공식 번호 → (설명, 함수, ICT, DIV, END_ROUTING)   ※ 파일 상단 표와 같이 고칠 것
+# [원본 item class 범위 검증 2026-07-07] 원본 수기 시트의 Item Class 계열과 대조해 확정:
+#   IP Prod=II 만, IP Outgoing=II+IP, CMP=CP, Outgoing PH=PH+PP, PH in Market=PH+PP.
 # 튜플: (이름, 함수, ICT, DIV, END_ROUTING). before UV=END_ROUTING 'N'(공정중), after UV/기타='Y'.
 REPORTS = {
     "2":  ("3-1. Balance IP Production",       shortage_bydate_sql, ["II"],       "Production", "Y"),
