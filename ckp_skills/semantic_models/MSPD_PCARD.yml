@@ -1,0 +1,292 @@
+semantic_models:
+  - name: mspd_pcard
+    description: "패스카드 마스터 — 생산 단위 카드의 마스터 (4.6M행). 카드 발행/속성. MSPD_PCARD_RESULT의 부모 격"
+    model: OCI.MSPD_PCARD
+
+    entities:
+      - name: pcard
+        type: primary
+        expr: "PLANT_CD || '|' || PCARD_NAME"
+        description: "패스카드 식별자 (PLANT + PCARD_NAME 복합키 추정) [추측]"
+
+      - name: pcard_id
+        type: foreign
+        expr: PCARD_ID
+        description: "패스카드 ID (NUMBER로 보이는 값, 샘플: 124192835)"
+
+      - name: ps
+        type: foreign
+        expr: PS_ID
+        description: "PS ID (샘플: '3110.20260219.FGA09.02.6H' — Plant.FA_DATE.WC.MLINE.DAY_SEQ 형태)"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드. MSBS_PLANT 조인 가능 [추측]"
+
+      - name: item
+        type: foreign
+        expr: ITEM_CD
+        description: "ITEM 코드. MSBS_ITEM 조인 가능 [추측]"
+
+      - name: style
+        type: foreign
+        expr: STYLE_CD
+        description: "스타일 코드. MSBS_ITEM_STYLE 조인 가능 [추측]"
+
+      - name: work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || WC_CD"
+        description: "라인 코드 (MSBS_WORK_CENTER 조인 가능) [추측]"
+
+      - name: fa_work_center
+        type: foreign
+        expr: "FA_PLANT_CD || '|' || FA_WC_CD"
+        description: "제조 라인 (FA_PLANT_CD + FA_WC_CD)"
+
+      - name: prod_group
+        type: foreign
+        expr: "PLANT_CD || '|' || PROD_GROUP_NO"
+        description: "생산 그룹. MSPD_PROD_GROUP 조인 가능 [추측]"
+
+      - name: prod_order
+        type: foreign
+        expr: PROD_ORDER_NO
+        description: "생산 오더 번호"
+
+      - name: wo
+        type: foreign
+        expr: WO_ID
+        description: "Work Order ID (긴 복합키 형태 — 샘플 참고)"
+
+    dimensions:
+      - name: pcard_name
+        type: categorical
+        expr: PCARD_NAME
+        description: "패스카드 네임 (샘플: '3110-L09-02-20260219-6H-8' — Plant-Line-Mline-FA_DATE-DAY_SEQ-PCARD_SEQ 형태)"
+
+      - name: op_cd
+        type: categorical
+        expr: OP_CD
+        description: "공정 코드 (샘플: FSS)"
+
+      - name: routing_seq
+        type: categorical
+        expr: ROUTING_SEQ
+        description: "라우팅 차수 (샘플: 10)"
+
+      - name: size_cd
+        type: categorical
+        expr: SIZE_CD
+        description: "사이즈 코드 (샘플: 10T)"
+
+      - name: prod_date
+        type: time
+        expr: "TO_DATE(PROD_DATE, 'YYYYMMDD')"
+        description: "생산 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: wc_cd
+        type: categorical
+        expr: WC_CD
+        description: "라인 코드 (샘플: FSS09)"
+
+      - name: unit_cd
+        type: categorical
+        expr: UNIT_CD
+        description: "단위 (샘플: PR=Pair)"
+
+      - name: barcode_yn
+        type: categorical
+        expr: BARCODE_YN
+        description: "바코드 발행 여부 (Y/N)"
+
+      - name: barcode_key
+        type: categorical
+        expr: BARCODE_KEY
+        description: "바코드 키 (VARCHAR2(30))"
+
+      - name: barcode_seq
+        type: categorical
+        expr: BARCODE_SEQ
+        description: "바코드 차수"
+
+      - name: last_print_dt
+        type: time
+        expr: LAST_PRINT_DT
+        description: "최종 출력 일자 (DATE)"
+
+      - name: start_routing_yn
+        type: categorical
+        expr: START_ROUTING_YN
+        description: "라우팅 시작 여부 (Y/N)"
+
+      - name: end_routing_yn
+        type: categorical
+        expr: END_ROUTING_YN
+        description: "라우팅 종료 여부 (Y/N)"
+
+      - name: day_seq
+        type: categorical
+        expr: DAY_SEQ
+        description: "일 차수 (NUMBER(5))"
+
+      - name: pcard_seq
+        type: categorical
+        expr: PCARD_SEQ
+        description: "패스카드 차수 (NUMBER(5))"
+
+      - name: sbd_uid
+        type: categorical
+        expr: SBD_UID
+        description: "SBD UID (NUMBER(15))"
+
+      - name: fa_plant_cd
+        type: categorical
+        expr: FA_PLANT_CD
+        description: "제조 공장 코드"
+
+      - name: fa_date
+        type: time
+        expr: "TO_DATE(FA_DATE, 'YYYYMMDD')"
+        description: "제조 일자 (VARCHAR2(8) YYYYMMDD). [참고: PROD_DATE와 의미 다름 — 생산일 vs 제조일]"
+
+      - name: fa_wc_cd
+        type: categorical
+        expr: FA_WC_CD
+        description: "제조 라인 (샘플: FGA09)"
+
+      - name: fa_mline_cd
+        type: categorical
+        expr: FA_MLINE_CD
+        description: "제조 미니라인"
+
+      - name: prod_group_no
+        type: categorical
+        expr: PROD_GROUP_NO
+        description: "생산 그룹 번호"
+
+      - name: prod_order_type
+        type: categorical
+        expr: PROD_ORDER_TYPE
+        description: "오더 타입 (샘플: ZFT)"
+
+      - name: long_memo
+        type: categorical
+        expr: "DBMS_LOB.SUBSTR(LONG_MEMO, 200, 1)"
+        description: "긴 메모 (NVARCHAR2(2000) — DBMS_LOB.SUBSTR로 200자 truncate. 사용자 지침)"
+
+      - name: result_create_yn
+        type: categorical
+        expr: RESULT_CREATE_YN
+        description: "실적 생성 여부 (Y/N)"
+
+      - name: erp_plant_cd
+        type: categorical
+        expr: ERP_PLANT_CD
+        description: "ERP 공장 코드"
+
+      - name: erp_wc_cd
+        type: categorical
+        expr: ERP_WC_CD
+        description: "ERP 라인 코드"
+
+      - name: erp_fa_plant_cd
+        type: categorical
+        expr: ERP_FA_PLANT_CD
+        description: "ERP 제조 공장 코드"
+
+      - name: erp_fa_wc_cd
+        type: categorical
+        expr: ERP_FA_WC_CD
+        description: "ERP 제조 라인"
+
+      - name: erp_fa_mline_cd
+        type: categorical
+        expr: ERP_FA_MLINE_CD
+        description: "ERP 제조 미니라인"
+
+      - name: bomlevel
+        type: categorical
+        expr: BOMLEVEL
+        description: "BOM 레벨"
+
+      - name: item_class_type
+        type: categorical
+        expr: ITEM_CLASS_TYPE
+        description: "아이템 클래스 타입 (샘플: FS)"
+
+      - name: item_class
+        type: categorical
+        expr: ITEM_CLASS
+        description: "아이템 클래스 (샘플: FS01)"
+
+      - name: cust_po_no
+        type: categorical
+        expr: CUST_PO_NO
+        description: "거래처 PO 번호"
+
+      - name: cust_po_no_seq
+        type: categorical
+        expr: CUST_PO_NO_SEQ
+        description: "거래처 PO 번호 차수"
+
+      - name: print_yn
+        type: categorical
+        expr: PRINT_YN
+        description: "패스카드 발행 여부 (Y/N)"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자 (샘플: PKG_PCARD_CREATE)"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 일자 (DATE)"
+
+      - name: create_program_id
+        type: categorical
+        expr: CREATE_PROGRAM_ID
+        description: "생성 프로그램 ID"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 일자 (DATE)"
+
+      - name: update_program_id
+        type: categorical
+        expr: UPDATE_PROGRAM_ID
+        description: "수정 프로그램 ID"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC"
+
+    measures:
+      - name: pcard_count
+        agg: count
+        expr: PCARD_NAME
+        description: "패스카드 행 수"
+
+      - name: prod_qty
+        agg: sum
+        expr: PROD_QTY
+        description: "생산 수량 합계 (NUMBER(19,5))"
+
+      - name: print_cnt
+        agg: sum
+        expr: PRINT_CNT
+        description: "출력 횟수 합계 (NUMBER(5))"

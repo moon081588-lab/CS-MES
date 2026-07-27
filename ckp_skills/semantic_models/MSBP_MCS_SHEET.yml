@@ -1,0 +1,162 @@
+semantic_models:
+  - name: msbp_mcs_sheet
+    description: "MCS 시트 — 일자·MCS·배치 단위의 MCS 혼합 정보 (정의서: 'MCS 혼합 정보라서 컬럼명의 의미를 IT에서 정확히 알지를 못함' — 다수 컬럼 의미 미상)"
+    model: OCI.MSBP_MCS_SHEET
+
+    entities:
+      - name: mcs_sheet
+        type: primary
+        expr: "FACTORY || '|' || WRK_DATE || '|' || MCS_CD || '|' || BATCH_DIV"
+        description: "MCS 시트 식별자 (FACTORY + WRK_DATE + MCS_CD + BATCH_DIV 복합키 추정) [추측]"
+
+      - name: factory
+        type: foreign
+        expr: FACTORY
+        description: "공장 코드 (VARCHAR2(2), 샘플: JJ)"
+
+      - name: mcs
+        type: foreign
+        expr: MCS_CD
+        description: "MCS 코드. MSBP_MCS와 조인 가능 [추측]. 샘플: MO028"
+
+      - name: op
+        type: foreign
+        expr: OP_CD
+        description: "공정 코드 (샘플: OSR)"
+
+    dimensions:
+      - name: wrk_date
+        type: time
+        expr: "TO_DATE(WRK_DATE, 'YYYYMMDD')"
+        description: "작업 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: mcs_color_cd
+        type: categorical
+        expr: MCS_COLOR_CD
+        description: "MCS 색상 코드 (샘플: 10001)"
+
+      - name: batch_div
+        type: categorical
+        expr: BATCH_DIV
+        description: "배치 구분 (Small/Large) [정의서 명시]. 샘플: L1"
+
+      - name: item_name
+        type: categorical
+        expr: ITEM_NAME
+        description: "ITEM 명 (샘플: 'IS 75', 'Totals')"
+
+      - name: grp_item
+        type: categorical
+        expr: GRP_ITEM
+        description: "그룹 아이템 (샘플: 200, 400)"
+
+      - name: season
+        type: categorical
+        expr: SEASON
+        description: "시즌 정보 (NULL 가능)"
+
+      - name: formula_er
+        type: categorical
+        expr: FORMULA_ER
+        description: "[정의서: '의미 미상' — MCS 혼합 정보]"
+
+      - name: mcs_er
+        type: categorical
+        expr: MCS_ER
+        description: "[정의서: '의미 미상' — MCS 혼합 정보]"
+
+      - name: vendor_name
+        type: categorical
+        expr: VENDOR_NAME
+        description: "업체명 (샘플: YOOKWANG CHEMICAL)"
+
+      - name: midsole_yn
+        type: categorical
+        expr: MIDSOLE_YN
+        description: "미드솔 유무 (Y/N)"
+
+      - name: eva_yn
+        type: categorical
+        expr: EVA_YN
+        description: "EVA 유무 (Y/N)"
+
+      - name: order_cd
+        type: categorical
+        expr: ORDER_CD
+        description: "오더 번호 (NUMBER, NULL 가능)"
+
+      - name: upd_user
+        type: categorical
+        expr: UPD_USER
+        description: "수정자"
+
+      - name: upd_ymd
+        type: time
+        expr: UPD_YMD
+        description: "수정 일자 (DATE)"
+
+      - name: weight_check_yn
+        type: categorical
+        expr: WEIGHT_CHECK_YN
+        description: "중량 체크 유무 (Y/N)"
+
+    measures:
+      - name: mcs_sheet_count
+        agg: count
+        expr: MCS_CD
+        description: "MCS 시트 행 수"
+
+      - name: ative_rate
+        agg: sum
+        expr: ATIVE_RATE
+        description: "[정의서: '의미 미상' — MCS 혼합 정보. 컬럼명도 ATIVE 오타로 보임]"
+
+      - name: weight_virgin
+        agg: sum
+        expr: WEIGHT_VIRGIN
+        description: "[정의서: '의미 미상']. 'Virgin 중량'으로 추정 [추측]"
+
+      - name: weight_pbpd
+        agg: sum
+        expr: WEIGHT_PBPD
+        description: "[정의서: '의미 미상']"
+
+      - name: phr
+        agg: sum
+        expr: PHR
+        description: "[정의서: '의미 미상']. PHR=Parts per Hundred Rubber 추정 [추측]"
+
+      - name: active_phr
+        agg: sum
+        expr: ACTIVE_PHR
+        description: "[정의서: '의미 미상']"
+
+      - name: sp_gr
+        agg: avg
+        expr: SP_GR
+        description: "[정의서: '의미 미상']. Specific Gravity(비중) 추정 [추측]. 합산 무의미 → avg 사용"
+
+      - name: volume
+        agg: sum
+        expr: VOLUME
+        description: "[정의서: '의미 미상']. 부피 추정 [추측]"
+
+      - name: unit_price
+        agg: avg
+        expr: UNIT_PRICE
+        description: "단가 (NUMBER(20,2)). 합산 무의미 → avg"
+
+      - name: amt
+        agg: sum
+        expr: AMT
+        description: "금액 합계 (NUMBER(20,2))"
+
+      - name: min_value
+        agg: min
+        expr: "MIN"
+        description: "MCS 최소값 [정의서 명시]"
+
+      - name: max_value
+        agg: max
+        expr: "MAX"
+        description: "MCS 최대값 [정의서 명시]"

@@ -1,0 +1,543 @@
+semantic_models:
+  - name: mspd_pcard_result
+    description: |
+      패스카드 이벤트 실적 — 758만행의 메인 fact 테이블. 생산/출고/입고/투입 4단계 ITPO 이벤트.
+      [중요] PLANT_CD vs ITPO_WC_PLANT_CD 차이 — PLANT_CD는 계획 책임 공장, ITPO_WC_PLANT_CD는 실제 생산/출고 공장 (외주 가능성).
+      [중요] CKP_DB_Inconsistency #1 — 계획일자 컬럼명: 이 테이블은 PLAN_PROD_DATE, MSPD_BATCH_PLAN은 PROD_PLAN_DATE 사용.
+    model: OCI.MSPD_PCARD_RESULT
+
+    entities:
+      - name: pcard
+        type: primary
+        expr: "PLANT_CD || '|' || PCARD_NAME || '|' || OP_CD"
+        description: "패스카드 이벤트 식별자 (PLANT + PCARD_NAME + OP_CD 복합키 추정 — 같은 카드가 여러 공정에 등장) [추측]"
+
+      - name: pcard_master
+        type: foreign
+        expr: "PLANT_CD || '|' || PCARD_NAME"
+        description: "패스카드 마스터. MSPD_PCARD와 조인 (Plant + PCARD_NAME)"
+
+      - name: pcard_id
+        type: foreign
+        expr: PCARD_ID
+        description: "패스카드 ID (NUMBER, MSPD_PCARD.PCARD_ID와 조인 가능) [추측]"
+
+      - name: ps
+        type: foreign
+        expr: PS_ID
+        description: "PS ID — 공장+제조일자+라인+미니라인+작업시간 [정의서 명시]. 샘플: '3110.20260220.FGA09.03.3H'"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드 (계획 책임 공장). MSBS_PLANT 조인 가능 [추측]"
+
+      - name: itpo_plant
+        type: foreign
+        expr: ITPO_WC_PLANT_CD
+        description: "ITPO(입고/투입/생산/출고) 워크센터 공장 코드 — [중요] 실제 작업 발생 공장. PLANT_CD와 다를 수 있음 (외주). 라인별 가동률·실적은 이 컬럼 기준이 정확"
+
+      - name: fa_plant
+        type: foreign
+        expr: FA_PLANT_CD
+        description: "제조 공장 코드"
+
+      - name: item
+        type: foreign
+        expr: ITEM_CD
+        description: "아이템 코드. MSBS_ITEM 조인 가능 [추측]"
+
+      - name: style
+        type: foreign
+        expr: STYLE_CD
+        description: |
+          스타일 코드. OCI.MSBS_ITEM_STYLE 와 STYLE_CD 단일키로 조인.
+          [확정: 2026-05-21 changshinincaipoc 검증 — STYLE_CD = STYLE_CD 단일키 조인 정상]
+          [도메인] '모델' 식별 단위 = STYLE_CD + MODEL_NAME 함께 봄.
+          MODEL_NAME 은 이 테이블에 없고 MSBS_ITEM_STYLE 에 있음 → model_name dimension 참조.
+
+      - name: work_center
+        type: foreign
+        expr: "FA_PLANT_CD || '|' || FA_WC_CD"
+        description: "제조 워크센터. MSBS_WORK_CENTER와 조인 가능 [추측]"
+
+      - name: wc_group
+        type: foreign
+        expr: "FA_PLANT_CD || '|' || FA_WC_GROUP_CD"
+        description: "제조 워크센터 그룹 (생산동). MSBS_WC_GROUP 조인 가능 [추측]"
+
+      - name: prod_group
+        type: foreign
+        expr: "PLANT_CD || '|' || PROD_GROUP_NO"
+        description: "생산 그룹. MSPD_PROD_GROUP 조인 가능 [추측]"
+
+      - name: prod_order
+        type: foreign
+        expr: PROD_ORDER_NO
+        description: "프로덕션 오더 번호"
+
+      - name: plan_work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || PLAN_PROD_WC_CD"
+        description: "계획 워크센터 — MSBS_WORK_CENTER와 조인 (PLANT_CD, WC_CD). [확정: P_MSPD* 프로시저 검증]. 주의: work_center entity는 FA_WC_CD 기준 (제조 측), 이 entity는 PLAN_PROD_WC_CD 기준 (계획 측) — 두 개가 다를 수 있음"
+
+      - name: item_class
+        type: foreign
+        expr: ITEM_CLASS
+        description: "아이템 클래스 — MSBS_ITEM_CLASS와 조인 (ITEM_CLASS = ITEM_CLASS). [확정: P_MSPD* 프로시저 검증]"
+
+    dimensions:
+      - name: pcard_name
+        type: categorical
+        expr: PCARD_NAME
+        description: "패스카드 이름 (샘플: '3110-L09-03-20260220-3H-3')"
+
+      - name: op_cd
+        type: categorical
+        expr: OP_CD
+        description: |
+          공정 코드. 사용자 지침의 코드 의미:
+          IPI/IPU=IP 공정, PHH/PHM/PHU=PH 공정,
+          BEM/BEP=베이스, BUA/BUB=부착, OSP/OST=OS, FSS=FS, UPS=UP, SLM=SL.
+          샘플: OSP
+
+      - name: routing_seq
+        type: categorical
+        expr: ROUTING_SEQ
+        description: "라우팅 차수"
+
+      - name: prod_move_type
+        type: categorical
+        expr: PROD_MOVE_TYPE
+        description: "생산/이동 구분 (샘플: PROD)"
+
+      - name: prod_order_type
+        type: categorical
+        expr: PROD_ORDER_TYPE
+        description: "프로덕션 오더 타입 (샘플: ZFT)"
+
+      - name: fa_date
+        type: time
+        expr: "TO_DATE(FA_DATE, 'YYYYMMDD')"
+        description: "제조 일자 (VARCHAR2(8) YYYYMMDD). [핵심] 라인 가동률·생산 실적 집계의 기본 일자"
+
+      - name: fa_wc_group_cd
+        type: categorical
+        expr: FA_WC_GROUP_CD
+        description: |
+          제조 워크센터 그룹 코드 (생산동, 샘플: A1).
+          ⚠ Production Status 화면의 'W/C Group' 컬럼과 다를 수 있음.
+          화면 'W/C Group' 표시는 MSBS_SUM_GROUP_WC.SUB_TOTAL_CD 기준
+          (COUNTRY + FORM_ID='MSPD22000S' 매핑).
+          예: PLANT 3120 마스터 FA_WC_GROUP_CD='IP' 하나뿐이지만, 화면엔 A1/B1/D1/RA 다양함.
+          [확정: P_MSPD29000S_Q_V06 검증]
+
+      - name: fa_wc_cd
+        type: categorical
+        expr: FA_WC_CD
+        description: |
+          제조 워크센터 코드 (라인, 샘플: FGA09).
+          ⚠ Production Status 화면의 'Line' 표시값은 raw FA_WC_CD 가 아님.
+          화면 'Line' 표시는 MSBS_SUM_GROUP_WC.VIEW_GROUP_CD 매핑값 (예: FGA03 → 'L 03').
+          매핑 키: WC_CD = FA_WC_CD, FORM_ID='MSPD22000S', COUNTRY_CD=조회 PLANT 의 COUNTRY.
+          [확정: P_MSPD29000S_Q_V06 검증]
+
+      - name: fa_mline_cd
+        type: categorical
+        expr: FA_MLINE_CD
+        description: "제조 미니라인 코드"
+
+      - name: item_class_type
+        type: categorical
+        expr: ITEM_CLASS_TYPE
+        description: "아이템 타입 (샘플: OS, FS, IP 등). [참고: 'P' 등으로 정품 필터링하는 비즈니스 룰이 있을 수 있음 — 프로시저 분석 필요]"
+
+      - name: item_class
+        type: categorical
+        expr: ITEM_CLASS
+        description: "아이템 클래스 (샘플: OS01)"
+
+      - name: size_cd
+        type: categorical
+        expr: SIZE_CD
+        description: "사이즈 코드 (샘플: 10)"
+
+      - name: model_name
+        type: categorical
+        expr: "(SELECT s.MODEL_NAME FROM OCI.MSBS_ITEM_STYLE s WHERE s.STYLE_CD = MSPD_PCARD_RESULT.STYLE_CD)"
+        description: |
+          모델명. OCI.MSBS_ITEM_STYLE.MODEL_NAME (STYLE_CD 단일키 조인).
+          [확정: 2026-05-21 검증 — MSBS_ITEM_STYLE 은 STYLE_CD 1:1 마스터]
+          [도메인] '모델' = STYLE_CD + MODEL_NAME. 모델 단위 분석 시 STYLE_CD 와 함께 GROUP BY.
+          MODEL_NAME 단독은 동명 모델이 여러 STYLE_CD 로 나뉠 수 있어 비유일.
+          (예: 'AVA X (M)' = HM9697-002 / HM9697-402 / HM9697-001 / IQ7633-003 등 복수 STYLE)
+          [실무 권장] SQL 작성 시 스칼라 서브쿼리보다 MSBS_ITEM_STYLE LEFT JOIN 사용:
+            LEFT JOIN OCI.MSBS_ITEM_STYLE s ON s.STYLE_CD = R.STYLE_CD
+          GROUP BY 키에는 R.STYLE_CD, s.MODEL_NAME 둘 다 포함.
+
+      - name: plan_prod_date
+        type: time
+        expr: "TO_DATE(PLAN_PROD_DATE, 'YYYYMMDD')"
+        description: "계획 생산 일자. [중요] CKP_DB_Inconsistency #1 — MSPD_BATCH_PLAN의 PROD_PLAN_DATE와 동일 의미지만 컬럼명이 다름"
+
+      - name: plan_prod_wc_cd
+        type: categorical
+        expr: PLAN_PROD_WC_CD
+        description: "계획 워크센터 코드"
+
+      - name: start_routing_yn
+        type: categorical
+        expr: START_ROUTING_YN
+        description: "라우팅 처음 여부 (Y/N) — 정의서 오타: '라운딩'"
+
+      - name: end_routing_yn
+        type: categorical
+        expr: END_ROUTING_YN
+        description: "라우팅 마지막 여부 (Y/N)"
+
+      - name: barcode_key
+        type: categorical
+        expr: BARCODE_KEY
+        description: |
+          바코드 키 — 카드 1장의 고유 식별자 (샘플: P3110L090320260220OS013H003).
+
+          [데이터 분산 사실]
+          같은 카드가 라우팅 단계마다 row 로 분산. 각 row 는 그 단계의
+          (OP_CD, ITEM_CLASS_TYPE) 페어 가짐. PCARD_QTY 는 모든 row 동일.
+
+          [집계 시점 주의]
+          - 화면(Production Status): (OP, ITEM_CLASS_TYPE) 페어 단일 호출 → 페어 안 중복 없음
+          - 자유 분석 (OP 묶음 SUM): 묶음 안 카드별 row 수만큼 부풀림 발생
+            → 카드 단위 합산은 distinct_card_qty metric 사용
+            → 자세한 패턴은 workflows/production-status.md §3-B 부록 참조
+
+      - name: in_dt
+        type: time
+        expr: IN_DT
+        description: "입고 일시 (DATE)"
+
+      - name: in_wc_cd
+        type: categorical
+        expr: IN_WC_CD
+        description: "입고 워크센터 코드"
+
+      - name: in_wh_cd
+        type: categorical
+        expr: IN_WH_CD
+        description: "입고 창고 코드"
+
+      - name: in_date
+        type: time
+        expr: "TO_DATE(IN_DATE, 'YYYYMMDD')"
+        description: "입고 일자 (VARCHAR2(8)). 19991231 = sentinel 값 (미입고). [확정: P_MSPD90000S_Q_V14 검증 패턴 — 19991231은 '아직 발생 안 함' 의미]"
+
+      - name: input_dt
+        type: time
+        expr: INPUT_DT
+        description: "투입 일시 (DATE)"
+
+      - name: input_wc_cd
+        type: categorical
+        expr: INPUT_WC_CD
+        description: "투입 워크센터 코드"
+
+      - name: input_wh_cd
+        type: categorical
+        expr: INPUT_WH_CD
+        description: "투입 창고 코드"
+
+      - name: input_date
+        type: time
+        expr: "TO_DATE(INPUT_DATE, 'YYYYMMDD')"
+        description: "투입 일자 (VARCHAR2(8)). 19991231 = sentinel 값 (미투입). [확정: P_MSPD90000S_Q_V14 검증 패턴 — 19991231은 '아직 발생 안 함' 의미]"
+
+      - name: prod_dt
+        type: time
+        expr: PROD_DT
+        description: "생산 일시 (DATE)"
+
+      - name: prod_wc_cd
+        type: categorical
+        expr: PROD_WC_CD
+        description: "생산 워크센터 코드 (샘플: OSP01)"
+
+      - name: prod_wh_cd
+        type: categorical
+        expr: PROD_WH_CD
+        description: "생산 창고 코드 (샘플: 51BT)"
+
+      - name: prod_date
+        type: time
+        expr: "TO_DATE(PROD_DATE, 'YYYYMMDD')"
+        description: "생산 일자 (VARCHAR2(8) YYYYMMDD). [핵심] FA_DATE와 의미 다름 — FA는 제조일, PROD는 실제 생산 발생일. 19991231 = sentinel 값 (미생산). [확정: P_MSPD90000S_Q_V14 라인 57 검증]"
+
+      - name: prod_out_yn
+        type: categorical
+        expr: PROD_OUT_YN
+        description: "출고 여부 (Y/N)"
+
+      - name: out_dt
+        type: time
+        expr: OUT_DT
+        description: "출고 일시 (DATE)"
+
+      - name: out_wc_cd
+        type: categorical
+        expr: OUT_WC_CD
+        description: "출고 워크센터 코드"
+
+      - name: out_wh_cd
+        type: categorical
+        expr: OUT_WH_CD
+        description: "출고 창고 코드"
+
+      - name: out_date
+        type: time
+        expr: "TO_DATE(OUT_DATE, 'YYYYMMDD')"
+        description: "출고 일자 (VARCHAR2(8)). 19991231 = sentinel 값 (미출고). [확정: P_MSPD90000S_Q_V14 라인 154 검증]"
+
+      - name: day_seq
+        type: categorical
+        expr: DAY_SEQ
+        description: "PSID의 차수 [정의서 명시]"
+
+      - name: pcard_seq
+        type: categorical
+        expr: PCARD_SEQ
+        description: "패스카드의 차수"
+
+      - name: sbd_uid
+        type: categorical
+        expr: SBD_UID
+        description: "SBD UID (NUMBER(15))"
+
+      - name: memo
+        type: categorical
+        expr: "DBMS_LOB.SUBSTR(MEMO, 200, 1)"
+        description: "[정의서: 사용하지 않음]. NVARCHAR2(2000) — 200자 truncate"
+
+      - name: close_yn
+        type: categorical
+        expr: CLOSE_YN
+        description: "종료 여부 (Y/N)"
+
+      - name: close_date
+        type: time
+        expr: "TO_DATE(CLOSE_DATE, 'YYYYMMDD')"
+        description: "종료 일자 (VARCHAR2(8))"
+
+      - name: closing_if_no
+        type: categorical
+        expr: CLOSING_IF_NO
+        description: "[정의서: 사용하지 않음]"
+
+      - name: erp_plant_cd
+        type: categorical
+        expr: ERP_PLANT_CD
+        description: "ERP 공장 코드"
+
+      - name: erp_plan_prod_wc_cd
+        type: categorical
+        expr: ERP_PLAN_PROD_WC_CD
+        description: "ERP 공장 생산 워크센터 코드"
+
+      - name: erp_fa_plant_cd
+        type: categorical
+        expr: ERP_FA_PLANT_CD
+        description: "ERP 제조 공장 코드"
+
+      - name: erp_fa_wc_group_cd
+        type: categorical
+        expr: ERP_FA_WC_GROUP_CD
+        description: "ERP 제조 워크센터 그룹 코드"
+
+      - name: erp_fa_wc_cd
+        type: categorical
+        expr: ERP_FA_WC_CD
+        description: "ERP 제조 워크센터 코드"
+
+      - name: erp_fa_mline_cd
+        type: categorical
+        expr: ERP_FA_MLINE_CD
+        description: "ERP 제조 미니라인"
+
+      - name: erp_itpo_wc_plant_cd
+        type: categorical
+        expr: ERP_ITPO_WC_PLANT_CD
+        description: "ERP 입고/투입/생산/출고 워크센터 공장 코드"
+
+      - name: erp_in_wc_cd
+        type: categorical
+        expr: ERP_IN_WC_CD
+        description: "ERP 입고 워크센터"
+
+      - name: erp_input_wc_cd
+        type: categorical
+        expr: ERP_INPUT_WC_CD
+        description: "ERP 투입 워크센터"
+
+      - name: erp_prod_wc_cd
+        type: categorical
+        expr: ERP_PROD_WC_CD
+        description: "ERP 생산 워크센터"
+
+      - name: erp_out_wc_cd
+        type: categorical
+        expr: ERP_OUT_WC_CD
+        description: "ERP 출고 워크센터"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자 (샘플: PKG_PCARD_CREATE)"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 일자 (DATE)"
+
+      - name: create_program_id
+        type: categorical
+        expr: CREATE_PROGRAM_ID
+        description: "생성 프로그램 ID"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자 (샘플: PKG_POP_SCAN_RESULT.SP_SCAN_RESULT_APPLY)"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 일자 (DATE)"
+
+      - name: update_program_id
+        type: categorical
+        expr: UPDATE_PROGRAM_ID
+        description: "수정 프로그램 ID"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC"
+
+      - name: summary_yn
+        type: categorical
+        expr: SUMMARY_YN
+        description: "[정의서: 사용하지 않음]"
+
+      - name: summary_dt
+        type: time
+        expr: SUMMARY_DT
+        description: "[정의서: 사용하지 않음]"
+
+      - name: summary_msg
+        type: categorical
+        expr: "DBMS_LOB.SUBSTR(SUMMARY_MSG, 200, 1)"
+        description: "[정의서: 사용하지 않음]. NVARCHAR2(1000) — 200자 truncate"
+
+      - name: input_mline_cd
+        type: categorical
+        expr: INPUT_MLINE_CD
+        description: "[정의서: 사용하지 않음]"
+
+      - name: zcp_close_yn
+        type: categorical
+        expr: ZCP_CLOSE_YN
+        description: "ZCP 종료 여부 (Y/N)"
+
+      - name: zcp_close_date
+        type: time
+        expr: "TO_DATE(ZCP_CLOSE_DATE, 'YYYYMMDD')"
+        description: "ZCP 종료 일자"
+
+      - name: outclose_yn
+        type: categorical
+        expr: OUTCLOSE_YN
+        description: "출고 마감 여부 (Y/N)"
+
+      - name: bomlevel
+        type: categorical
+        expr: BOMLEVEL
+        description: "BOM 레벨"
+
+      - name: scan_psid
+        type: categorical
+        expr: SCAN_PSID
+        description: "[정의서: 사용하지 않음]"
+
+      - name: result_type
+        type: categorical
+        expr: RESULT_TYPE
+        description: "디폴트 'SCAN' [정의서 명시]. 분석 시 RESULT_TYPE='SCAN' 필터로 스캔 데이터만 보는 것이 일반적. [확정: P_MSPD51000S_Q_V24 라인 178, 232 검증 — P.O Cross Check 등 정합성 분석에서 필수 필터]"
+
+      - name: sm_in_dt
+        type: time
+        expr: SM_IN_DT
+        description: "슈퍼마켓 입고 일시 (DATE)"
+
+      - name: sm_in_wh_cd
+        type: categorical
+        expr: SM_IN_WH_CD
+        description: "슈퍼마켓 입고 창고 코드"
+
+      - name: sm_in_date
+        type: time
+        expr: "TO_DATE(SM_IN_DATE, 'YYYYMMDD')"
+        description: "슈퍼마켓 입고 일자(시간 포함)"
+
+      - name: move_close_yn
+        type: categorical
+        expr: MOVE_CLOSE_YN
+        description: "이동 여부 (Y/N)"
+
+      - name: move_close_date
+        type: time
+        expr: "TO_DATE(MOVE_CLOSE_DATE, 'YYYYMMDD')"
+        description: "이동 종료 일자"
+
+      - name: move_closing_if_no
+        type: categorical
+        expr: MOVE_CLOSING_IF_NO
+        description: "이동 데이터 인터페이스 여부 (NUMBER(15))"
+
+      - name: delivery_no
+        type: categorical
+        expr: DELIVERY_NO
+        description: "출고 번호"
+
+      - name: car_no
+        type: categorical
+        expr: CAR_NO
+        description: "차량 번호"
+
+      - name: cust_po_no
+        type: categorical
+        expr: CUST_PO_NO
+        description: "거래처 코드"
+
+      - name: cust_po_no_seq
+        type: categorical
+        expr: CUST_PO_NO_SEQ
+        description: "거래처 코드 차수"
+
+    measures:
+      - name: pcard_result_count
+        agg: count
+        expr: PCARD_NAME
+        description: "패스카드 이벤트 행 수"
+
+      - name: pcard_qty
+        agg: sum
+        expr: PCARD_QTY
+        description: "수량 합계 (NUMBER(19,5)) — 핵심 measure. 실적 집계의 기본"
+
+      - name: upc_qty
+        agg: sum
+        expr: UPC_QTY
+        description: "UPC 수량 합계 (NUMBER(19,5))"

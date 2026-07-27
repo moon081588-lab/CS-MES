@@ -1,0 +1,95 @@
+# =============================================================================
+# Domain: Shortage Balance Checking
+# Screen ID: SCR-001
+# Source Procedure: LMES.P_MSPD90000S_Q_V14
+# Main Table: OCI.MSPD_PCARD_RESULT (1층: mspd_pcard_result)
+#
+# 화면 설명: Line·신발 모델·사이즈별 부족분(Shortage) 현황 조회
+# 프로시저 V_P_DIV 파라미터로 'P'(Production) / 'O'(Outgoing) / 'B'(Both) 분기.
+#
+# 핵심 비즈니스 룰 (P_MSPD90000S_Q_V14 본문 검증 완료):
+# - PROD_DATE='19991231' = 미생산 (Production Shortage 판정)
+# - OUT_DATE ='19991231' = 미출고  (Outgoing Shortage 판정)
+# - PROD_MOVE_TYPE='PROD' (이동 이벤트 제외)
+# - ITEM_CLASS_TYPE <> 'FG' (완제품 제외, 단 FG는 UP으로 별도 UNION)
+# - END_ROUTING_YN='Y' (Outgoing은 라인 마지막만)
+# - MSPD_PROD_GROUP.CLOSING_YN='N' (유효 생산그룹만)
+# =============================================================================
+
+metrics:
+
+  # ---------------------------------------------------------------------------
+  # 1. Production Shortage — V_P_DIV='P' 분기
+  # ---------------------------------------------------------------------------
+
+  - name: production_shortage_qty
+    label: Production Shortage 수량
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      생산 부족 수량 — FA_DATE에 잡혔는데 아직 PROD_DATE가 '19991231'(미생산)인 PCARD_QTY 합계.
+      화면 'Div=P' (Production)에 해당.
+      [확정: P_MSPD90000S_Q_V14 라인 32-61 검증]
+      참고: filter는 raw 컬럼(PROD_DATE 문자열) 비교 — 1층 dimension prod_date는 TO_DATE 변환식이라 사용 안 함.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('item_class_type') }} <> 'FG'
+      AND PROD_DATE = '19991231'
+
+  # ---------------------------------------------------------------------------
+  # 2. Outgoing Shortage — V_P_DIV='O' 분기
+  # ---------------------------------------------------------------------------
+
+  - name: outgoing_shortage_qty
+    label: Outgoing Shortage 수량
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      출고 부족 수량 — FA_DATE에 잡혔고 END_ROUTING_YN='Y'(라인 마지막)인데 아직 OUT_DATE가 '19991231'(미출고)인 PCARD_QTY 합계.
+      입고 매칭(PROD_MOVE_TYPE='MOVE')은 별도 EXISTS로 확인됨.
+      화면 'Div=O' (Outgoing)에 해당.
+      [확정: P_MSPD90000S_Q_V14 라인 111-156 검증]
+      참고: filter는 raw 컬럼(OUT_DATE 문자열) 비교 — 1층 dimension out_date는 TO_DATE 변환식이라 사용 안 함.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('item_class_type') }} <> 'FG'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND OUT_DATE = '19991231'
+
+  # ---------------------------------------------------------------------------
+  # 3. Both Shortage — V_P_DIV='B' 분기
+  # ---------------------------------------------------------------------------
+
+  - name: total_shortage_qty
+    label: 전체 Shortage 수량 (Production + Outgoing)
+    type: derived
+    type_params:
+      expr: production_shortage_qty + outgoing_shortage_qty
+      metrics:
+        - name: production_shortage_qty
+        - name: outgoing_shortage_qty
+    description: |
+      Production Shortage + Outgoing Shortage 합산.
+      화면 'Div=B' (Both)에 해당.
+      [확정: P_MSPD90000S_Q_V14 라인 202-355 검증 (V_P_DIV='B' 분기)]
+
+  # ---------------------------------------------------------------------------
+  # 4. FG (Finished Goods) Shortage — UP으로 별도 UNION 처리
+  # ---------------------------------------------------------------------------
+
+  - name: fg_production_shortage_qty
+    label: FG Production Shortage 수량 (UP만)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      완제품(FG) 생산 부족 — 프로시저는 ITEM_CLASS_TYPE='FG' 입력 시 ITEM_CLASS_TYPE='UP'으로 변환해서 조회.
+      Upper(UP)만 FG 후보로 본다는 의미.
+      [확정: P_MSPD90000S_Q_V14 라인 78-92 (UNION 부분) 검증]
+      참고: filter는 raw 컬럼(PROD_DATE 문자열) 비교.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('item_class_type') }} = 'UP'
+      AND PROD_DATE = '19991231'

@@ -1,0 +1,182 @@
+semantic_models:
+  - name: msbp_roll_lot_new
+    description: "롤 LOT 신규본 — MSBP_ROLL_LOT의 신규 버전. 더 단순한 컬럼 구조 (34컬럼)"
+    model: OCI.MSBP_ROLL_LOT_NEW
+
+    entities:
+      - name: lot
+        type: primary
+        expr: BAR_KEY
+        description: "바코드 — PK [추측: 정의서에 PK 명시 없으나 unique key로 보임]"
+
+      - name: factory
+        type: foreign
+        expr: FACTORY
+        description: "공장 코드 (샘플: JJ)"
+
+      - name: mcs
+        type: foreign
+        expr: MCS_CD
+        description: "MCS 코드. MSBP_MCS와 조인 가능 [추측]. 샘플: 'OGRSLC 001'"
+
+      - name: model
+        type: foreign
+        expr: MODEL_CD
+        description: "모델 코드 (샘플: DQ8426-007)"
+
+      - name: emp
+        type: foreign
+        expr: EMP_ID
+        description: "사원 ID (샘플: '15082970 - ELINA MAHULAE')"
+
+    dimensions:
+      - name: area_cd
+        type: categorical
+        expr: AREA_CD
+        description: "위치 코드 (샘플: B1)"
+
+      - name: lot_no
+        type: categorical
+        expr: LOT_NO
+        description: "LOT 번호"
+
+      - name: lot_no_seq
+        type: categorical
+        expr: LOT_NO_SEQ
+        description: "LOT 번호 차수 (NUMBER(13))"
+
+      - name: lot_type
+        type: categorical
+        expr: LOT_TYPE
+        description: "LOT 유형 (1자리, 샘플: L)"
+
+      - name: mcs_name
+        type: categorical
+        expr: MCS_NAME
+        description: "MCS 명 (샘플: 'OGRSLC 001 NO REGRIND')"
+
+      - name: mcs_color
+        type: categorical
+        expr: MCS_COLOR
+        description: "MCS 색상 (샘플: 'BLACK(00A)')"
+
+      - name: mcs_color_name
+        type: categorical
+        expr: MCS_COLOR_NAME
+        description: "MCS 색상명"
+
+      - name: model_name
+        type: categorical
+        expr: MODEL_NAME
+        description: "모델 명 (샘플: 'AIR JORDAN 1 MID')"
+
+      - name: op_cd
+        type: categorical
+        expr: OP_CD
+        description: "공정 코드 (샘플: AGIN)"
+
+      - name: ymd
+        type: time
+        expr: "TO_DATE(YMD, 'YYYYMMDD')"
+        description: "일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: hms
+        type: categorical
+        expr: HMS
+        description: "시간 (VARCHAR2(6) HHMMSS, 샘플: 51942 — 앞 0 빠짐)"
+
+      - name: io_div
+        type: categorical
+        expr: IO_DIV
+        description: "입출 구분 (1자리, 샘플: F)"
+
+      - name: upd_user
+        type: categorical
+        expr: UPD_USER
+        description: "수정자 (샘플: rb.ade, rb.asep)"
+
+      - name: upd_ymd
+        type: time
+        expr: UPD_YMD
+        description: "수정 일자 (DATE)"
+
+      - name: download_yn
+        type: categorical
+        expr: DOWNLOAD_YN
+        description: "다운로드 유무 (정의서 오타: '다운도르 유무')"
+
+      - name: upload_yn
+        type: categorical
+        expr: UPLOAD_YN
+        description: "업로드 유무 (Y/N)"
+
+      - name: locate_cd
+        type: categorical
+        expr: LOCATE_CD
+        description: "로케이션 코드 (샘플: L36-03, L48-07)"
+
+      - name: check_cd
+        type: categorical
+        expr: CHECK_CD
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: check_rs
+        type: categorical
+        expr: CHECK_RS
+        description: "[정의서: '정확한 의미를 모름']"
+
+      - name: press_op_cd
+        type: categorical
+        expr: PRESS_OP_CD
+        description: "차기 공정 코드 (샘플: OS)"
+
+      - name: processflag
+        type: categorical
+        expr: PROCESSFLAG
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: product_definition_id
+        type: categorical
+        expr: PRODUCTDEFINITIONID
+        description: "SAP에서 Interface 되는 데이터 [정의서 명시]"
+
+      - name: thickness
+        type: categorical
+        expr: THICKNESS
+        description: "두께 (샘플: OSP56, OSP58)"
+
+      - name: close_yn
+        type: categorical
+        expr: CLOSE_YN
+        description: "종료 구분 (Y/N)"
+
+      - name: input_proc
+        type: categorical
+        expr: INPUT_PROC
+        description: "Procedure 명 (샘플: 'FIN_S:SP_GMES0505_S')"
+
+      - name: proc_memo
+        type: categorical
+        expr: PROC_MEMO
+        description: "[정의서: '데이터 존재하지 않음']"
+
+    measures:
+      - name: roll_lot_new_count
+        agg: count
+        expr: BAR_KEY
+        description: "롤 LOT(신규) 행 수"
+
+      - name: weight
+        agg: sum
+        expr: WEIGHT
+        description: "중량 합계 (NUMBER(20,8))"
+
+      - name: st_er
+        agg: sum
+        expr: ST_ER
+        description: "ER 시작 (CE팀) [정의서 명시]"
+
+      - name: check_er
+        agg: sum
+        expr: CHECK_ER
+        description: "ER 종료 (CE팀) [정의서 명시]"

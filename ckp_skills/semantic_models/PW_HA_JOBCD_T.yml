@@ -1,0 +1,79 @@
+semantic_models:
+  - name: pw_ha_jobcd_t
+    description: |
+      직무 마스터(Job Code) — 직무 코드(JOBCD) → 직무명(JOBCD_NM) 디코드 + 직무 계층/노무구분 정보. 워크포스(인사·근태)에서 JOBCD 를 이름으로 풀 때 쓴다.
+      [확정: DB 검증] 2,443행, distinct JOBCD 1,156, 그중 EFF_STATUS='A' 활성 661종, DATASET 1종. ⚠️ 같은 JOBCD 가 중복 적재되어 있다(예 'A116' 2행) → 조인 시 반드시 DISTINCT + EFF_STATUS='A' 로 dedup.
+      [확정: DB 검증] 인사 PW_HR_ACTION_T.JOBCD 및 근태 PW_TL_DAILY_T.JOBCD 와 같은 코드 체계. 예 B326=IP Injection Associate(JOBCLS=B32, LVL=6, PPH=D), A116=Assembly Associate, B732=Phylon Press Lead(LVL=2, PPH=I).
+      엑셀 보강(중요): 사용자 제공 엑셀 'JOB CLASS(PW_HA_JOBCD)' 시트(655행)는 이 테이블에 없는 4단 계층명과 KPI 분류를 더한 레퍼런스다 → semantic_models/ref/job_class_hierarchy.csv 로 저장.
+      [확정: DB 대조] 엑셀 J_LEVEL_CD = DB JOBCD, J_LEVEL_NM = JOBCD_NM, J_JOB_CD = JOBCLS, LEVEL_CD = JOBCD_LVL 로 정확히 일치(샘플 검증). 엑셀이 추가로 제공하는 것: J_FAMILY/J_FUNCTION 코드·명, J_JOB_NAME(직무 그룹명), EMP_CLS_KPI(Office Worker/Production Worker), OH_TYPE(SOH/SG&A/OH Indirect/-). 이 4종은 DB 테이블에 없으므로 CSV 가 진실의 출처.
+    model: OCI.PW_HA_JOBCD_T
+
+    entities:
+      - name: jobcd_key
+        type: primary
+        expr: "SERVICE_ID || '|' || DATASET || '|' || JOBCD || '|' || TO_CHAR(EFFDT,'YYYYMMDD')"
+        description: "직무 마스터 식별자. 비즈니스 디코드 키는 JOBCD(+ EFF_STATUS='A'). 중복행이 있어 DISTINCT/dedup 필요."
+
+      - name: jobcd
+        type: foreign
+        expr: JOBCD
+        description: "직무 코드. VARCHAR2(80, 실값 4자 예 'B326'). 인사·근태 테이블의 JOBCD 와 조인하는 키."
+
+    dimensions:
+      - name: jobcd_nm
+        type: categorical
+        expr: JOBCD_NM
+        description: "직무명(디코드 결과). VARCHAR2(200). 예 'IP Injection Associate', 'Phylon Press Lead', 'Assembly Associate'. 답변에 코드 대신 노출."
+
+      - name: jobcd_snm
+        type: categorical
+        expr: JOBCD_SNM
+        description: "직무 약칭. VARCHAR2(40). NULL 가능."
+
+      - name: jobcls
+        type: categorical
+        expr: JOBCLS
+        description: "직무 클래스(상위 그룹 코드, 예 'B32'). VARCHAR2(80). 엑셀의 J_JOB_CD 와 동일. 직무 그룹 단위 롤업 키."
+
+      - name: jobcd_lvl
+        type: categorical
+        expr: JOBCD_LVL
+        description: "직무 레벨(숫자, 예 '6'=Associate, '2'=Lead). VARCHAR2(40). 엑셀의 LEVEL_CD 와 동일. 직급/숙련 단계 구분."
+
+      - name: pph_flag
+        type: categorical
+        expr: PPH_FLAG
+        description: "노무 구분. VARCHAR2(40). [확정: 근태/인사 공통 체계] 'D'=Direct, 'I'=Indirect, 'O'=Overhead. 직무 자체의 직접/간접 성격."
+
+      - name: eff_status
+        type: categorical
+        expr: EFF_STATUS
+        description: "효력 상태. VARCHAR2(4). 'A'=Active. ⚠️ 디코드 조인 시 EFF_STATUS='A' 필수(폐지/중복행 제거)."
+
+      - name: effdt
+        type: time
+        expr: EFFDT
+        description: "효력일. DATE. 중복행 dedup 시 최신 EFFDT 채택 가능."
+
+      # ── 엑셀 보강(ref/job_class_hierarchy.csv, DB 미보유) ──
+      # 아래 4종은 DB 테이블에 없고 CSV 로만 제공된다. JOBCD 로 CSV 를 LEFT JOIN 해 사용.
+      # · J_FAMILY_CD / J_FAMILY_NM : 직무 패밀리(최상위, 예 B00 Bottom / X00 Development)
+      # · J_FUNCTION_CD / J_FUNCTION_NM : 직무 펑션(예 B30 IP)
+      # · J_JOB_NAME : 직무 그룹명(JOBCLS 의 이름, 예 'IP Injection')
+      # · EMP_CLS_KPI : 'Office Worker' / 'Production Worker' (사무직/생산직 KPI 분류)
+      # · OH_TYPE : 'SOH' / 'SG&A' / 'OH Indirect' / '-' (오버헤드 유형)
+      - name: emp_cls_kpi_ref
+        type: categorical
+        expr: "JOBCD"
+        description: "(엑셀 보강) 사무직/생산직 KPI 분류. CSV(ref/job_class_hierarchy.csv)의 EMP_CLS_KPI 를 JOBCD 로 조인해 얻는다. 값 'Office Worker' / 'Production Worker'. DB 컬럼 아님."
+
+      - name: oh_type_ref
+        type: categorical
+        expr: "JOBCD"
+        description: "(엑셀 보강) 오버헤드 유형. CSV 의 OH_TYPE 를 JOBCD 로 조인. 값 'SOH'/'SG&A'/'OH Indirect'/'-'. DB 컬럼 아님."
+
+    measures:
+      - name: jobcd_count
+        agg: count
+        expr: JOBCD
+        description: "직무 코드 수. 보통 집계 대상이 아니라 디코드/계층 조인용 차원. 활성 직무 종수는 COUNT(DISTINCT JOBCD) WHERE EFF_STATUS='A'."

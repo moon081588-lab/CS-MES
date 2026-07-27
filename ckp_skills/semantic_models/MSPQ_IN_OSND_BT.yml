@@ -1,0 +1,231 @@
+semantic_models:
+  - name: mspq_in_osnd_bt
+    description: |
+      Internal OS&D (Bottom Internal OS&D Register) — CKP 공장 **내부** 프레스/OP별 생산 불량 등록 테이블.
+      화면명 "Bottom Internal OS&D Register" (SCR-007). 프로시저는 MSPQ_IN_OSND_BT 를 메인으로 조회.
+      ※ External OS&D(MSPQ_EX_OSND / SCR-005·006)와 **완전히 다른 화면·테이블**이다. 같은 "OS&D" 약어를
+        쓸 뿐, External=공장 간 후보충(Supply→Demand), Internal=공장 내부 불량. 혼동 금지.
+
+      [확정: DB 검증 2026-07-11 / 최근 1개월]
+        - 한 행 = 1 OSND_ID (물리 PK). 베이스 테이블이 이미 OSND_ID당 1행 → 화면 procedure의
+          dedup(ROW_NUMBER PARTITION BY OSND_ID … WHERE RN=1)은 OCI에선 불필요. 그 dedup은 @JJEDIF
+          색상 조인 fan-out을 제거하려던 것이며 색상 '이름'용일 뿐 수량엔 영향 없음.
+        - 취소(CANCEL) 컬럼 없음 → External과 달리 CANCEL_YN 필터 불필요.
+
+      ★ 공정(건물) 롤업 — PB_CD 기준 [확정: DB 검증. 화면의 "Plant Building" 필터와 1:1 일치]
+        - PB_CD='CKP-A'  → IP     (OP_CD=IPI; +IPU 등장 시 IP)
+        - PB_CD='CKP-B'  → Phylon (OP_CD=PHH + PHM; +PHU 등장 시 Phylon)
+        - OP 세부: IPI=IP Injection / PHH=Phylon Press(SUB_WC=CTM01~30) / PHM=CMP Press(SUB_WC=CP01~06)
+        - ⚠️ 현장 정의 "Phylon = Phylon Press + CMP Press" = PHH + PHM. Phylon을 PHH만으로 잡으면
+          CMP Press(PHM) 누락으로 수량 과소. 반드시 롤업(PB_CD='CKP-B' 또는 OP_CD IN ('PHH','PHM','PHU')).
+
+      ★ OSND_TYPE 디코드 — MSBS_CODE_MASTER CODE_CLASS_CD='PQ_GRADE_TYPE' (PLANT_CD 스코프)
+        [확정: DB 직접 조회 2026-07-11]. ※ PQ_OSND_TYPE 아님(External과 다름).
+        생산 하위단계(grade) 코드이며 "검사단계" 아님. Plant 3120 전체 코드:
+          9=Production-Trim, 10=Production-UV, 11=Production-HK, 12=Production-Buff,
+          13=Production-CTM, 14=Production-Spray, 15=Production-CMP, 16=Production-IPF,
+          8=Overrun, 7=CFM, 6=Test, 5=Sales Sample, 4=Trial, 3=Other, 2=Change Lot.
+        실사용 예(07-11): PHH→{13 CTM, 10 UV, 9 Trim}, PHM→{15 CMP}.
+
+      ★ 수량 단위 — OSND_BT_QTY는 **낱개(원본, L/R 개별)**. 화면 Grand Total도 낱개 기준.
+        켤레 환산 = OSND_BT_QTY/2 는 **근사치**(LR_CD로 L/R이 행마다 분리되어 있고 L+R 짝 보장 없음).
+        기본 표기=낱개, 켤레(÷2) 병기.
+
+      [재현 검증 2026-07-11, PB_CD='CKP-B'(Phylon)]: SUM(OSND_BT_QTY)=4,411(=PHH 3,801+PHM 610)
+        → 화면 Grand Total OS&D Qty 4,411 정확히 일치. REPL_QTY는 후보충 진행에 따라 갱신되는 라이브
+        컬럼이라 캡처 시점차 발생 가능(등록 수량 OSND_BT_QTY는 불변).
+    model: OCI.MSPQ_IN_OSND_BT
+
+    entities:
+      - name: osnd
+        type: primary
+        expr: OSND_ID
+        description: "Internal OS&D ID (NUMBER(14)) — PK. 한 행 = 1 OSND_ID."
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드. CKP=3120 [확정]."
+
+      - name: ord_plant
+        type: foreign
+        expr: ORD_PLANT_CD
+        description: "Order 공장 코드"
+
+      - name: style
+        type: foreign
+        expr: STYLE_CD
+        description: "스타일 코드. MSBS_ITEM_STYLE(OCI 존재) 조인으로 STYLE_NAME 디코드 가능."
+
+      - name: item
+        type: foreign
+        expr: ITEM_CD
+        description: "반제 코드"
+
+      - name: prod_order
+        type: foreign
+        expr: PROD_ORDER_NO
+        description: "프로덕션 오더 번호"
+
+      - name: prod_group
+        type: foreign
+        expr: PROD_GROUP_NO
+        description: "프로덕션 그룹 번호 (NULL 가능)"
+
+      - name: mcs
+        type: foreign
+        expr: MCS_CD
+        description: "MCS 코드"
+
+      - name: pcard
+        type: foreign
+        expr: "PLANT_CD || '|' || PCARD_KEY"
+        description: "패스카드 Key (NULL 가능)"
+
+      - name: grade_type_code
+        type: foreign
+        expr: OSND_TYPE
+        description: |
+          생산 하위단계(grade) 코드 — MSBS_CODE_MASTER(CODE_CLASS_CD='PQ_GRADE_TYPE', PLANT_CD 스코프)의
+          SUB_CODE와 조인. [확정: DB 직접 조회 2026-07-11] 13=Production-CTM,10=Production-UV,9=Production-Trim,
+          15=Production-CMP,16=Production-IPF,14=Production-Spray,11=Production-HK,12=Production-Buff,8=Overrun 등.
+          ⚠️ External의 PQ_OSND_TYPE 아님. "검사단계" 아님.
+
+    dimensions:
+      - name: osnd_date
+        type: time
+        expr: "TO_DATE(OSND_DATE, 'YYYYMMDD')"
+        description: "OS&D 발생 일자 (VARCHAR2 YYYYMMDD). 화면 Date 필터. 기간은 OSND_DATE 리터럴 범위로."
+
+      - name: osnd_dt
+        type: time
+        expr: OSND_DT
+        description: "OS&D 발생 일시 (DATE, 시간 포함). 시간대별(HOUR) 분석용."
+
+      - name: pb_cd
+        type: categorical
+        expr: PB_CD
+        description: |
+          Plant Building (건물). [확정: DB 검증] CKP-A=IP(IPI), CKP-B=Phylon(PHH+PHM).
+          화면 "Plant Building" 필터. **공정 롤업의 기준 컬럼(가장 견고).**
+
+      - name: op_cd
+        type: categorical
+        expr: OP_CD
+        description: |
+          공정(OP) 코드. [확정: DB 검증] IPI=IP Injection / PHH=Phylon Press / PHM=CMP Press.
+          (PHU=Phylon UV, IPU 등장 가능 — 각각 Phylon/IP로 롤업). 화면 Process 필터.
+
+      - name: sub_wc_cd
+        type: categorical
+        expr: SUB_WC_CD
+        description: "서브 작업장/라인 코드. [확정] PHH→CTM01~30, PHM→CP01~06. 화면 Line 필터. (라인 '이름' 테이블 MSBS_WC_SUB는 OCI 부재 → 코드로 표기)"
+
+      - name: machine_cd
+        type: categorical
+        expr: MACHINE_CD
+        description: "머신 코드 (주로 IPI에서 사용, VARCHAR2(10))."
+
+      - name: osnd_type
+        type: categorical
+        expr: OSND_TYPE
+        description: |
+          생산 하위단계(grade) 코드. [확정: DB 2026-07-11] MSBS_CODE_MASTER(CODE_CLASS_CD='PQ_GRADE_TYPE',
+          PLANT_CD='3120')로 디코드: 13=Production-CTM,10=Production-UV,9=Production-Trim,15=Production-CMP 등.
+          화면 Grade 필터. ⚠️ PQ_OSND_TYPE(External) 아님·"검사단계" 아님. OP 롤업의 대체축으로 쓰지 말 것.
+
+      - name: reason_cd
+        type: categorical
+        expr: REASON_CD
+        description: "불량 사유 코드. (사유 '이름' 디코드 테이블 MSPQ_OP_DEFECT는 OCI 부재 → 코드로 표기)"
+
+      - name: input_type
+        type: categorical
+        expr: INPUT_TYPE
+        description: "입력 유형 (VARCHAR2(4))"
+
+      - name: item_class
+        type: categorical
+        expr: ITEM_CLASS
+        description: "반제 클래스. MSBS_ITEM_CLASS(OCI 존재) 조인으로 ITEM_CLASS_NAME 디코드 가능. (샘플: PH-IPF)"
+
+      - name: size_cd
+        type: categorical
+        expr: SIZE_CD
+        description: "사이즈 (샘플: 8T). 정렬은 REPLACE(SIZE_CD,'T','.5') 후 숫자."
+
+      - name: lr_cd
+        type: categorical
+        expr: LR_CD
+        description: "왼쪽/오른쪽 (L/R). 켤레 환산이 근사인 이유 — 행마다 L 또는 R 단위로 적재."
+
+      - name: mold_cd
+        type: categorical
+        expr: MOLD_CD
+        description: "몰드 코드"
+
+      - name: mold_id
+        type: categorical
+        expr: MOLD_ID
+        description: "몰드 ID (샘플: IPF 001)"
+
+      - name: color_cd
+        type: categorical
+        expr: COLOR_CD
+        description: "색상 코드. (색상 '이름'은 EPPP_MAT_MCS_COLOR_INFO@JJEDIF — OCI 부재 → 코드로 표기)"
+
+      - name: shift_cd
+        type: categorical
+        expr: SHIFT_CD
+        description: "교대(시프트) 코드. (교대 '이름' COMCODEMASTER@JJEDIF — OCI 부재 → 코드로 표기)"
+
+      - name: rework_date
+        type: time
+        expr: "TO_DATE(REWORK_DATE, 'YYYYMMDD')"
+        description: "재작업 일자"
+
+      - name: repl_dt
+        type: time
+        expr: REPL_DT
+        description: "후보충(Replenishment) 일시 (DATE). REPL_QTY가 채워진 시점."
+
+      - name: repl_cfm_dt
+        type: time
+        expr: REPL_CFM_DT
+        description: "후보충 확인 일시 (DATE)"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "등록 일시 (DATE)"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "등록자"
+
+    measures:
+      - name: osnd_count
+        agg: count
+        expr: OSND_ID
+        description: "Internal OS&D 행 수 (= OSND_ID 수, 1행=1건)."
+
+      - name: osnd_bt_qty
+        agg: sum
+        expr: OSND_BT_QTY
+        description: "내부 불량 등록 수량 합계 — **낱개(원본)**. NUMBER(6). 화면 'OS&D Qty' Grand Total과 대응(불변)."
+
+      - name: repl_qty
+        agg: sum
+        expr: "NVL(REPL_QTY,0)"
+        description: "후보충 완료 수량 합계 — 낱개. NUMBER(6). 화면 'Repl'. ⚠️라이브 갱신 컬럼(캡처 시점차)."
+
+      - name: balance_qty
+        agg: sum
+        expr: "NVL(OSND_BT_QTY,0) - NVL(REPL_QTY,0)"
+        description: "잔량 합계 = 등록 - 후보충 — 낱개. 화면 'Bal'. [확정: procedure BALANCE 정의 라인 검증]."
+
+      - name: rework_qty
+        agg: sum
+        expr: REWORK_QTY
+        description: "재작업 수량 합계 (NUMBER(6))."

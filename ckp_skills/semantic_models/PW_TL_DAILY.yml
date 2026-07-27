@@ -1,0 +1,104 @@
+semantic_models:
+  - name: pw_tl_daily
+    description: |
+      ⚠️ [LEGACY — v9부터 비주력] 이 테이블(OCI.PW_TL_DAILY)은 '결격 사유가 있는 사원-일'만 적재하던 구버전 6-플래그 예외로그다.
+      v9 의 주력 근태 테이블은 OCI.PW_TL_DAILY_T(semantic_models/PW_TL_DAILY_T.yml) 다 — 풀 로스터 + 실제 스캔시각 + 부서/직무/PPH 보유, 율 KPI 산출 가능.
+      특별히 구버전 6-플래그 기준 분석을 요청받은 경우에만 이 모델을 사용하고, 일반 근태 질문은 PW_TL_DAILY_T 로 처리한다.
+      [확정: DB 검증] 적재 범위 — FACTORY_CODE 'JJ' 단일, WORK_DATE 2026-01-02 ~ 2026-06-10, 34,414행(예외로그 성격).
+      ---
+      (이하 구버전 정의 원문)
+      일별 근태(Time & Labor) 실적 — 사원 1명의 하루 근태를 1행으로 보관하는 상세(detail) 테이블.
+      행 단위(grain): (공장, 작업일자, 사번). 즉 한 행 = "그 날짜의 한 사원" 기록이다.
+      결근/연차/휴가/출산휴가/무급휴가/병가 6개 컬럼은, 그 사원이 그날 해당 출석 결격 사유에 해당하면 '1', 아니면 '0' 으로 찍히는 사원별 플래그다.
+      (인원수·합계가 아니라, 그 사원 한 명의 해당 여부. 그래서 measure 가 아니라 dimension 으로 둔다.)
+      6개 플래그가 모두 '0' 이면 그날 결격 사유 없이 정상 출근한 것을 의미한다.
+      사유별 집계가 필요하면 해당 플래그 dimension = '1' 로 필터한 뒤 행 수(tl_daily_count)를 세면 된다.
+      모든 컬럼의 한글명·데이터타입은 PW_TL_DAILY 컬럼 정의서 기준.
+    model: OCI.PW_TL_DAILY
+
+    entities:
+      - name: tl_daily
+        type: primary
+        expr: "FACTORY_CODE || '|' || WORK_DATE || '|' || EMP_ID"
+        description: "일별 근태 식별자 — 한 사원의 하루 1행 (FACTORY_CODE + WORK_DATE + EMP_ID 복합키)"
+
+      - name: factory
+        type: foreign
+        expr: FACTORY_CODE
+        description: "공장 코드. VARCHAR2(10 Byte). 샘플 'JJ' 확인. MES 표준 PLANT_CD(JJ=3110 / CKP=3120 / RJ=3210 / JJS=3220)와 동일 코드체계, MSBS_PLANT 조인 가능"
+
+      - name: emp
+        type: foreign
+        expr: EMP_ID
+        description: "사번. VARCHAR2(10 Byte). 이 행의 주체가 되는 사원 — 이 사원의 그날 근태가 한 행으로 기록됨. 사원 마스터와 조인 가능"
+
+      - name: dept
+        type: foreign
+        expr: DEPT_CD
+        description: "부서 코드. VARCHAR2(10 Byte). 부서 마스터와 조인 가능"
+
+    dimensions:
+      - name: work_date
+        type: time
+        expr: "TO_DATE(WORK_DATE, 'YYYYMMDD')"
+        description: "작업(근태) 일자. VARCHAR2(8 Byte), YYYYMMDD 문자열 → TO_DATE 변환"
+
+      - name: emp_name
+        type: categorical
+        expr: EMP_NAME
+        description: "성명. VARCHAR2(100 Byte). 해당 행 사원의 이름"
+
+      - name: dept_nm
+        type: categorical
+        expr: DEPT_NM
+        description: "부서명. VARCHAR2(100 Byte)"
+
+      - name: absent
+        type: categorical
+        expr: ABSENT
+        description: "결근 여부 플래그. VARCHAR2(1 Byte). 이 사원이 그날 결근이면 '1', 아니면 '0'"
+
+      - name: annulal_leave
+        type: categorical
+        expr: ANNULAL_LEAVE
+        description: "연차 여부 플래그. VARCHAR2(1 Byte). 이 사원이 그날 연차면 '1', 아니면 '0'. 컬럼명 철자는 'ANNULAL'(ANNUAL 오타) 원문 유지"
+
+      - name: premit_leave
+        type: categorical
+        expr: PREMIT_LEAVE
+        description: "휴가 여부 플래그. VARCHAR2(1 Byte). 이 사원이 그날 휴가면 '1', 아니면 '0'. 컬럼명 철자는 'PREMIT'(PERMIT 오타) 원문 유지"
+
+      - name: maternity_leave
+        type: categorical
+        expr: MATERNITY_LEAVE
+        description: "출산휴가 여부 플래그. VARCHAR2(1 Byte). 이 사원이 그날 출산휴가면 '1', 아니면 '0'"
+
+      - name: permit_no_pay
+        type: categorical
+        expr: PERMIT_NO_PAY
+        description: "무급휴가 여부 플래그. VARCHAR2(1 Byte). 이 사원이 그날 무급휴가면 '1', 아니면 '0'"
+
+      - name: sick_leave
+        type: categorical
+        expr: SICK_LEAVE
+        description: "병가 여부 플래그. VARCHAR2(1 Byte). 이 사원이 그날 병가면 '1', 아니면 '0'"
+
+      - name: update_date
+        type: time
+        expr: UPDATE_DATE
+        description: "수정 일자. DATE 타입이므로 TO_DATE 변환 불필요. (샘플 값 비어있음)"
+
+      - name: update_user
+        type: categorical
+        expr: UPDATE_USER
+        description: "수정자. VARCHAR2(50 Byte). (샘플 값 비어있음)"
+
+    measures:
+      - name: tl_daily_count
+        agg: count
+        expr: EMP_ID
+        description: |
+          근태 레코드(행) 수 — 사원 1명의 하루가 1행.
+          이 한 개 measure 를 플래그 dimension 으로 필터해서 사유별 집계를 낸다.
+          예) absent = '1' 필터 후 행 수 → 그날 결근 건수,
+              6개 플래그가 모두 '0' 인 행 수 → 그날 정상 출근 건수.

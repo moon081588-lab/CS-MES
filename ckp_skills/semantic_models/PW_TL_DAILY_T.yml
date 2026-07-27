@@ -1,0 +1,277 @@
+semantic_models:
+  - name: pw_tl_daily_t
+    description: |
+      일별 근태(Time & Labor) 실적 — 사원 1명의 하루 근태를 1행으로 보관하는 상세(detail) 테이블.
+      [확정: DB 검증] CKP(CIKAMPEK) 근무자의 2026-01-01 ~ 현재 + 미래 예정분까지 적재. COMPANY 는 전부 'JJ'(법인 코드이며 공장 코드가 아님), 실제 공장/부서는 DEPT_FNM(예: 'CIKAMPEK IP - INJECTION GROUP C')로 식별.
+      행 단위(grain): (EMPID, TL_DATE) 1행. [확정: DB 검증 — 985,986행 = distinct(EMPID|TL_DATE), 사원 2,542명] 즉 한 행 = "그 날짜의 한 사원" 기록이다.
+      이 테이블은 구버전 OCI.PW_TL_DAILY(결격 사유만 적재하던 6-플래그 예외로그, §legacy)를 대체하는 풀 로스터(full roster)다.
+      핵심 차이: 정상 출근 행(WORK_STATUS='AT')이 실제 스캔 시각과 함께 적재되므로, 모집단(분모)이 테이블 안에 존재한다 → 출근율·지각·조퇴 등 율(rate) KPI 산출이 가능하다.
+      WORK_STATUS 한 컬럼이 그날의 근태 상태를 단일 코드로 표현한다(구버전의 6개 사유 플래그를 대체). 단, 결근(Absent)만은 예외로 WORK_STATUS='AB' 와 결근 사유코드 CHAR10_02='016' 을 OR 로 함께 봐야 한다([확정: 사용자 회신]).
+      모든 컬럼의 의미는 DB 실데이터 집계 + 사용자 회신으로 검증한 범위에서만 [확정]으로 표기한다. 검증 안 된 코드 값은 의미를 단정하지 않고 '미확정'으로만 두며(추측 라벨 미사용), 집계에서는 제외 규칙으로 안전 처리한다.
+    model: OCI.PW_TL_DAILY_T
+
+    entities:
+      - name: tl_daily_t
+        type: primary
+        expr: "SERVICE_ID || '|' || TL_DAILY_ID"
+        description: "일별 근태 식별자 — SERVICE_ID + TL_DAILY_ID(NUMBER) 가 물리 PK. 비즈니스 grain 은 (EMPID, TL_DATE)."
+
+      - name: emp
+        type: foreign
+        expr: EMPID
+        description: "사번. VARCHAR2(20). 이 행의 주체 사원. 사원 마스터와 조인 가능. [확정: (EMPID,TL_DATE) 가 유니크]"
+
+      - name: company
+        type: foreign
+        expr: COMPANY
+        description: "법인 코드. VARCHAR2(5). [확정: DB 검증 — 전 행이 'JJ' 단일값]. 공장 코드가 아니라 법인 코드이므로 plant 필터로 쓰지 말 것. 공장/부서 식별은 DEPT_FNM 사용."
+
+      - name: dept
+        type: foreign
+        expr: DEPT
+        description: "부서 코드(숫자형 문자열, 예 '290219'). VARCHAR2(20). 사람이 읽는 이름은 DEPT_FNM."
+
+    dimensions:
+      - name: tl_date
+        type: time
+        expr: TL_DATE
+        description: |
+          근태 일자. DATE 타입(TO_DATE 변환 불필요). 기간 필터는 DATE 리터럴로: TL_DATE BETWEEN DATE '2026-06-01' AND DATE '2026-06-10'.
+          [확정: DB 검증] 과거 실적부터 미래 예정분까지 포함. MAX 에 3031-09-04 같은 sentinel 미래일이 섞여 있으므로, 실적 집계 시 TL_DATE <= TRUNC(SYSDATE) 로 미래/sentinel 을 제외할 것.
+          [확정: 사용자 회신] 야간조(예: SHIFT 057, 22:30~익일 06:30)는 익일 새벽에 퇴근해도 TL_DATE 에 '근무 시작일'이 찍힌다. 즉 시프트 날짜 귀속이 이미 처리돼 있어 야간조를 어느 날로 셀지 별도 보정이 필요 없다. (SCHED_END_TIME/END_TIME 만 다음날로 넘어감)
+
+      - name: work_status
+        type: categorical
+        expr: WORK_STATUS
+        description: |
+          그날의 근태 상태 단일 코드. VARCHAR2(10). 구버전 6개 사유 플래그를 대체하는 핵심 컬럼.
+          [확정: 사용자 회신] 'AT' = 출근(Attendance), 'VC' = 휴가(Vacation), 'HO' = 휴일(Holiday).
+          [확정: 사용자 회신] 'NN' 은 생략(분석 미사용), '공백' 은 미래 예정분 등.
+          ⚠️ 결근(Absent)은 WORK_STATUS 단일 코드만으로 잡지 않는다.
+          [확정: 사용자 회신] 결근 = WORK_STATUS='AB' OR CHAR10_02='016'. 즉 'AB' 행 + 결근 사유코드 CHAR10_02='016' 행을 모두 포함한다.
+          (구버전에서 'AB'(26행)만으로 보던 결근은 과소집계였음. 실제 결근 판정은 CHAR10_02='016' 를 OR 로 함께 본다.)
+          [확정: DB 검증] WORK_STATUS 분포 — AT 282,849 / VC 122,995 / HO 109,619 / NN 55,192 / AB 26 / 공백 415,305.
+          ── 집계 규칙(숫자 보호용) ──
+          실적/율 집계의 모집단은 출근(AT) + 결근(AB OR CHAR10_02='016') 만 사용한다.
+          'VC'(휴가)는 분모에서 제외해 따로 관리. 'HO'(휴일)·'NN'(생략)·공백(미래 예정분 다수)은 실적 집계에서 제외.
+          반드시 TL_DATE <= TRUNC(SYSDATE) 와 함께 쓴다.
+
+      - name: char10_02
+        type: categorical
+        expr: CHAR10_02
+        description: |
+          확장 문자코드 컬럼. VARCHAR2(10). 일반적 의미는 미확정이나, [확정: 사용자 회신] 값 '016' 은 결근 사유코드다.
+          결근 판정에 사용: WORK_STATUS='AB' 와 함께 OR 로 묶어 결근(Absent)을 정의한다 → 결근 = (WORK_STATUS='AB' OR CHAR10_02='016').
+          NULL 비교 주의: CHAR10_02 가 NULL 인 행은 ='016' 이 거짓이 되어 결근으로 잡히지 않는다(정상). '016' 이외 값의 의미는 미확정이므로 단정하지 않는다.
+
+      - name: sched_id
+        type: categorical
+        expr: SCHED_ID
+        description: |
+          근무 스케줄 패턴 ID. VARCHAR2(30). 예: '3RD_SHIFT_CKP', 'NON_SHIFT', 'SHIFT_1'.
+          [확정: 사용자 회신] 'NON_SHIFT' 로 찍히면 사무직(교대 없이 근무하는 직원). 그 외 '*SHIFT*' 류는 교대 근무.
+
+      - name: rotation_id
+        type: categorical
+        expr: ROTATION_ID
+        description: "교대 로테이션 그룹. VARCHAR2(30). 예 'GROUP_A'/'GROUP_B'/'GROUP_C'. NON_SHIFT 는 공백."
+
+      - name: shift_id
+        type: categorical
+        expr: SHIFT_ID
+        description: "시프트 코드. VARCHAR2(30). 예 '025'/'038'/'057'/'001'. 구체 시각은 SCHED_BGN_TIME 으로 확인."
+
+      - name: day_type
+        type: categorical
+        expr: DAY_TYPE
+        description: "일자 유형. VARCHAR2(10). [확정: DB 분포] 값 — NOR / SAT / SUN / HOL / SHL / 공백. 코드 의미는 미확정이므로 단정하지 않음."
+
+      - name: bgn_status
+        type: categorical
+        expr: BGN_STATUS
+        description: "출근 스캔 상태 코드. VARCHAR2(10). 값 '001'/'002'/공백 존재. 코드 의미 미확정 — 분석에 사용하지 않음(지각 판정은 BGN_TIME 직접 비교)."
+
+      - name: end_status
+        type: categorical
+        expr: END_STATUS
+        description: "퇴근 스캔 상태 코드. VARCHAR2(10). 코드 의미 미확정 — 분석에 사용하지 않음."
+
+      - name: job_position
+        type: categorical
+        expr: JOB_POSITION
+        description: "직급 코드. VARCHAR2(40). 예 '250'. 사람이 읽는 이름은 JOB_POSITION_NM."
+
+      - name: job_position_nm
+        type: categorical
+        expr: JOB_POSITION_NM
+        description: "직급명. VARCHAR2(240). [확정: DB 분포] T/M(작업자, 대다수) / T/L / Staff / G/L / Assistant Manager / Chief / Manager / Senior Manager 등."
+
+      - name: jobcd
+        type: categorical
+        expr: JOBCD
+        description: "직무 코드. VARCHAR2(20). 예 'B326'. 사람이 읽는 이름은 JOBCD_NM."
+
+      - name: jobcd_nm
+        type: categorical
+        expr: JOBCD_NM
+        description: "직무명. VARCHAR2(200). 예 'IP Injection Associate', 'Phylon Press Associate', 'QC Associate'."
+
+      - name: pph_flag
+        type: categorical
+        expr: PPH_FLAG
+        description: |
+          노무 구분 플래그. VARCHAR2(10). [확정: 사용자 회신] 'D'=Direct(직접), 'I'=Indirect(간접), 'O'=Overhead(간접/관리).
+          [확정: DB 분포] D 829,294 / I 112,776 / O 43,916.
+
+      - name: dept_fnm
+        type: categorical
+        expr: DEPT_FNM
+        description: "부서 전체명(읽는 이름). VARCHAR2(800). 예 'CIKAMPEK IP - INJECTION GROUP C'. [확정: DB 검증 — 전부 CIKAMPEK 으로 시작 = CKP] 공장/공정/그룹을 담고 있어 부서별 집계의 표시명으로 사용."
+
+      - name: job_position_nm_supp
+        type: categorical
+        expr: SUPP_DEPT_FNM
+        description: "지원(파견) 부서 전체명. VARCHAR2(800). 해당 사원이 타 부서로 지원 근무한 경우의 부서명. 평소엔 비어있을 수 있음."
+
+      - name: display_name
+        type: categorical
+        expr: DISPLAY_NAME
+        description: "표시용 사원명(성명). VARCHAR2(600)."
+
+      # ── 생산 계층(라인/공정/셀) — 근태를 라인·공정 단위로 분해할 때 ──
+      - name: line
+        type: categorical
+        expr: LINE
+        description: "생산 라인 코드. VARCHAR2(10). 라인별 근태(출근율 등) 분해용. DEPT_FNM 이 이미 라인/그룹을 담는 경우가 많아 표시는 DEPT_FNM 병행."
+
+      - name: unit
+        type: categorical
+        expr: UNIT
+        description: "생산 공정(Unit) 코드. VARCHAR2(10). 공정별 근태 분해용."
+
+      - name: cell
+        type: categorical
+        expr: CELL
+        description: "셀(Cell) 코드. VARCHAR2(10). 최소 작업 단위."
+
+      # ── 파견/지원 근무(SUPP_*) — 사원이 타 부서로 지원 근무한 날의 소속 ──
+      # 평소엔 비어있고, 지원 근무 행에만 채워진다. '지원 나간/받은' 부서 기준 집계가 필요할 때 사용.
+      # SUPP_DEPT(지원부서코드)/SUPP_LINE/SUPP_UNIT/SUPP_CELL/SUPP_JOBCD/SUPP_PPH_FLAG,
+      # 표시명은 SUPP_DEPT_FNM(위 job_position_nm_supp)·SUPP_JOBCD_NM.
+      - name: supp_dept
+        type: categorical
+        expr: SUPP_DEPT
+        description: "지원(파견) 근무 부서 코드. VARCHAR2(20). 지원 근무 행에만 채워짐. 표시명은 SUPP_DEPT_FNM. '어느 부서로 지원 갔나' 분석용."
+
+      - name: supp_pph_flag
+        type: categorical
+        expr: SUPP_PPH_FLAG
+        description: "지원 근무 시의 노무 구분(D/I/O). VARCHAR2(10). 지원 근무 행에만."
+
+      # ── 잔업(Overtime) 시각군 — 잔업 KPI 필요 시에만 ──
+      # OT_BEF_*(근무 전 잔업)·OT_AFT_*(근무 후 잔업) 각각 REQ(예정)/실제(BGN/END)/APP(승인) TIMESTAMP 존재.
+      # 잔업시간 = (OT_BEF_END_TIME - OT_BEF_BGN_TIME) + (OT_AFT_END_TIME - OT_AFT_BGN_TIME). 대부분 NULL.
+      - name: ot_aft_bgn_time
+        type: time
+        expr: OT_AFT_BGN_TIME
+        description: "근무 후 잔업 시작(실제). TIMESTAMP(6). 잔업시간 산출 시 OT_AFT_END_TIME 과 짝. 대부분 NULL."
+
+      - name: ot_aft_end_time
+        type: time
+        expr: OT_AFT_END_TIME
+        description: "근무 후 잔업 종료(실제). TIMESTAMP(6)."
+
+    # ── 시각(TIMESTAMP) 컬럼 ── [확정: 사용자 회신 + DB 검증]
+    # SCHED_BGN_TIME/SCHED_END_TIME = 시스템이 만든 '예정' 출퇴근 시각.
+    # BGN_TIME/END_TIME            = 작업자가 실제 스캔한 '실적' 출퇴근 시각.  ← 지각/조퇴 계산의 핵심
+    # APP_BGN_TIME/APP_END_TIME    = SCHED_BGN/END 과 동일(승인 시각). 분석에서 무시 가능.
+    # OT_BEF_* / OT_AFT_*          = 근무 전/후 잔업(Overtime) 관련 시각군. (필요 시에만)
+      - name: sched_bgn_time
+        type: time
+        expr: SCHED_BGN_TIME
+        description: "예정 출근 시각(시스템 생성). TIMESTAMP(6). [확정: 사용자 회신] 실제 스캔이 아님."
+
+      - name: sched_end_time
+        type: time
+        expr: SCHED_END_TIME
+        description: "예정 퇴근 시각(시스템 생성). TIMESTAMP(6)."
+
+      - name: bgn_time
+        type: time
+        expr: BGN_TIME
+        description: "실제 출근 스캔 시각. TIMESTAMP(6). [확정: 사용자 회신] 작업자가 스캔한 실적. WORK_STATUS='AT' 행에 채워짐. SCHED_BGN_TIME 과 비교해 지각 산출."
+
+      - name: end_time
+        type: time
+        expr: END_TIME
+        description: "실제 퇴근 스캔 시각. TIMESTAMP(6). SCHED_END_TIME 과 비교해 조기퇴근 산출."
+
+      - name: app_bgn_time
+        type: time
+        expr: APP_BGN_TIME
+        description: "승인 출근 시각. TIMESTAMP(6). [확정: 사용자 회신] SCHED_BGN_TIME 과 동일하므로 분석에서 무시 가능."
+
+      - name: app_end_time
+        type: time
+        expr: APP_END_TIME
+        description: "승인 퇴근 시각. TIMESTAMP(6). SCHED_END_TIME 과 동일, 무시 가능."
+
+      - name: offset_minute
+        type: categorical
+        expr: OFFSET_MINUTE
+        description: |
+          스케줄 오프셋(분). NUMBER. 예 -60(시프트 시작 1시간 당김), -30/-90/30/60 등. 대부분 NULL.
+          [확정: DB 검증] 이 값은 SCHED_BGN_TIME 에 '이미 반영'돼 있다. (시프트 038 기본 14:30 → OFFSET -60 행은 SCHED_BGN=13:30, -180 행은 11:30)
+          ⚠️ 따라서 지각/근무시간 계산 시 OFFSET 을 SCHED_BGN_TIME 에 다시 더하거나 빼지 말 것 — 이중 보정이 된다. SCHED_BGN_TIME 을 그대로 신뢰해 쓴다.
+
+    measures:
+      - name: tl_count
+        agg: count
+        expr: EMPID
+        description: |
+          근태 레코드(행) 수 — 사원 1명의 하루가 1행.
+          WORK_STATUS 필터로 상태별 집계: WORK_STATUS='AT' → 출근 인원, 'VC' → 휴가 인원, 'HO' → 휴일.
+          결근 인원은 WORK_STATUS 단일값이 아니라 (WORK_STATUS='AB' OR CHAR10_02='016') 으로 잡는다.
+          분모(근무대상 인원) = 출근(AT) + 결근(AB OR CHAR10_02='016') → 출근율 = AT 행수 / 대상 행수.
+
+      - name: present_count
+        agg: count
+        expr: "CASE WHEN WORK_STATUS = 'AT' AND (CHAR10_02 <> '016' OR CHAR10_02 IS NULL) THEN EMPID END"
+        description: |
+          출근 인원 — WORK_STATUS='AT' 행 중 결근 사유코드(CHAR10_02='016')가 아닌 행 수. [확정: AT 행은 실제 스캔 시각 보유]
+          결근(AB OR CHAR10_02='016')과 상호배타가 되도록 '016' 행은 출근에서 제외 → 출근+결근 = 근무대상 이 성립.
+
+      - name: work_target_count
+        agg: count
+        expr: "CASE WHEN WORK_STATUS IN ('AT','AB') OR CHAR10_02 = '016' THEN EMPID END"
+        description: |
+          근무대상 인원(율 KPI 분모). 출근(AT) + 결근(AB OR CHAR10_02='016') 의 합집합.
+          [확정: 사용자 회신] 휴가(VC)는 분모에서 제외하고 따로 관리. 휴일(HO)·생략(NN)·미래 예정분(공백)도 제외.
+          출근율 = present_count / work_target_count, 결근율 = absent_count / work_target_count.
+          (present 와 absent 는 상호배타로 정의되어 present_count + absent_count = work_target_count.)
+
+      - name: absent_count
+        agg: count
+        expr: "CASE WHEN WORK_STATUS = 'AB' OR CHAR10_02 = '016' THEN EMPID END"
+        description: |
+          결근 인원. [확정: 사용자 회신] 결근 = WORK_STATUS='AB' OR CHAR10_02='016'.
+          'AB' 행(소수)뿐 아니라 결근 사유코드 CHAR10_02='016' 행을 OR 로 함께 포함한다. WORK_STATUS='AB' 만으로 세면 과소집계되므로 반드시 OR 조건을 함께 쓴다.
+
+      - name: vacation_count
+        agg: count
+        expr: "CASE WHEN WORK_STATUS = 'VC' THEN EMPID END"
+        description: "휴가 인원 — WORK_STATUS='VC'. [확정: 사용자] 율 분모에서 제외, 별도 관리 지표."
+
+      - name: late_count
+        agg: count
+        expr: "CASE WHEN WORK_STATUS = 'AT' AND BGN_TIME > SCHED_BGN_TIME THEN EMPID END"
+        description: |
+          지각 인원 — 출근 행 중 실제 스캔(BGN_TIME)이 예정(SCHED_BGN_TIME)보다 늦은 행 수.
+          [확정: DB 검증] (1) BGN/SCHED_BGN_TIME 이 풀 TIMESTAMP 라 야간조(자정 넘김)도 보정 없이 정상 동작.
+          (2) OFFSET_MINUTE 는 SCHED_BGN_TIME 에 이미 반영됨(예: 시프트 038 기본 14:30, OFFSET -60 행은 SCHED_BGN=13:30) → 지각식에 OFFSET 을 재적용하지 말 것(이중 보정 오류).
+          (3) 유예시간(grace) [확정: 사용자] 없음 — 1분만 늦어도 지각. 즉 BGN_TIME > SCHED_BGN_TIME 이면 무조건 지각. (별도 + INTERVAL 보정 불필요)
+
+      - name: early_leave_count
+        agg: count
+        expr: "CASE WHEN WORK_STATUS = 'AT' AND END_TIME < SCHED_END_TIME THEN EMPID END"
+        description: "조기퇴근 인원 — 출근 행 중 실제 퇴근(END_TIME)이 예정(SCHED_END_TIME)보다 이른 행 수. END/SCHED_END_TIME 풀 TIMESTAMP 라 야간조도 정상."

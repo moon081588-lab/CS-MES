@@ -1,0 +1,402 @@
+semantic_models:
+  - name: msbp_ip_mix
+    description: "IP 믹싱 실적 — IP(중창/판재) 공정의 배합 실적. BLEND_DATE/BATCH_NO 기준. 'IP 믹싱/중창 혼합' 자연어 → 이 테이블"
+    model: OCI.MSBP_IP_MIX
+
+    entities:
+      - name: ip_mix
+        type: primary
+        expr: "BATCH_NO || '|' || BLEND_DATE || '|' || BLEND_TIME"
+        description: "IP 믹싱 식별자 (BATCH_NO + BLEND_DATE + BLEND_TIME 복합) [추측: 정의서에 PK 없음]"
+
+      - name: batch
+        type: foreign
+        expr: BATCH_NO
+        description: "배치 번호 (VARCHAR2(12), 샘플: B1707110). MSBP_ROLL_BLEND.BATCH_NO와 조인 가능 [추측]"
+
+      - name: model
+        type: foreign
+        expr: MODEL_CD
+        description: "모델 코드"
+
+      - name: mcs
+        type: foreign
+        expr: MCS_NO
+        description: "MCS 번호. MSBP_MCS와 조인 가능 [추측]. 샘플: MC001"
+
+      - name: machine
+        type: foreign
+        expr: MACHINE_NO
+        description: "Blending 설비 번호 (샘플: MCA01). [참고: CKP_DB_Inconsistency #2 — 이 컬럼은 MSBP_ROLL_SO.MC_CD와 다른 설비 체계]"
+
+    dimensions:
+      - name: blend_date
+        type: time
+        expr: "TO_DATE(BLEND_DATE, 'YYYYMMDD')"
+        description: "혼합 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: blend_time
+        type: categorical
+        expr: BLEND_TIME
+        description: "혼합 시간 (VARCHAR2(6) HHMMSS, 샘플: 14333 — 앞 0 빠짐)"
+
+      - name: test_dat
+        type: time
+        expr: "TO_DATE(TEST_DAT, 'YYYYMMDD')"
+        description: "LAB 테스트 일자"
+
+      - name: mat_col
+        type: categorical
+        expr: MAT_COL
+        description: "자재 색상 (샘플: ANTRACHITE)"
+
+      - name: mat_lot_s
+        type: categorical
+        expr: MAT_LOT_S
+        description: "자재 Lot 번호 Small"
+
+      - name: mat_lot_l
+        type: categorical
+        expr: MAT_LOT_L
+        description: "자재 Lot 번호 Large"
+
+      - name: remarks
+        type: categorical
+        expr: REMARKS
+        description: "비고 (샘플: M)"
+
+      - name: fix_tf
+        type: categorical
+        expr: FIX_TF
+        description: "[정의서: '사용하지 않음']"
+
+      - name: update_date
+        type: time
+        expr: UPDATE_DATE
+        description: "수정 일자 (DATE)"
+
+      - name: update_user
+        type: categorical
+        expr: UPDATE_USER
+        description: "수정자 (샘플: GMES)"
+
+      - name: test_time
+        type: categorical
+        expr: TEST_TIME
+        description: "QA 체크 시간"
+
+      - name: color
+        type: categorical
+        expr: COLOR
+        description: "색상 (샘플: 1)"
+
+      - name: result_yn
+        type: categorical
+        expr: RESULT_YN
+        description: "[정의서: '사용하지 않음']"
+
+      - name: remarks1
+        type: categorical
+        expr: REMARKS1
+        description: "비고1"
+
+      - name: import_yn
+        type: categorical
+        expr: IMPORT_YN
+        description: "디폴트 'N' [정의서 명시]"
+
+      - name: weigh_date
+        type: time
+        expr: WEIGH_DATE
+        description: "중량 측정 일자 (DATE)"
+
+      - name: new_mc_col
+        type: categorical
+        expr: NEW_MC_COL
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone_cd
+        type: categorical
+        expr: ZONE_CD
+        description: "ZONE 코드 (샘플: Z001)"
+
+      - name: slab_test_date
+        type: time
+        expr: "TO_DATE(SLAB_TEST_DATE, 'YYYYMMDD')"
+        description: "SLAB 테스트 일자"
+
+      - name: slab_test_time
+        type: categorical
+        expr: SLAB_TEST_TIME
+        description: "SLAB 테스트 시간 (VARCHAR2(6))"
+
+      - name: input_proc
+        type: categorical
+        expr: INPUT_PROC
+        description: "관련 Procedure 명 (샘플: 'Pkg_Izpz_Batch_Mix.SAVE_MIX')"
+
+      - name: manual_nik
+        type: categorical
+        expr: MANUAL_NIK
+        description: "사용자 사번"
+
+      - name: inj_zone1
+        type: categorical
+        expr: INJ_ZONE1
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: inj_zone2
+        type: categorical
+        expr: INJ_ZONE2
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: inj_zone3
+        type: categorical
+        expr: INJ_ZONE3
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: inj_zone4
+        type: categorical
+        expr: INJ_ZONE4
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: inj_zone5
+        type: categorical
+        expr: INJ_ZONE5
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: inj_zone6
+        type: categorical
+        expr: INJ_ZONE6
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: inj_zone7
+        type: categorical
+        expr: INJ_ZONE7
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: inj_zone8
+        type: categorical
+        expr: INJ_ZONE8
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone1
+        type: categorical
+        expr: MOLD_ZONE1
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone2
+        type: categorical
+        expr: MOLD_ZONE2
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone3
+        type: categorical
+        expr: MOLD_ZONE3
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone4
+        type: categorical
+        expr: MOLD_ZONE4
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone5
+        type: categorical
+        expr: MOLD_ZONE5
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone6
+        type: categorical
+        expr: MOLD_ZONE6
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone7
+        type: categorical
+        expr: MOLD_ZONE7
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mold_zone8
+        type: categorical
+        expr: MOLD_ZONE8
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone1
+        type: categorical
+        expr: ZONE1
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone2
+        type: categorical
+        expr: ZONE2
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone3
+        type: categorical
+        expr: ZONE3
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone4
+        type: categorical
+        expr: ZONE4
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone5
+        type: categorical
+        expr: ZONE5
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone6
+        type: categorical
+        expr: ZONE6
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone7
+        type: categorical
+        expr: ZONE7
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: zone8
+        type: categorical
+        expr: ZONE8
+        description: "[정의서: '데이터 존재하지 않음']"
+
+    measures:
+      - name: ip_mix_count
+        agg: count
+        expr: BATCH_NO
+        description: "IP 믹싱 행 수"
+
+      - name: batch_distinct_count
+        agg: count_distinct
+        expr: BATCH_NO
+        description: "고유 배치 개수 (사용자 지침: '배치 건수' = COUNT(DISTINCT BATCH_NO))"
+
+      - name: mat_s
+        agg: sum
+        expr: MAT_S
+        description: "자재 Small (Mixing Formula)"
+
+      - name: mat_l
+        agg: sum
+        expr: MAT_L
+        description: "자재 Large (Mixing Formula)"
+
+      - name: mat_tot
+        agg: sum
+        expr: MAT_TOT
+        description: "자재 Total"
+
+      - name: mat_lot_tot
+        agg: sum
+        expr: MAT_LOT_TOT
+        description: "자재 Lot Total"
+
+      - name: blend_s
+        agg: sum
+        expr: BLEND_S
+        description: "블렌딩 Small"
+
+      - name: blend_s_s
+        agg: sum
+        expr: BLEND_S_S
+        description: "블렌딩 Small (보조)"
+
+      - name: blend_l
+        agg: sum
+        expr: BLEND_L
+        description: "블렌딩 Large"
+
+      - name: blend_l_s
+        agg: sum
+        expr: BLEND_L_S
+        description: "블렌딩 Large small"
+
+      - name: blend_tot
+        agg: sum
+        expr: BLEND_TOT
+        description: "블렌딩 Total"
+
+      - name: to_s
+        agg: sum
+        expr: TO_S
+        description: "Formula small (정의서 오타: Formala)"
+
+      - name: to_l
+        agg: sum
+        expr: TO_L
+        description: "Formula Large (정의서 오타: Formala)"
+
+      - name: to_tot
+        agg: sum
+        expr: TO_TOT
+        description: "Formula total"
+
+      - name: meas_length
+        agg: avg
+        expr: MEAS_LENGTH
+        description: "측정 길이 (평균)"
+
+      - name: expan_rate
+        agg: avg
+        expr: EXPAN_RATE
+        description: "Formula adjustment (평균)"
+
+      - name: expan_range
+        agg: avg
+        expr: EXPAN_RANGE
+        description: "Formula adjustment (평균)"
+
+      - name: rate
+        agg: avg
+        expr: RATE
+        description: "[정의서: 'IT에서 사용하지 않음']"
+
+      - name: qty_remain
+        agg: sum
+        expr: QTY_REMAIN
+        description: "[정의서: 'IT에서 사용하지 않음']"
+
+      - name: qty_used
+        agg: sum
+        expr: QTY_USED
+        description: "[정의서: 'IT에서 사용하지 않음']"
+
+      - name: s_remain
+        agg: sum
+        expr: S_REMAIN
+        description: "[정의서: 'IT에서 사용하지 않음']"
+
+      - name: l_remain
+        agg: sum
+        expr: L_REMAIN
+        description: "[정의서: 'IT에서 사용하지 않음']"
+
+      - name: hd
+        agg: avg
+        expr: HD
+        description: "QA 체크 항목 [정의서 명시]"
+
+      - name: er
+        agg: avg
+        expr: ER
+        description: "QA 체크 항목"
+
+      - name: sg
+        agg: avg
+        expr: SG
+        description: "QA 체크 항목"
+
+      - name: er_24h
+        agg: avg
+        expr: ER_24H
+        description: "QA 체크 항목 (24시간)"
+
+      - name: hd_24h
+        agg: avg
+        expr: HD_24H
+        description: "QA 체크 항목 (24시간)"
+
+      - name: seq_max
+        agg: max
+        expr: SEQ
+        description: "차수 (NUMBER(10), 최대값)"

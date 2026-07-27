@@ -1,0 +1,212 @@
+semantic_models:
+  - name: msbp_roll_plan
+    description: "롤 공정 계획 — Phylon/IP 공정의 SO(Shop Order)별 계획 중량과 배치 수량. FA_DATE 기준"
+    model: OCI.MSBP_ROLL_PLAN
+
+    entities:
+      - name: so
+        type: primary
+        expr: SO_ID
+        description: "SO ID (NUMBER(13), PK)"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "플랜트 코드 (3110=JJ, 3120=CKP). 정의서 명시. MSBS_PLANT 조인 가능 [추측]"
+
+      - name: factory
+        type: foreign
+        expr: FACTORY
+        description: "공장 코드 (샘플: JJ — VARCHAR2(5)). PLANT_CD와 별도 컬럼 [정의서 명시: '공장코드(JJ)']"
+
+      - name: item
+        type: foreign
+        expr: ITEM_CD
+        description: "아이템 코드. MSBS_ITEM 조인 가능 [추측]"
+
+      - name: style
+        type: foreign
+        expr: STYLE_CD
+        description: "스타일 코드. MSBS_ITEM_STYLE 조인 가능 [추측]"
+
+      - name: model
+        type: foreign
+        expr: MODEL_CD
+        description: "모델 코드 (NULL 가능)"
+
+      - name: mcs
+        type: foreign
+        expr: MCS_CD
+        description: "MCS 코드. MSBP_MCS와 조인 가능 [추측]. 샘플: 'CMP 001', 'CMP 010'"
+
+    dimensions:
+      - name: area_cd
+        type: categorical
+        expr: AREA_CD
+        description: "위치 코드 (B1=Phylon, B2=IP) [정의서 명시]"
+
+      - name: op_cd
+        type: categorical
+        expr: OP_CD
+        description: "공정 코드 (샘플: PH)"
+
+      - name: item_class
+        type: categorical
+        expr: ITEM_CLASS
+        description: "반제품 코드 (샘플: PZ)"
+
+      - name: cfm_date
+        type: time
+        expr: "TO_DATE(CFM_DATE, 'YYYYMMDD')"
+        description: "계획 승인 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: fa_date
+        type: time
+        expr: "TO_DATE(FA_DATE, 'YYYYMMDD')"
+        description: "제조 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: line_cd
+        type: categorical
+        expr: LINE_CD
+        description: "라인 코드 (VARCHAR2(3), 샘플은 NULL 다수)"
+
+      - name: mcs_color
+        type: categorical
+        expr: MCS_COLOR
+        description: "MCS 색상 코드 (샘플: 'WHITE(10A)', 'CASHMERE(73B)')"
+
+      - name: model_nm
+        type: categorical
+        expr: MODEL_NM
+        description: "모델 명 (NULL 가능)"
+
+      - name: upd_user
+        type: categorical
+        expr: UPD_USER
+        description: "수정자 (샘플: Production)"
+
+      - name: upd_ymd
+        type: time
+        expr: UPD_YMD
+        description: "수정 일자 (DATE)"
+
+      - name: download_yn
+        type: categorical
+        expr: DOWNLOAD_YN
+        description: "다운로드 유무 (Y/N)"
+
+      - name: upload_yn
+        type: categorical
+        expr: UPLOAD_YN
+        description: "업로드 유무 (Y/N)"
+
+      - name: op_ymd
+        type: categorical
+        expr: OP_YMD
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+      - name: osd_type
+        type: categorical
+        expr: OSD_TYPE
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+      - name: plan_ymd
+        type: categorical
+        expr: PLAN_YMD
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+      - name: product_definition_id
+        type: categorical
+        expr: PRODUCTDEFINITIONID
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+      - name: unid
+        type: categorical
+        expr: UNID
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+      - name: input_proc
+        type: categorical
+        expr: INPUT_PROC
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+      - name: input_dt
+        type: time
+        expr: INPUT_DT
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+      - name: input_memo
+        type: categorical
+        expr: INPUT_MEMO
+        description: "[데이터 존재하지 않음 — 정의서 명시]"
+
+    measures:
+      - name: roll_plan_count
+        agg: count
+        expr: SO_ID
+        description: "롤 계획 행 수"
+
+      - name: plan_weight
+        agg: sum
+        expr: PLAN_WEIGHT
+        description: "계획 중량 합계 (NUMBER(20,8))"
+
+      - name: usage_weight
+        agg: sum
+        expr: USAGE_WEIGHT
+        description: "사용 중량 합계 (실적성 지표로 보임 [추측])"
+
+      - name: remain_weight
+        agg: sum
+        expr: REMAIN_WEIGHT
+        description: "잔량 중량 합계"
+
+      - name: shortage_weight
+        agg: sum
+        expr: SHORTAGE_WEIGHT
+        description: "부족분 중량 합계"
+
+      - name: defective_weight
+        agg: sum
+        expr: DEFECTIVE_WEIGHT
+        description: "불량 중량 합계"
+
+      - name: etc_weight
+        agg: sum
+        expr: ETC_WEIGHT
+        description: "기타 중량 합계"
+
+      - name: large_stock
+        agg: sum
+        expr: LARGE_STOCK
+        description: "라지 재고 합계"
+
+      - name: small_stock
+        agg: sum
+        expr: SMALL_STOCK
+        description: "스몰 재고 합계"
+
+      - name: prs_qty
+        agg: sum
+        expr: PRS_QTY
+        description: "족당 환산 수량 합계 (NUMBER(18,6))"
+
+      - name: batch_size_sum
+        agg: sum
+        expr: BATCH_SIZE
+        description: "배치 사이즈 합계 (NUMBER(18,6))"
+
+      - name: batch_qty
+        agg: sum
+        expr: BATCH_QTY
+        description: "배치 수량 합계"
+
+      - name: large_qty
+        agg: sum
+        expr: LARGE_QTY
+        description: "라지 수량 합계"
+
+      - name: small_qty
+        agg: sum
+        expr: SMALL_QTY
+        description: "스몰 수량 합계"

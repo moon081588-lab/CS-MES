@@ -1,0 +1,117 @@
+semantic_models:
+  - name: mspd_prod_group
+    description: "생산 그룹 — Plant·라인·아이템·기간 단위로 묶인 SAP Production Group 마스터"
+    model: OCI.MSPD_PROD_GROUP
+
+    entities:
+      - name: prod_group
+        type: primary
+        expr: "PLANT_CD || '|' || PROD_GROUP_NO"
+        description: "생산 그룹 식별자 (PLANT_CD + PROD_GROUP_NO 복합키) [추측: 정의서에 PK 명시 없음, 샘플 기반 판단]"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드 (3110/3120/3210/3220). MSBS_PLANT와 조인 가능 [추측: 조인 대상 미검증]"
+
+      - name: work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || FA_WC_CD"
+        description: "작업장 (Plant + FA_WC_CD). MSBS_WORK_CENTER와 조인 가능 [추측]"
+
+      - name: item
+        type: foreign
+        expr: ITEM_CD
+        description: "아이템 코드. MSBS_ITEM과 조인 가능 [추측]"
+
+      - name: erp_plant
+        type: foreign
+        expr: ERP_PLANT_CD
+        description: "SAP 공장 코드 (PLANT_CD와 동일값으로 보임 — 샘플 기준)"
+
+      - name: erp_work_center
+        type: foreign
+        expr: "ERP_PLANT_CD || '|' || ERP_FA_WC_CD"
+        description: "SAP 작업장 (FA_WC_CD와 동일값으로 보임 — 샘플 기준)"
+
+    dimensions:
+      - name: prod_group_no
+        type: categorical
+        expr: PROD_GROUP_NO
+        description: "SAP Production Group Number (10자리, 샘플: 2511130053)"
+
+      - name: prod_order_type
+        type: categorical
+        expr: PROD_ORDER_TYPE
+        description: "오더 타입. 샘플 값: ZFT, ZNO, ZPS"
+
+      - name: fa_sdate
+        type: time
+        expr: "TO_DATE(FA_SDATE, 'YYYYMMDD')"
+        description: "제조 시작일자 (원본 VARCHAR2(8) YYYYMMDD)"
+
+      - name: fa_edate
+        type: time
+        expr: "TO_DATE(FA_EDATE, 'YYYYMMDD')"
+        description: "제조 종료일자 (원본 VARCHAR2(8) YYYYMMDD)"
+
+      - name: closing_yn
+        type: categorical
+        expr: CLOSING_YN
+        description: "마감 구분 (Y/N). 샘플은 N만"
+
+      - name: closing_user
+        type: categorical
+        expr: CLOSING_USER
+        description: "마감자 (NULL 다수)"
+
+      - name: closing_dt
+        type: time
+        expr: CLOSING_DT
+        description: "마감 일자 (DATE 타입)"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자 (샘플: Migration)"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 일자 (DATE 타입)"
+
+      - name: create_program_id
+        type: categorical
+        expr: CREATE_PROGRAM_ID
+        description: "생성 프로그램 ID"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 일자 (DATE 타입)"
+
+      - name: update_program_id
+        type: categorical
+        expr: UPDATE_PROGRAM_ID
+        description: "수정 프로그램 ID"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC (감사 정보)"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC (감사 정보)"
+
+    measures:
+      - name: prod_group_count
+        agg: count
+        expr: PROD_GROUP_NO
+        description: "생산 그룹 개수"

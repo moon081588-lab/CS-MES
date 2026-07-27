@@ -1,0 +1,370 @@
+semantic_models:
+  - name: mspq_ex_osnd
+    description: |
+      OS&D (Over/Short/Damage) 불량·손실 — Plant 외부 OS&D. 65K행.
+      OSND_TYPE 실제 코드 매핑 [확정: OCI DB 직접 조회 MSBS_CODE_MASTER CODE_CLASS_CD='PQ_OSND_TYPE' 2026-03-05]:
+        D = Defective           (기존 기록 'Damage' 오류 — 교정)
+        I = Inline Defect       (기존 기록 'Issue' 오류 — 교정)
+        L = Lot Closing Shortage(기존 기록 'Lost' 오류 — 교정)
+        O = Overrun             (기존 누락 — 추가)
+        S = Shortage            (동일, 이상 없음)
+      비활성(USE_YN='N'): M=Miss Packing, Z=Migration.
+    model: OCI.MSPQ_EX_OSND
+
+    entities:
+      - name: osnd
+        type: primary
+        expr: OSND_ID
+        description: "OS&D ID (NUMBER(14)) — PK"
+
+      - name: org_osnd
+        type: foreign
+        expr: ORG_OSND_ID
+        description: "오리지널 OS&D ID (자기 참조 가능, 샘플에선 OSND_ID와 동일)"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드. MSBS_PLANT 조인 가능 [추측]"
+
+      - name: ord_plant
+        type: foreign
+        expr: ORD_PLANT_CD
+        description: "Order 공장 코드"
+
+      - name: supply_plant
+        type: foreign
+        expr: SUPPLY_PLANT_CD
+        description: "공급하는 공장 코드 [정의서 명시] (샘플: 3220)"
+
+      - name: work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || FA_WC_CD"
+        description: "FA 워크센터 (정의서엔 '창고'로 표기됨 — 의미 모호)"
+
+      - name: inspect_point
+        type: foreign
+        expr: "PLANT_CD || '|' || INSPECT_POINT_ID"
+        description: "Inspection Area. MSPQ_INSPECT_POINT 조인 가능 [추측]"
+
+      - name: item
+        type: foreign
+        expr: ITEM_CD
+        description: "반제 코드 (정의서 명시 그대로). MSBS_ITEM 조인 가능 [추측]"
+
+      - name: style
+        type: foreign
+        expr: STYLE_CD
+        description: "스타일 코드"
+
+      - name: prod_group
+        type: foreign
+        expr: "PLANT_CD || '|' || PROD_GROUP_NO"
+        description: "프로덕션 그룹 (NULL 가능)"
+
+      - name: prod_order
+        type: foreign
+        expr: PROD_ORDER_NO
+        description: "프로덕션 오더 번호"
+
+      - name: pcard
+        type: foreign
+        expr: "PLANT_CD || '|' || PCARD_KEY"
+        description: "OS&D Key (패스카드 연결 가능성 [추측]). 샘플: UPS260316000106"
+
+      - name: mcs
+        type: foreign
+        expr: MCS_CD
+        description: "MCS 코드"
+
+      - name: osnd_type_code
+        type: foreign
+        expr: OSND_TYPE
+        description: "OS&D 타입 코드 — MSBS_CODE_MASTER.SUB_CODE와 조인 (lookup). [확정: 프로시저 검증 + DB 직접 조회 2026-03-05] D=Defective, I=Inline Defect, L=Lot Closing Shortage, O=Overrun, S=Shortage"
+
+    dimensions:
+      - name: osnd_date
+        type: time
+        expr: "TO_DATE(OSND_DATE, 'YYYYMMDD')"
+        description: "OS&D 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: osnd_dt
+        type: time
+        expr: OSND_DT
+        description: "OS&D 일시 (DATE, 시간 포함)"
+
+      - name: pb_cd
+        type: categorical
+        expr: PB_CD
+        description: "Plant (정의서엔 'Plant'로만 표기, 샘플: A)"
+
+      - name: mline_cd
+        type: categorical
+        expr: MLINE_CD
+        description: "미니라인 (샘플: '-')"
+
+      - name: osnd_type
+        type: categorical
+        expr: OSND_TYPE
+        description: "OS&D 타입. [확정: OCI DB 직접 조회 2026-03-05] D=Defective, I=Inline Defect, L=Lot Closing Shortage, O=Overrun, S=Shortage. MSBS_CODE_MASTER(CODE_CLASS_CD='PQ_OSND_TYPE')로 lookup."
+
+      - name: supply_op_cd
+        type: categorical
+        expr: SUPPLY_OP_CD
+        description: "공급하는 반제 코드 (샘플: UPS)"
+
+      - name: reason_cd
+        type: categorical
+        expr: REASON_CD
+        description: "사유 코드 (샘플: IND01)"
+
+      - name: item_class
+        type: categorical
+        expr: ITEM_CLASS
+        description: "반제 코드 (샘플: UP01)"
+
+      - name: size_cd
+        type: categorical
+        expr: SIZE_CD
+        description: "사이즈 (샘플: 9T)"
+
+      - name: lr_cd
+        type: categorical
+        expr: LR_CD
+        description: "왼쪽/오른쪽 (1자리, 샘플: L)"
+
+      - name: std_repl_dt
+        type: time
+        expr: STD_REPL_DT
+        description: "보충 일시 (DATE) — 정의서엔 '보충시간'"
+
+      - name: ets_dt
+        type: time
+        expr: ETS_DT
+        description: "[정의서: 사용하지 않음]"
+
+      - name: ets_memo
+        type: categorical
+        expr: ETS_MEMO
+        description: "[정의서: 사용하지 않음]"
+
+      - name: cfm_dt
+        type: time
+        expr: CFM_DT
+        description: "[정의서: 사용하지 않음]. 샘플엔 값 있음 — 확인일 [추측]"
+
+      - name: cfm_user
+        type: categorical
+        expr: CFM_USER
+        description: "확인자"
+
+      - name: pcard_key
+        type: categorical
+        expr: PCARD_KEY
+        description: "OS&D Key"
+
+      - name: pcard_print_dt
+        type: time
+        expr: PCARD_PRINT_DT
+        description: "OS&D 프린터 일자"
+
+      - name: rework_date
+        type: time
+        expr: "TO_DATE(REWORK_DATE, 'YYYYMMDD')"
+        description: "재작업 일자"
+
+      - name: p_scn_dt
+        type: time
+        expr: P_SCN_DT
+        description: "생산 스캔 일자 (DATE)"
+
+      - name: o_scn_dt
+        type: time
+        expr: O_SCN_DT
+        description: "출고 스캔 일자 (DATE)"
+
+      - name: i_scn_dt
+        type: time
+        expr: I_SCN_DT
+        description: "입고 스캔 일자 (DATE)"
+
+      - name: cancel_yn
+        type: categorical
+        expr: CANCEL_YN
+        description: "취소 여부 (Y/N)"
+
+      - name: cancel_dt
+        type: time
+        expr: CANCEL_DT
+        description: "취소 일자 (DATE)"
+
+      - name: cancel_user
+        type: categorical
+        expr: CANCEL_USER
+        description: "취소한 사람"
+
+      - name: cancel_memo
+        type: categorical
+        expr: CANCEL_MEMO
+        description: "취소 메모"
+
+      - name: close_yn
+        type: categorical
+        expr: CLOSE_YN
+        description: "종료 여부 (Y/N)"
+
+      - name: close_dt
+        type: time
+        expr: CLOSE_DT
+        description: "종료 일자 (DATE)"
+
+      - name: bottom_availe_yn
+        type: categorical
+        expr: BOTTOM_AVAILE_YN
+        description: "[정의서: 사용하지 않음]"
+
+      - name: no_repl_reason
+        type: categorical
+        expr: NO_REPL_REASON
+        description: "[정의서: 사용하지 않음]"
+
+      - name: memo
+        type: categorical
+        expr: MEMO
+        description: "[정의서: 사용하지 않음]"
+
+      - name: ss_apply_date
+        type: time
+        expr: "TO_DATE(SS_APPLY_DATE, 'YYYYMMDD')"
+        description: "[정의서: 사용하지 않음]"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자 (샘플: prod.novita)"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 일자 (DATE)"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 일자 (DATE)"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC"
+
+      - name: delivery_no
+        type: categorical
+        expr: DELIVERY_NO
+        description: "CKP → JJ 이송 번호 [정의서 명시]"
+
+      - name: ref_caption
+        type: categorical
+        expr: REF_CAPTION
+        description: "[정의서: 사용하지 않음]"
+
+      - name: ref_value01
+        type: categorical
+        expr: REF_VALUE01
+        description: "[정의서: 사용하지 않음]"
+
+      - name: ref_value02
+        type: categorical
+        expr: REF_VALUE02
+        description: "[정의서: 사용하지 않음]"
+
+      - name: ref_value03
+        type: categorical
+        expr: REF_VALUE03
+        description: "[정의서: 사용하지 않음]"
+
+      - name: mold_cd
+        type: categorical
+        expr: MOLD_CD
+        description: "몰드 코드"
+
+      - name: color_cd
+        type: categorical
+        expr: COLOR_CD
+        description: "색상 코드"
+
+      - name: mold_set
+        type: categorical
+        expr: MOLD_SET
+        description: "몰드 SET"
+
+      - name: if_finish_yn
+        type: categorical
+        expr: IF_FINISH_YN
+        description: "인터페이스 여부 (Y/N)"
+
+      - name: if_send_dt
+        type: time
+        expr: IF_SEND_DT
+        description: "인터페이스 일자 (DATE)"
+
+      - name: mold_id
+        type: categorical
+        expr: MOLD_ID
+        description: "몰드 ID"
+
+      - name: p_scn_pc
+        type: categorical
+        expr: P_SCN_PC
+        description: "생산 스캔 PC"
+
+      - name: o_scn_pc
+        type: categorical
+        expr: O_SCN_PC
+        description: "출고 스캔 PC"
+
+      - name: i_scn_pc
+        type: categorical
+        expr: I_SCN_PC
+        description: "입고 스캔 PC"
+
+    measures:
+      - name: osnd_count
+        agg: count
+        expr: OSND_ID
+        description: "OS&D 행 수"
+
+      - name: osnd_ex_qty
+        agg: sum
+        expr: OSND_EX_QTY
+        description: "OS&D 수량 합계 (NUMBER(6))"
+
+      - name: std_repl_hour
+        agg: avg
+        expr: STD_REPL_HOUR
+        description: "보충 시간 평균 (NUMBER(6,2))"
+
+      - name: pcard_print_cnt
+        agg: sum
+        expr: PCARD_PRINT_CNT
+        description: "OS&D 프린터 수량 합계 (NUMBER(3))"
+
+      - name: rework_qty
+        agg: sum
+        expr: REWORK_QTY
+        description: "재작업 수량 합계 (NUMBER(6))"
+
+      - name: ss_apply_pcs_qty
+        agg: sum
+        expr: SS_APPLY_PCS_QTY
+        description: "[정의서: 사용하지 않음]"

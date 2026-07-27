@@ -1,0 +1,305 @@
+# =============================================================================
+# Domain: Production Status OP
+# Screen ID: SCR-002
+# Source Procedure: LMES.P_MSPD29000S_Q_V06
+# Main Table: OCI.MSPD_PCARD_RESULT (1층: mspd_pcard_result)
+#
+# 화면 설명: 일자별, 시프트별 특정 공정(반제품)의 생산/출고 현황
+# 프로시저 V_P_WORK_TYPE 분기: TEMPLATE / SHIFT / MAIN / DETAIL
+#   - MAIN: Process > Total (PRODUCT/OUTGOING UNION)
+#   - DETAIL: 시프트/시간대/계획/달성률 모두 (가장 핵심)
+#
+# 핵심 비즈니스 룰 (P_MSPD29000S_Q_V06 본문 검증 완료):
+# - PROD_MOVE_TYPE = 'PROD' (이동 이벤트 제외)
+# - 실적 사용 컬럼: ITPO_WC_PLANT_CD (실제 작업 발생 공장)
+# - 계획 사용 컬럼: PLANT_CD (계획 책임 공장)
+# - 실적 sentinel 제외: PROD_DT > TO_DATE('20010101', 'YYYYMMDD') (19991231 sentinel 제외)
+# - 시프트 결정: FN_GET_BT_SHIFT(SUBSTR(PROD_WH_CD, 3, 2), PROD_DATE, TO_CHAR(PROD_DT, 'HH24MISS'))
+#   → Plant 인자는 PROD_WH_CD에서 'IP'/'BT' 추출 (예: '51IP01' → 'IP')
+#
+# 사용 안내:
+# - 일자 조건 (PROD_DATE / PLAN_PROD_DATE / OUT_DATE)은 metric에 박지 않음
+#   → LLM이 사용자 질문의 날짜에 따라 동적으로 GROUP BY 또는 WHERE에 추가
+# - 라인 그룹핑: FA_WC_CD dimension 사용 (단, 화면 'W/C Group'/'Line' 표시는
+#   MSBS_SUM_GROUP_WC.SUB_TOTAL_CD / VIEW_GROUP_CD 매핑 필요 — workflow §3-B 참조)
+# - 공장 필터: ITPO_WC_PLANT_CD (실적) / PLANT_CD (계획) 구분 주의
+#
+# ITPO_TYPE 활성 분기 (V_P_ITPO_TYPE):
+#   - PRODUCT  (SEQ=3) : 활성. 실적 일자 = PROD_DATE
+#   - OUTGOING (SEQ=4) : 활성. 실적 일자 = OUT_DATE
+#   - INCOMING (SEQ=1) : 비활성 (프로시저 라인 1058~ 통째로 주석처리)
+#   - INPUT    (SEQ=2) : 비활성 (프로시저 라인 1309~ 통째로 주석처리)
+#   → INCOMING/INPUT 관련 질문(입고/투입)은 이 도메인 범위 밖, 사용자에게 명시.
+#
+# 분기별 ITEM_CLASS_TYPE 필터 차이:
+#   - MAIN  (Process 트리, §3-A)             : ITEM_CLASS_TYPE 필터 미적용 (프로시저 주석처리)
+#   - DETAIL (라인별/시프트/사이즈, §3-B/3-C) : ITEM_CLASS_TYPE 강제 동등 필터 (V_P_ITEM_CLASS_TYPE)
+#   → MAIN metric (production_qty/outgoing_qty) 사용 시 ITEM_CLASS_TYPE 박지 말 것.
+#
+# OP 다중 선택:
+#   - MAIN  : OP_CD IN splittable(V_P_OP_CD) 다중 허용 (Process 트리에 펼쳐 보여줌)
+#   - DETAIL: OP_CD = V_P_OP_CD 단일 동등 (화면은 마스터(좌측 Process)에서 1개 클릭 → DETAIL 호출)
+#   → 자유 분석으로 OP 묶음 SUM 요청 시 BARCODE_KEY 카드 중복 주의 → distinct_card_qty 사용 권장.
+# =============================================================================
+
+metrics:
+
+  # ---------------------------------------------------------------------------
+  # 1. 메인 헤더: Process > Total
+  # ---------------------------------------------------------------------------
+
+  - name: production_qty
+    label: 생산 수량 (Production Total)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      특정 일자·공정의 생산 수량 합계 (PROD_DATE 기준 집계).
+      화면 'Process > Total' 의 PRODUCT 행에 해당.
+      [확정: P_MSPD29000S_Q_V06 라인 130-167 (MAIN > PRODUCT) 검증]
+      참고: 라인별 분석 시 ITPO_WC_PLANT_CD 기준 (외주 포함).
+      참고: 일자 그룹핑은 prod_date dimension 사용.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+
+  - name: outgoing_qty
+    label: 출고 수량 (Outgoing Total)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      특정 일자·공정의 출고 수량 합계 (OUT_DATE 기준 집계).
+      화면 'Process > Total' 의 OUTGOING 행에 해당.
+      [확정: P_MSPD29000S_Q_V06 라인 168-205 (MAIN > OUTGOING) 검증]
+      참고: 일자 그룹핑은 out_date dimension 사용.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+
+  # ---------------------------------------------------------------------------
+  # 2. Plan: 계획 수량 (PLAN_PROD_DATE / PLANT_CD 기준)
+  # ---------------------------------------------------------------------------
+
+  - name: plan_qty
+    label: 계획 수량 (Plan)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      라인(FA_WC_CD)별 계획 수량 합계.
+      화면 'Prod. Status of Time > Plan' 컬럼.
+      [확정: P_MSPD29000S_Q_V06 라인 343-383 (DETAIL > Plan UNION) 검증]
+      주의: 계획은 실적과 필터 기준이 다름:
+      - 일자: PLAN_PROD_DATE 기준 (실적은 PROD_DATE)
+      - 공장: PLANT_CD 기준 (실적은 ITPO_WC_PLANT_CD)
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+
+  # ---------------------------------------------------------------------------
+  # 3. 실적 (sentinel 제외)
+  # ---------------------------------------------------------------------------
+
+  - name: sum_qty
+    label: 실적 수량 (Sum, sentinel 제외)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      실제 생산이 일어난 수량 합계 — 19991231 sentinel(미생산) 제외.
+      화면 'Prod. Status of Time > 합계' 컬럼.
+      [확정: P_MSPD29000S_Q_V06 라인 390 (CASE WHEN PROD_DT > '20010101') 검증]
+      참고: sentinel 제외 조건이 핵심. PROD_DATE = '19991231'인 행은 PROD_DT가 NULL/sentinel이라 제외됨.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND PROD_DT > TO_DATE('20010101', 'YYYYMMDD')
+
+  # ---------------------------------------------------------------------------
+  # 4. 시프트별 수량 (S1, S2, S3) — FN_GET_BT_SHIFT 사용
+  # ---------------------------------------------------------------------------
+
+  - name: shift1_qty
+    label: Shift1 수량
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      Shift1 시간대(S1, 06:30~14:29 NOR요일 기준)에 일어난 생산 수량.
+      Plant·요일별로 시프트 시간대가 다름 (FN_GET_BT_SHIFT 함수로 결정).
+      Plant 인자는 PROD_WH_CD에서 추출 (예: '51IP01' → 'IP', '51BT05' → 'BT').
+      화면 'Prod. Status of Time > Shift1' 컬럼.
+      [확정: P_MSPD29000S_Q_V06 라인 391 검증]
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND FN_GET_BT_SHIFT(SUBSTR(PROD_WH_CD, 3, 2), PROD_DATE, TO_CHAR(PROD_DT, 'HH24MISS')) = 'S1'
+
+  - name: shift2_qty
+    label: Shift2 수량
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      Shift2 시간대(S2)에 일어난 생산 수량.
+      [확정: P_MSPD29000S_Q_V06 라인 392 검증]
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND FN_GET_BT_SHIFT(SUBSTR(PROD_WH_CD, 3, 2), PROD_DATE, TO_CHAR(PROD_DT, 'HH24MISS')) = 'S2'
+
+  - name: shift3_qty
+    label: Shift3 수량
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      Shift3 시간대(S3, 야간)에 일어난 생산 수량.
+      [확정: P_MSPD29000S_Q_V06 라인 393 검증]
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND FN_GET_BT_SHIFT(SUBSTR(PROD_WH_CD, 3, 2), PROD_DATE, TO_CHAR(PROD_DT, 'HH24MISS')) = 'S3'
+
+  # ---------------------------------------------------------------------------
+  # 5. 계획 대비 실적 비율 (PROD_RT)
+  # ---------------------------------------------------------------------------
+
+  - name: achievement_rate
+    label: 계획 대비 실적 비율 (%)
+    type: ratio
+    type_params:
+      numerator: sum_qty
+      denominator: plan_qty
+    description: |
+      계획 수량 대비 실제 생산 수량 비율 (백분율).
+      [확정: P_MSPD29000S_Q_V06 라인 313, 446 (PROD_RT) 검증]
+
+      두 가지 형태 — 컨텍스트에 따라 선택:
+      - raw_level_form (라인 개별 셀 — 화면 라인별 % 컬럼):
+          CASE WHEN NVL(SUM(PLAN_QTY),0) <> 0
+               THEN ROUND( NVL(SUM(SUM_QTY),0) / NVL(SUM(PLAN_QTY),0), 2 ) * 100
+               ELSE 0 END
+      - final_form (그룹/총계 — SUB_TOTAL 행, 전체 합계 행):
+          CAST(CASE WHEN SUM(PLAN_QTY)=0 THEN 0
+                    ELSE SUM(SUM_QTY)/SUM(PLAN_QTY)*100 END AS NUMBER(19,5))
+
+      차이 — 그룹/총계에서 라인별 % 를 그냥 평균 내면 의미 없는 값이 됨.
+      반드시 분자/분모를 먼저 합산한 뒤 비율 계산해야 함.
+
+      주의: numerator(실적)와 denominator(계획)의 필터 조건이 서로 다름:
+      - sum_qty: PROD_DATE 기준 + ITPO_WC_PLANT_CD 필터
+      - plan_qty: PLAN_PROD_DATE 기준 + PLANT_CD 필터
+      LLM이 SQL 작성 시 두 metric을 따로 계산해서 비율을 내야 함.
+
+      [분해축 — 라인 외 STYLE_CD/MODEL_NAME 단위]
+      achievement_rate 는 라인(FA_WC_CD) 단위가 기본이지만 STYLE_CD 단위 분해도 가능.
+      모델 단위 = STYLE_CD + MODEL_NAME (MSBS_ITEM_STYLE LEFT JOIN).
+
+      ⚠ [확정: STYLE_CD 분해 시 OP_CD + ITEM_CLASS_TYPE 단일 동등 필수]
+        STYLE_CD 로 GROUP BY 하면서 OP 를 고정하지 않으면, 한 카드가 여러 OP row 로
+        분산돼 SUM 이 부풀려짐. 화면 DETAIL 분기가 OP 단일 동등을 강제하는 이유.
+        - OP 미고정: 부풀림 발생 (2026-03-13 CKP 실측 약 2.15배 — row합 248,910 vs 카드중복제거 115,632)
+        - OP 단일 고정: 부풀림 없음 (row합 = 카드중복제거합 — 2026-03-13 IPI/II 43,207 = 43,207)
+        따라서 모델 단위 달성률 SQL 은 plan leg / prod leg 양쪽에
+        OP_CD = :V_OP AND ITEM_CLASS_TYPE = :V_ICT 동등 조건을 반드시 포함.
+
+      [모델 단위 SQL 골격]
+        WITH PLAN_DT AS (
+          SELECT STYLE_CD, SUM(PCARD_QTY) AS PLAN_QTY
+          FROM OCI.MSPD_PCARD_RESULT
+          WHERE PLAN_PROD_DATE = :V_DATE AND PROD_MOVE_TYPE = 'PROD'
+            AND PLANT_CD = :V_PLANT
+            AND OP_CD = :V_OP AND ITEM_CLASS_TYPE = :V_ICT
+          GROUP BY STYLE_CD
+        ),
+        PROD_DT AS (
+          SELECT STYLE_CD,
+                 SUM(CASE WHEN PROD_DT > TO_DATE('20010101','YYYYMMDD')
+                          THEN PCARD_QTY ELSE 0 END) AS SUM_QTY
+          FROM OCI.MSPD_PCARD_RESULT
+          WHERE PROD_DATE = :V_DATE AND PROD_MOVE_TYPE = 'PROD'
+            AND ITPO_WC_PLANT_CD = :V_PLANT
+            AND OP_CD = :V_OP AND ITEM_CLASS_TYPE = :V_ICT
+          GROUP BY STYLE_CD
+        )
+        SELECT COALESCE(p.STYLE_CD, r.STYLE_CD) AS STYLE_CD,
+               s.MODEL_NAME,
+               NVL(p.PLAN_QTY,0) AS PLAN_QTY,
+               NVL(r.SUM_QTY,0)  AS SUM_QTY,
+               ROUND(NVL(r.SUM_QTY,0) / NULLIF(p.PLAN_QTY,0) * 100, 1) AS PROD_RT
+        FROM PLAN_DT p
+        FULL OUTER JOIN PROD_DT r ON p.STYLE_CD = r.STYLE_CD
+        LEFT JOIN OCI.MSBS_ITEM_STYLE s
+               ON s.STYLE_CD = COALESCE(p.STYLE_CD, r.STYLE_CD)
+        ORDER BY PROD_RT ASC NULLS LAST;
+
+      [FULL OUTER JOIN 이유]
+        plan_only (계획 있고 실적 0 = 미생산 모델) 과
+        prod_only (실적 있고 계획 없음 = 계획 외 생산) 를 모두 보이게.
+        '실적 저조 모델' 분석에서 plan_only 가 가장 중요한 케이스.
+        '화면 정확 재현' 만 원하면 PLAN_DT 를 기준으로 LEFT JOIN 으로 좁힐 수 있음.
+
+      [그룹/총계 PROD_RT] 위 final_form 규칙 그대로 — 분자/분모 먼저 합산 후 비율.
+
+  # ---------------------------------------------------------------------------
+  # 5-2. 모델 단위 계획 대비 실적 비율 (STYLE_CD + MODEL_NAME)
+  # ---------------------------------------------------------------------------
+
+  - name: model_achievement_rate
+    label: 모델별 계획 대비 실적 비율 (%)
+    type: ratio
+    type_params:
+      numerator: sum_qty
+      denominator: plan_qty
+    description: |
+      STYLE_CD + MODEL_NAME(= 모델) 단위의 계획 대비 실적 비율.
+      achievement_rate 와 공식 동일, 분해축만 모델 단위.
+      [확정: 2026-05-21 검증 — OP 단일 고정 시 STYLE_CD GROUP BY 부풀림 없음]
+
+      ⚠ 필수 전제: OP_CD + ITEM_CLASS_TYPE 단일 동등.
+        미고정 시 카드 라우팅 중복으로 SUM 부풀림 (2026-03-13 CKP 약 2.15배).
+      SQL 골격: achievement_rate description 의 [모델 단위 SQL 골격] 참조.
+      모델명 표시: OCI.MSBS_ITEM_STYLE LEFT JOIN (STYLE_CD 단일키).
+      '계획만 잡히고 실적 0' 누적 미생산 질문은 부족분 관리 도메인
+      (fn_shortage_by_line_style_size) 가 더 정확 — 그쪽 라우팅 고려.
+
+  # ---------------------------------------------------------------------------
+  # 6. 카드 단위 측정값 (자유 분석 — OP 묶음 시 중복 제거)
+  # ---------------------------------------------------------------------------
+
+  - name: distinct_card_qty
+    label: 카드 단위 실적 수량 (BARCODE_KEY 중복 제거)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      한 카드(BARCODE_KEY)가 여러 OP row 로 분산되어 있을 때, 카드 1장당 PCARD_QTY 1회만 합산.
+      자유 분석 (OP 묶음, 페어 미고정) 에서 SUM(PCARD_QTY) 부풀림을 방지.
+
+      [언제 사용]
+      - "라인 03 어제 PH 공정 묶어서 총량" (PHH/PHM/PHU 묶음)
+      - "라인 03 어제 IP·PH 공정 합쳐서"
+      - 사용자가 "묶어서 / 합쳐서 / 총량" 표현 사용 시
+      [언제 사용 안 함]
+      - 화면 재현 ((OP, ITEM_CLASS_TYPE) 페어 단일 호출) — 페어 안 중복 없음
+      - "OP 별로 분해" 요청 — GROUP BY OP_CD 로 처리
+
+      [구현]
+      filter 표현으로 못 담음. workflow §3-B 부록의 raw SQL 패턴 사용.
+      골격:
+        SELECT SUM(card_qty) FROM (
+          SELECT BARCODE_KEY, MAX(PCARD_QTY) AS card_qty
+            FROM OCI.MSPD_PCARD_RESULT WHERE <필터> GROUP BY BARCODE_KEY );
+
+      [확정: 2026-03-02 / FGA03 실측 검증 — 부풀림 발생, 배수는 데이터 의존]
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND PROD_DT > TO_DATE('20010101', 'YYYYMMDD')
+
+  - name: card_count
+    label: 카드 건수 (수량 무시)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      라인/공정에서 실제로 다룬 카드 장 수. 수량 합산이 아니라 BARCODE_KEY 의 DISTINCT 개수.
+      구현: COUNT(DISTINCT BARCODE_KEY). filter 표현으로 못 담음, raw SQL.
+      사용 시점: "라인이 어제 다룬 카드 몇 장?" 같은 카드 단위 질문.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND PROD_DT > TO_DATE('20010101', 'YYYYMMDD')

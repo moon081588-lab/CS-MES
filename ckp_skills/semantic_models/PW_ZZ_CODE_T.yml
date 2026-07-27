@@ -1,0 +1,74 @@
+semantic_models:
+  - name: pw_zz_code_t
+    description: |
+      공통코드 마스터 — "코드 → 사람이 읽는 이름" 번역표(디코드 레퍼런스). 워크포스(인사·근태) 도메인에서 코드형 컬럼을 이름으로 바꾸는 데 쓴다.
+      [확정: DB 검증] 약 18,973행. grain = (SERVICE_ID, CODE_CLASS_ID, CODE_ID)(+ DATASET/EFFDT 로 버전 분기). 워크포스에서 쓰는 서비스는 SERVICE_ID='JJ'.
+      디코드 공식: 어떤 코드값 X 를 풀려면 → SERVICE_ID='JJ' AND CODE_CLASS_ID='<해당 클래스>' AND CODE_ID=X 로 조회해 CODE_NM 을 가져온다.
+      ⚠️ 중복행 주의: 같은 (CODE_CLASS_ID, CODE_ID) 가 DATASET/EFFDT 차이로 2행 이상 나올 수 있다([확정: DB 검증 — EMP_TYPE/HIRE_TYPE 등은 코드당 2행]). 조인 시 행 부풀림을 막으려면 MAX(CODE_NM) 로 집계하거나 DATASET 으로 좁혀 dedup 한다.
+      이 파일은 사용자 제공 엑셀(인사 정보.xlsx)의 SELECT 문을 실제 DB로 실행해 검증한 코드 클래스만 [확정]으로 싣는다. SQL 골격은 functions/workforce.md, 규칙 요약은 workflows/_common.md §11.
+    model: OCI.PW_ZZ_CODE_T
+
+    entities:
+      - name: code
+        type: primary
+        expr: "SERVICE_ID || '|' || CODE_CLASS_ID || '|' || CODE_ID || '|' || DATASET"
+        description: "공통코드 식별자. 비즈니스 디코드 키는 (SERVICE_ID, CODE_CLASS_ID, CODE_ID). DATASET/EFFDT 로 버전 분기될 수 있어 중복 dedup 필요."
+
+    dimensions:
+      - name: service_id
+        type: categorical
+        expr: SERVICE_ID
+        description: "서비스(법인/시스템) 식별자. VARCHAR2(40). 워크포스 디코드는 SERVICE_ID='JJ' 로 고정해 조회한다."
+
+      - name: code_class_id
+        type: categorical
+        expr: CODE_CLASS_ID
+        description: |
+          코드 클래스(어떤 종류의 코드인지). VARCHAR2(120). 디코드 시 반드시 클래스를 지정한다(같은 CODE_ID 라도 클래스가 다르면 다른 뜻).
+          [확정: DB 검증 — SERVICE_ID='JJ' 기준 검증된 워크포스 클래스]
+            · HIRE_ACTN_MODE (3)  : 입사/전입 발령 유형 (HIR/REH/TRN)
+            · MUTS_ACTN_TYPE (2)  : 이동/인사변동 발령 유형 (JOC/XFR)
+            · ABS_CLASS (6)        : 휴직/부재 유형 (PLA/VAC/BSN/DSP/EDU/SND)  ※ 엑셀의 'ABS_CLAS' 는 오타
+            · PROBATION_POSITION(1): 수습 (POS)
+            · JOB_TITLE (32)       : 직책 (110 Chairman ... 211 조장)
+            · JOB_POSITION (47)    : 직급 (100 CEO ... 250 T/M, 248 T/L, 246 G/L, 230 Staff)  ← HR_ACTION.JOB_POSITION 은 이 클래스로 푼다
+            · POSITION (12)        : 직급(축약본). JOB_POSITION 과 250/248/246 동일하나 코드 수가 적음 — JOB_POSITION 우선
+            · EMP_TYPE (4)         : 사원유형 (10 Executives/14 Office worker/16 Production/17 Special service)
+            · HIRE_TYPE (5)        : 고용형태 (14 Permanent/15 Contract/18 Entrustment/24 Temporary/25 Dispatched)
+            · PERS_TYPE (4)        : 인사구분 (EMP/CWR/EXP/OTH)
+
+      - name: code_id
+        type: categorical
+        expr: CODE_ID
+        description: "코드 값(원본). VARCHAR2(200). 예 'XFR', '250', '16'. 디코드 대상이 되는 raw 값."
+
+      - name: code_nm
+        type: categorical
+        expr: CODE_NM
+        description: "코드 명칭(번역 결과). VARCHAR2(2400). 디코드의 산출물 — 예 'Transfer', 'T/M', 'Production'. 답변·표에 코드 대신 이 값을 노출한다."
+
+      - name: eff_status
+        type: categorical
+        expr: EFF_STATUS
+        description: "효력 상태. VARCHAR2(4). 'A'=Active. 폐지 코드 제외가 필요하면 EFF_STATUS='A' 필터(엑셀 POSITION SELECT 가 이 필터를 사용)."
+
+      - name: effdt
+        type: time
+        expr: EFFDT
+        description: "코드 효력일. DATE. 같은 코드의 버전 분기 원인 중 하나(중복행 dedup 시 최신 EFFDT 채택 가능)."
+
+      - name: dataset
+        type: categorical
+        expr: DATASET
+        description: "데이터셋 파티션. VARCHAR2(40). 같은 (CLASS, CODE_ID) 가 DATASET 별로 중복될 수 있다 → dedup 키 또는 좁히기 키."
+
+      - name: sort_order
+        type: categorical
+        expr: SORT_ORDER
+        description: "정렬 순서(NUMBER). 화면 표시 순서용. 분석 정렬에 활용 가능."
+
+    measures:
+      - name: code_count
+        agg: count
+        expr: CODE_ID
+        description: "코드 행 수. 보통 직접 집계 대상이 아니라 디코드 조인용 차원 테이블로 쓴다. 클래스별 코드 개수 확인 시 COUNT(DISTINCT CODE_ID)."

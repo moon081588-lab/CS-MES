@@ -1,0 +1,196 @@
+# =============================================================================
+# Domain: P.O Cross Check (Production-Outgoing Cross Check)
+# Screen ID: SCR-003
+# Source Procedure: LMES.P_MSPD51000S_Q_V24
+# Main Table: OCI.MSPD_PCARD_RESULT (1층: mspd_pcard_result)
+#
+# 화면 설명: 반제품의 생산-출고 내역 수량 크로스체크
+# 프로시저 V_P_WORK_TYPE 분기:
+#   - MAIN (라인 87): Line별 CH Plan / Prod / Out / % ★ 핵심
+#   - DETAIL (라인 477): 라인별 상세
+#   - DETAIL_SIZE (라인 766): Size Info
+#   - DETAIL_SIZE_DETAIL (라인 1092): 더 상세
+#   - SCAN_DATA (라인 1383): Prod/Out Scan 내역 (POP_PCARD_SCAN 사용)
+#
+# 핵심 비즈니스 룰 (P_MSPD51000S_Q_V24 본문 검증 완료):
+# - PROD_MOVE_TYPE = 'PROD' (이동 이벤트 제외)
+# - END_ROUTING_YN = 'Y' (라인 마지막 공정만)
+# - OP_CD <> 'UPC' (UPC 공정 제외)
+# - RESULT_TYPE = 'SCAN' (스캔 데이터만)
+# - 생산: PROD_DATE = 조회일자, 출고: OUT_DATE = 조회일자
+# - sentinel '20000101' 이하 = 미발생 판정 (예: PROD_DATE <= '20000101' = 미생산)
+# - CH Plan은 함수 호출: FN_GET_CH_PLAN(조회일, WC_CD)
+#
+# 사용 안내:
+# - 일자 조건은 metric에 박지 않음 (LLM이 동적으로)
+# - 라인 그룹핑: WC_CD 기준 (단 PROD_ORDER_TYPE='ZCP'면 'ZCP01'로 매핑)
+# - 정합률: out_only_qty가 적을수록 100%에 가까움 (출고 ↔ 생산 매칭률)
+# =============================================================================
+
+metrics:
+
+  # ---------------------------------------------------------------------------
+  # 1. 라인별 계획 수치 (CH Plan) — FN_GET_CH_PLAN 함수 사용
+  # ---------------------------------------------------------------------------
+
+  - name: ch_plan_qty
+    label: 라인별 CH 계획 수량
+    type: simple
+    type_params:
+      measure: pcard_qty   # placeholder; 실제는 MSBS_SHIFT 서브쿼리
+    description: |
+      라인별 일자 기준 Cutting House 계획 수량 (화면 CH PLAN 컬럼).
+      MSPD_PCARD_RESULT 직접 집계 아님 — 별도 테이블 `OCI.MSBS_SHIFT` 에서 조회.
+      [확정: P_MSPD51000S_Q_V24 라인 134 + reference/FN_GET_CH_PLAN.txt 본문 + 2026-03-02 ~ 03-06 화면 캡쳐 5 일치 실측 검증 (2026-05-19)]
+
+      ## 원천 함수 정의 (LMES.FN_GET_CH_PLAN)
+      reference/FN_GET_CH_PLAN.txt 본체:
+          SELECT PLAN_QTY INTO V_STR_CD
+            FROM (SELECT 'FGA'||SUBSTR(CST.LINE_CD,-2) AS LINE_CD,
+                         DECODE(MAX(CST.DESCRIPTION),'0',NULL,MAX(CST.DESCRIPTION)) AS PLAN_QTY
+                    FROM MSBS_SHIFT CST
+                   WHERE CST.PLAN_DATE        = P_YYYYMMDD
+                     AND CST.SHIFT_TYPE       = '1'
+                     AND CST.PROCESSSEGMENTID = 'FGA'
+                     AND CST.ISUSABLE         = 'Usable'
+                   GROUP BY 'FGA'||SUBSTR(CST.LINE_CD,-2), SUBSTR(CST.LINE_CD,-5,3))
+           WHERE LINE_CD = P_GMES_WC_CD;
+          ...
+          RETURN NVL(V_STR_CD, 0);
+      DESCRIPTION 컬럼이 plan_qty 의 실제 값. NULL/'0' 이면 0 반환.
+
+      ## OCI 환경에서 사용법
+      - `LMES.FN_GET_CH_PLAN` 함수 자체는 OCI 스키마에 부재 → 그대로 호출 시 `ORA-00904`
+      - 하지만 함수가 참조하는 `MSBS_SHIFT` 테이블은 OCI 에 **존재** (665 rows for 2026-03-02 ~ 03-06)
+      - LLM 은 함수 호출 대신 다음 인라인 서브쿼리로 동일 결과 확보:
+        ```sql
+        (SELECT NVL(DECODE(MAX(CST.DESCRIPTION),'0',NULL,MAX(CST.DESCRIPTION)), 0)
+           FROM OCI.MSBS_SHIFT CST
+          WHERE CST.PLAN_DATE        = :V_DATE
+            AND CST.SHIFT_TYPE       = '1'
+            AND CST.PROCESSSEGMENTID = 'FGA'
+            AND CST.ISUSABLE         = 'Usable'
+            AND 'FGA'||SUBSTR(CST.LINE_CD,-2) = BS_WC.WC_CD)
+        ```
+      - 또는 사전 CTE 로 라인별 CH_PLAN 을 한 번에 펼친 뒤 JOIN (대량 쿼리에서 권장).
+
+      ## 실측 검증 결과 (2026-03-02 5 일치)
+      L 01=2364, L 02=2208, L 03=2208, L 04=2208, L 05=1416, L 06=0, L 07=1200,
+      L 08=2208, L 09=0, L 10=2268 — 화면 캡쳐 P-O CH PLAN 컬럼과 100% 일치.
+
+      ## 주의
+      - 1층 measure 로는 직접 표현 불가 (PCARD 합산 아님)
+      - 5 plant 멀티 사이트가 아닌 단일 SHIFT_TYPE='1', PROCESSSEGMENTID='FGA' 만 — UPC/IP/PH 등 다른 공정은 지원 안 함
+    filter: ""
+
+  # ---------------------------------------------------------------------------
+  # 2. 생산 수량 (Production)
+  # ---------------------------------------------------------------------------
+
+  - name: prod_qty
+    label: 생산 수량 (P.O Cross Check)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      P.O Cross Check 화면의 생산 수량 (PROD_DATE 기준 PCARD_QTY 합계).
+      화면 'Prod Qty' 컬럼.
+      [확정: P_MSPD51000S_Q_V24 라인 162-179 (MAIN > PRODUCTION) 검증]
+      비즈니스 룰: 라인 마지막 공정(END_ROUTING_YN='Y')의 SCAN 데이터만, UPC 공정 제외
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('op_cd') }} <> 'UPC'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+
+  # ---------------------------------------------------------------------------
+  # 3. 출고 수량 (Outgoing)
+  # ---------------------------------------------------------------------------
+
+  - name: out_qty
+    label: 출고 수량 (P.O Cross Check)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      P.O Cross Check 화면의 출고 수량 (OUT_DATE 기준 PCARD_QTY 합계).
+      화면 'Out Qty' 컬럼.
+      [확정: P_MSPD51000S_Q_V24 라인 195-235 (MAIN > MOVE/OUT) 검증]
+      비즈니스 룰: 라인 마지막 공정(END_ROUTING_YN='Y')의 SCAN 데이터만, UPC 제외
+      추가 검증: IPI/PHH 공정은 다른 Plant로의 MOVE가 EXISTS인 것만 (Cross-plant 검증)
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('op_cd') }} <> 'UPC'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+
+  # ---------------------------------------------------------------------------
+  # 4. 생산만 있고 출고 없음 (Prod Only)
+  # ---------------------------------------------------------------------------
+
+  - name: prod_only_qty
+    label: 생산만 있는 수량 (출고 안 됨)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      생산은 됐는데 아직 출고 안 된 수량 (PROD_DATE = 조회일 AND OUT_DATE <= '20000101').
+      OUT_DATE = '19991231' (sentinel, 미출고) 활용한 판정.
+      [확정: P_MSPD51000S_Q_V24 라인 178 (PROD_ONLY_QTY) 검증]
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('op_cd') }} <> 'UPC'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+      AND OUT_DATE <= '20000101'
+
+  # ---------------------------------------------------------------------------
+  # 5. 출고만 있고 생산 없음 (Out Only) — 화면의 'Out Only Qty'
+  # ---------------------------------------------------------------------------
+
+  - name: out_only_qty
+    label: 출고만 있는 수량 (생산 안 됨, Out Only)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      출고는 됐는데 생산 기록이 없는 수량 (OUT_DATE = 조회일 AND PROD_DATE <= '20000101').
+      이게 많으면 정합성 문제 (생산 미기록 출고).
+      화면 'Out Only Qty' 컬럼.
+      [확정: P_MSPD51000S_Q_V24 라인 211 (OUT_ONLY_QTY) 검증]
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('op_cd') }} <> 'UPC'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+      AND PROD_DATE <= '20000101'
+
+  # ---------------------------------------------------------------------------
+  # 6. 정합률 (P.O Match Rate)
+  # ---------------------------------------------------------------------------
+
+  - name: po_match_rate
+    label: 생산-출고 정합률 (%)
+    type: derived
+    type_params:
+      expr: 100 - (out_only_qty / out_qty * 100)
+      metrics:
+        - name: out_only_qty
+        - name: out_qty
+    description: |
+      생산-출고 정합률 (%) — 100에 가까울수록 정합성 높음.
+      프로시저 정의: 100.00 - (O1_QTY / O_QTY * 100), 단 O_QTY=0이면 NULL.
+      의미: 출고 수량 중 '출고만 있는(생산 없는)' 비율을 100에서 뺀 값.
+      → 모든 출고가 생산과 매칭되면 100%, 출고 중 일부가 생산 미매칭이면 100 미만.
+      화면 '%' 컬럼.
+      [확정: P_MSPD51000S_Q_V24 라인 273 검증]
+
+      ## 분모 0 케이스의 화면 NVL 디폴트 (★ O-I 와 다름)
+      Out=0 또는 분모 0 시 metric 산식 자체는 NULL 산출. 화면 NVL 디폴트는 도메인별로 다름:
+        - **P-O 화면 (이 metric)**: NULL → **100.00** 으로 표시 (빈 라인도 100.00)
+        - **O-I 화면 (oi_match_rate)**: NULL → **0.00** 으로 표시 (빈 라인은 0.00)
+      [확정: 2026-03-02 ~ 03-06 5 일치 캡쳐 검증 — L 39/40/41 (활동 0 라인) P-O 화면에서 % 컬럼 표시 안 됨 / 빈 라인 (값 없는 라인) 은 화면 NVL 로 100.00 표시. O-I 화면에서는 0.00 표시]
+      → 답변 시 "Out=0 인 라인의 매칭률" 질문 들어오면 화면이 어느 쪽인지 확인하고 디폴트 분기.
+
+      주의: out_qty=0 케이스 LLM SQL 에서 NULLIF 또는 CASE 처리 필요.
+      화면 재현 SQL 작성 시 `NVL(CASE WHEN O_QTY<>0 THEN 100-(O1/O*100) ELSE NULL END, 100.00) AS PO_MATCH_RATE` 권장.

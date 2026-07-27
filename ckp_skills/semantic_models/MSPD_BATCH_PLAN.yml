@@ -1,0 +1,227 @@
+semantic_models:
+  - name: mspd_batch_plan
+    description: "배치 생산 계획 — Plant·라인·아이템·사이즈별 계획 수량. SAP I/F로 생성 (CKP_DB_Inconsistency #1: 이 테이블은 PROD_PLAN_DATE 사용, MSPD_PCARD_RESULT는 PLAN_PROD_DATE 사용)"
+    model: OCI.MSPD_BATCH_PLAN
+
+    entities:
+      - name: batch_plan
+        type: primary
+        expr: "PLANT_CD || '|' || PROD_ORDER_NO || '|' || LOT_NO_SEQ"
+        description: "배치 계획 식별자 (PLANT + PROD_ORDER_NO + LOT_NO_SEQ 복합키 추정) [추측: 정의서에 PK 명시 없음]"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드. MSBS_PLANT 조인 가능 [추측]"
+
+      - name: prod_group
+        type: foreign
+        expr: "PLANT_CD || '|' || PROD_GROUP_NO"
+        description: "생산 그룹. MSPD_PROD_GROUP과 조인 가능 [추측]"
+
+      - name: prod_order
+        type: foreign
+        expr: PROD_ORDER_NO
+        description: "생산 오더 번호 (SAP)"
+
+      - name: work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || FA_WC_CD"
+        description: "라인 코드. MSBS_WORK_CENTER 조인 가능 [추측]"
+
+      - name: item
+        type: foreign
+        expr: ITEM_CD
+        description: "아이템 코드. MSBS_ITEM 조인 가능 [추측]"
+
+      - name: parent_item
+        type: foreign
+        expr: PARENT_ITEM_CD
+        description: "상위(완제품) 아이템 코드. MSBS_ITEM 조인 가능 [추측]"
+
+      - name: parent_prod_order
+        type: foreign
+        expr: PARENT_PROD_ORDER_NO
+        description: "상위 생산 오더 번호"
+
+      - name: erp_plant
+        type: foreign
+        expr: ERP_PLANT_CD
+        description: "ERP 공장 코드 (PLANT_CD와 동일값)"
+
+      - name: parent_erp_plant
+        type: foreign
+        expr: PARENT_ERP_PLANT_CD
+        description: "상위 공장 코드"
+
+    dimensions:
+      - name: prod_group_no
+        type: categorical
+        expr: PROD_GROUP_NO
+        description: "생산 그룹 번호"
+
+      - name: prod_plan_date
+        type: time
+        expr: "TO_DATE(PROD_PLAN_DATE, 'YYYYMMDD')"
+        description: "계획 일자 (VARCHAR2(8) YYYYMMDD). [주의: MSPD_PCARD_RESULT의 PLAN_PROD_DATE와 동일 의미지만 컬럼명이 다름 — CKP_DB_Inconsistency #1]"
+
+      - name: fa_date
+        type: time
+        expr: "TO_DATE(FA_DATE, 'YYYYMMDD')"
+        description: "생산 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: size_cd
+        type: categorical
+        expr: SIZE_CD
+        description: "사이즈 코드 (샘플: 12T, 7, 6, 10T)"
+
+      - name: unit_cd
+        type: categorical
+        expr: UNIT_CD
+        description: "단위. 샘플: KG, M (Meter)"
+
+      - name: item_class_type
+        type: categorical
+        expr: ITEM_CLASS_TYPE
+        description: "반제품 코드 유형. 샘플: OR, UL"
+
+      - name: item_class
+        type: categorical
+        expr: ITEM_CLASS
+        description: "반제품 코드. 샘플: OR, UL"
+
+      - name: model_cd
+        type: categorical
+        expr: MODEL_CD
+        description: "모델 코드 (샘플: YA0677, JD0005)"
+
+      - name: style_cd
+        type: categorical
+        expr: STYLE_CD
+        description: "스타일 코드 (샘플: IR5167-003, DQ8426-003)"
+
+      - name: mcs_cd
+        type: categorical
+        expr: MCS_CD
+        description: "MCS 코드. MSBP_MCS와 조인 가능 [추측]. NULL 가능 (UL 등은 NULL)"
+
+      - name: mcs_color_cd
+        type: categorical
+        expr: MCS_COLOR_CD
+        description: "MCS 색상 코드 (샘플: 'ANTHRACITE(06F)', 'BLACK(00A)', 'NONE')"
+
+      - name: mcs_option
+        type: categorical
+        expr: MCS_OPTION
+        description: "MCS 옵션 (샘플: 'NO REGRIND', NULL)"
+
+      - name: wh_cd
+        type: categorical
+        expr: WH_CD
+        description: "창고 코드 (샘플: 51A1, 51G1, 51RA)"
+
+      - name: parent_item_class
+        type: categorical
+        expr: PARENT_ITEM_CLASS
+        description: "상위 아이템 코드 (샘플: OS01, OS08, UP01)"
+
+      - name: parent_unit_cd
+        type: categorical
+        expr: PARENT_UNIT_CD
+        description: "상위 단위 코드 (샘플: PR=Pair)"
+
+      - name: parent_plan_date
+        type: time
+        expr: "TO_DATE(PARENT_PLAN_DATE, 'YYYYMMDD')"
+        description: "상위 계획 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: parent_plan_no
+        type: categorical
+        expr: PARENT_PLAN_NO
+        description: "상위 계획 번호"
+
+      - name: lot_no_seq
+        type: categorical
+        expr: LOT_NO_SEQ
+        description: "LOT 번호 차수 (샘플: 8, 4, 3, 9, 12)"
+
+      - name: buy_date
+        type: time
+        expr: "TO_DATE(BUY_DATE, 'YYYYMMDD')"
+        description: "구매 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: if_finish_yn
+        type: categorical
+        expr: IF_FINISH_YN
+        description: "인터페이스 완료 유무 (Y/N)"
+
+      - name: if_send_dt
+        type: time
+        expr: IF_SEND_DT
+        description: "I/F 전송 일자 (DATE)"
+
+      - name: if_recieve_dt
+        type: time
+        expr: IF_RECIEVE_DT
+        description: "I/F 수신 일자 (DATE, 정의서 오타 그대로 RECIEVE)"
+
+      - name: if_err_msg
+        type: categorical
+        expr: IF_ERR_MSG
+        description: "I/F 에러 메시지 (NVARCHAR2(2000))"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자 (샘플: SP_IFR_BATCH_PLAN — SAP I/F 프로시저)"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 일자 (DATE)"
+
+      - name: create_program_id
+        type: categorical
+        expr: CREATE_PROGRAM_ID
+        description: "생성 프로그램 ID"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 일자 (DATE)"
+
+      - name: update_program_id
+        type: categorical
+        expr: UPDATE_PROGRAM_ID
+        description: "수정 프로그램 ID"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC"
+
+    measures:
+      - name: batch_plan_count
+        agg: count
+        expr: PROD_ORDER_NO
+        description: "배치 계획 행 수"
+
+      - name: prod_qty
+        agg: sum
+        expr: PROD_QTY
+        description: "계획 생산 수량 합계 (NUMBER(19,5)). 단위는 UNIT_CD 따름 (KG/M 등 혼재 — 합산 시 unit_cd로 그룹핑 권장)"
+
+      - name: parent_qty
+        agg: sum
+        expr: PARENT_QTY
+        description: "상위(완제품) 수량 합계. 단위는 PARENT_UNIT_CD (보통 PR=Pair)"

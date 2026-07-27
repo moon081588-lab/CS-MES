@@ -1,0 +1,172 @@
+semantic_models:
+  - name: msbp_roll_so
+    description: "롤 SO (Shop Order) — 설비별·시프트별·시간대별 배치 생산 지시"
+    model: OCI.MSBP_ROLL_SO
+
+    entities:
+      - name: so
+        type: primary
+        expr: "SO_ID || '|' || SO_SEQ"
+        description: "SO 식별자 (SO_ID + SO_SEQ 복합키 추정) [추측: 정의서에 PK 명시 없음]"
+
+      - name: so_id
+        type: foreign
+        expr: SO_ID
+        description: "SO ID (Shop Order ID). MSBP_ROLL_PLAN.SO_ID와 조인 가능 [추측]"
+
+      - name: machine
+        type: foreign
+        expr: MC_CD
+        description: "설비 코드 (KD=Kneader, BB=Banbury, EP=Eva Press) [정의서 명시]. 샘플: EP102, KD202"
+
+    dimensions:
+      - name: so_seq
+        type: categorical
+        expr: SO_SEQ
+        description: "SO 차수 (NUMBER(13))"
+
+      - name: mc_seq
+        type: categorical
+        expr: MC_SEQ
+        description: "설비 차수 (NUMBER(13))"
+
+      - name: shift
+        type: categorical
+        expr: SHIFT
+        description: "Shift (NUMBER(13), 샘플: 1, 3)"
+
+      - name: hh
+        type: categorical
+        expr: HH
+        description: "시간 (NUMBER(13), 샘플: 1, 3)"
+
+      - name: hh_seq
+        type: categorical
+        expr: HH_SEQ
+        description: "시간 차수"
+
+      - name: status
+        type: categorical
+        expr: STATUS
+        description: "상태 (1=Shop order 생성, 4=자동 계량기 I/F, 7=자동계량기 계량 완료) [정의서 명시]"
+
+      - name: batch_type
+        type: categorical
+        expr: BATCH_TYPE
+        description: "배치 종류 (L=Large, S=Small) [정의서 명시: 'Large 와 Small 만 존재']"
+
+      - name: unid_seq
+        type: categorical
+        expr: UNID_SEQ
+        description: "차수 (NUMBER(13))"
+
+      - name: upd_user
+        type: categorical
+        expr: UPD_USER
+        description: "수정자 (샘플: Production)"
+
+      - name: upd_ymd
+        type: time
+        expr: UPD_YMD
+        description: "수정 일자 (DATE)"
+
+      - name: download_yn
+        type: categorical
+        expr: DOWNLOAD_YN
+        description: "다운로드 유무 (Y/N)"
+
+      - name: upload_yn
+        type: categorical
+        expr: UPLOAD_YN
+        description: "업로드 유무 (Y/N)"
+
+      - name: old_mc_cd
+        type: categorical
+        expr: OLD_MC_CD
+        description: "[정의서: '데이터 존재하지 않음']. 샘플엔 일부 값(5)이 있음 — 정의서와 실제 불일치 가능 [추측]"
+
+      - name: sotbl_mcs_cd
+        type: categorical
+        expr: SOTBL_MCS_CD
+        description: "[정의서: '데이터 존재하지 않음']. 실제 샘플엔 값 있음 (샘플: 'SRFO 004', 'CMP 001') — MCS 코드로 보임 [추측]"
+
+      - name: sotbl_inp_user
+        type: categorical
+        expr: SOTBL_INP_USER
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: sotbl_inp_dt
+        type: time
+        expr: SOTBL_INP_DT
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: sotbl_extra1
+        type: categorical
+        expr: SOTBL_EXTRA1
+        description: "[정의서: '데이터 존재하지 않음']. 실제 샘플엔 'EP', 'PH' 등 공정 코드로 보이는 값 있음 [추측]"
+
+      - name: sotbl_extra2
+        type: categorical
+        expr: SOTBL_EXTRA2
+        description: "[정의서: '데이터 존재하지 않음']. 샘플엔 일자(20260227) 들어있음 [추측]"
+
+      - name: sotbl_extra3
+        type: categorical
+        expr: SOTBL_EXTRA3
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: seq
+        type: categorical
+        expr: SEQ
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: so_cfm_date
+        type: time
+        expr: "TO_DATE(SO_CFM_DATE, 'YYYYMMDD')"
+        description: "[정의서: '데이터 존재하지 않음']. 실제 샘플엔 일자값(20260227) 있음 — SO 승인일자로 보임 [추측]"
+
+      - name: so_color_cd
+        type: categorical
+        expr: SO_COLOR_CD
+        description: "[정의서: '데이터 존재하지 않음']. 실제 샘플엔 'SRFO 004' 등 색상/MCS 값 있음 [추측]"
+
+      - name: so_clear_yn
+        type: categorical
+        expr: SO_CLEAR_YN
+        description: "[정의서: '데이터 존재하지 않음']. 샘플엔 'N' 값 일부 [추측]"
+
+      - name: so_memo
+        type: categorical
+        expr: SO_MEMO
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: input_proc
+        type: categorical
+        expr: INPUT_PROC
+        description: "[정의서: '데이터 존재하지 않음']. 샘플엔 'P_MSBP17000S_1_CREATION_V03' 등 프로시저명 있음 [추측]"
+
+      - name: input_dt
+        type: time
+        expr: INPUT_DT
+        description: "[정의서: '데이터 존재하지 않음']. 샘플엔 일자값 있음 [추측]"
+
+      - name: input_memo
+        type: categorical
+        expr: INPUT_MEMO
+        description: "[정의서: '데이터 존재하지 않음']"
+
+    measures:
+      - name: roll_so_count
+        agg: count
+        expr: SO_ID
+        description: "SO 행 수"
+
+      - name: batch_size_sum
+        agg: sum
+        expr: BATCH_SIZE
+        description: "배치 사이즈 합계 (NUMBER(18,6))"
+
+      - name: batch_qty
+        agg: sum
+        expr: BATCH_QTY
+        description: "배치 수량 합계 (정의서: '1 BATCH 1 개')"

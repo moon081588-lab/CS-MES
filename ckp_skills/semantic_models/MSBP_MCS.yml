@@ -1,0 +1,66 @@
+semantic_models:
+  - name: msbp_mcs
+    description: "MCS (Master Compound Sheet) 마스터 — Bottom 공정의 배합·반제품 코드 마스터"
+    model: OCI.MSBP_MCS
+
+    entities:
+      - name: mcs
+        type: primary
+        expr: MCS_CD
+        description: "MCS 식별자 [추측: 정의서에 PK 명시 없으나 'MCS Code' 컬럼이 유일 키로 보임]"
+
+      - name: cmp
+        type: foreign
+        expr: CMP_CD
+        description: "Bottom 공정 코드 (샘플 값: OS, IP, PU, IN). 다른 테이블의 공정 코드 컬럼과 조인 가능성 [추측: 조인 대상 미확정]"
+
+      - name: op
+        type: foreign
+        expr: OP_CD
+        description: "Bottom 반제품 코드 (샘플 값: OSR, IPR, PUP, INR). 다른 테이블의 OP_CD와 조인 가능성 [추측: 조인 대상 미확정]"
+
+    dimensions:
+      - name: mcs_name
+        type: categorical
+        expr: MCS_NAME
+        description: "MCS 명 (샘플: 'OGRS 011', 'OEF 006' 등)"
+
+      - name: use_yn
+        type: categorical
+        expr: USE_YN
+        description: "사용 유무 (Y/N). 샘플은 Y만 등장"
+
+      - name: send_chk
+        type: categorical
+        expr: SEND_CHK
+        description: "전송 상태 (단순 Y/N 아님 — 샘플 값: 공백/NULL/R/Y. VARCHAR2(30)로 다양한 값 가능)"
+
+      - name: send_ymd
+        type: time
+        expr: SEND_YMD
+        description: "전송 일자 (정의서 타입: DATE, 샘플 표시 형태: YY/MM/DD)"
+
+      - name: upd_user
+        type: categorical
+        expr: UPD_USER
+        description: "수정자 (사용자 ID, 샘플: 'BAOMCOST.MATERIAL', 'it.iwan' 등)"
+
+      - name: upd_ymd
+        type: time
+        expr: UPD_YMD
+        description: "수정 일자 (정의서 타입: DATE)"
+
+      - name: batch_size
+        type: categorical
+        expr: BATCH_SIZE
+        description: "배치 사이즈 (정의서 타입: VARCHAR2(10), 샘플엔 숫자값(70) 또는 NULL. measure로도 활용 가능성 있음 [추측])"
+
+      - name: clear_yn
+        type: categorical
+        expr: CLEAR_YN
+        description: "JJ 작업 여부 (Y=JJ에서 작업 안 함, N=JJ에서 작업)"
+
+      - name: description
+        type: categorical
+        expr: DESCRIPTION
+        description: "비고 (샘플은 MCS_NAME과 동일한 값으로 보임)"

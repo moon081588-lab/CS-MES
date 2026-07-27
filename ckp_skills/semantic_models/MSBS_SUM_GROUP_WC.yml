@@ -1,0 +1,69 @@
+semantic_models:
+  - name: msbs_sum_group_wc
+    description: |
+      화면 그리드의 'W/C Group' 컬럼과 'Line' 컬럼이 어디서 오는지 매핑하는 마스터.
+      [중요] FORM_ID='MSPD22000S' 행만 Production Status 화면(P_MSPD29000S_Q)에 사용됨.
+        다른 FORM_ID (예: MSPD51000S, MSPD52000S, MSCS12000S) 는 다른 화면용 매핑이라 섞이면 안 됨.
+      [중요] WC_LIST 는 COUNTRY 단위로 구성됨 — PLANT 필터 없음.
+        PLANT 4개(JJ=3110/CKP=3120/RJ=3210/JJS=3220)는 모두 COUNTRY 3000(Indonesia)에 속함.
+      [확정: P_MSPD29000S_Q_V06 라인 291, 544, 718, 969 — FORM_ID='MSPD22000S' 하드코딩 4곳 확인]
+    model: OCI.MSBS_SUM_GROUP_WC
+
+    entities:
+      - name: sum_group_wc
+        type: primary
+        expr: "COUNTRY_CD || '|' || FORM_ID || '|' || WC_CD"
+        description: "COUNTRY + FORM + WC 복합키"
+
+      - name: country
+        type: foreign
+        expr: COUNTRY_CD
+        description: "국가 코드 (예: 3000=Indonesia). MSBS_ORGANIZATION_SUB 로 PLANT→COUNTRY 역매핑"
+
+      - name: work_center
+        type: foreign
+        expr: WC_CD
+        description: "작업장. MSBS_WORK_CENTER.WC_CD 와 조인 [확정: P_MSPD29000S_Q_V06 검증]"
+
+    dimensions:
+      - name: country_cd
+        type: categorical
+        expr: COUNTRY_CD
+        description: "국가 코드. 알려진 값: 3000=Indonesia (JJ/CKP/RJ/JJS 4 PLANT 모두 속함)"
+
+      - name: form_id
+        type: categorical
+        expr: FORM_ID
+        description: |
+          화면 ID. Production Status 분석에서는 'MSPD22000S' 고정.
+          다른 화면용 행이 섞이면 잘못된 매핑이 끌려옴.
+          [확정: P_MSPD29000S_Q_V06 본문 4곳 하드코딩]
+
+      - name: wc_cd
+        type: categorical
+        expr: WC_CD
+        description: "작업장 코드 (예: FGA03). MSPD_PCARD_RESULT.FA_WC_CD 와 매칭"
+
+      - name: view_group_cd
+        type: categorical
+        expr: VIEW_GROUP_CD
+        description: |
+          화면 'Line' 컬럼 표시값 (예: 'L 03', 'L A1').
+          [확정: P_MSPD29000S_Q_V06 검증 — 화면 'Line' = VIEW_GROUP_CD]
+          표시명/정렬은 MSBS_SUM_GROUP_CD (SUM_GROUP_TYPE='VIEW_GROUP') 와 조인하여 가져옴.
+
+      - name: sub_total_cd
+        type: categorical
+        expr: SUB_TOTAL_CD
+        description: |
+          화면 'W/C Group' 컬럼 표시값 (예: 'A1','B1','C1','D1','RA').
+          [확정: P_MSPD29000S_Q_V06 검증 — 화면 'W/C Group' = SUB_TOTAL_CD]
+          ⚠ MSBS_WORK_CENTER.WC_GROUP_CD 와 다를 수 있음.
+            예: PLANT 3120 마스터 WC_GROUP_CD='IP' 하나뿐인데 화면 'W/C Group'은 A1/B1/D1/RA 다양함.
+          표시명/정렬은 MSBS_SUM_GROUP_CD (SUM_GROUP_TYPE='SUB_TOTAL') 와 조인하여 가져옴.
+
+    measures:
+      - name: sum_group_wc_count
+        agg: count
+        expr: WC_CD
+        description: "매핑 행 수"

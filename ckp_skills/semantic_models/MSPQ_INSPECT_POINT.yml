@@ -1,0 +1,137 @@
+semantic_models:
+  - name: mspq_inspect_point
+    description: "QA 인스펙션 포인트 마스터 — 검사 위치(라인/공정/리소스)별 인스펙션 정의"
+    model: OCI.MSPQ_INSPECT_POINT
+
+    entities:
+      - name: inspect_point
+        type: primary
+        expr: "PLANT_CD || '|' || INSPECT_POINT_ID"
+        description: "인스펙션 포인트 식별자 (PLANT_CD + INSPECT_POINT_ID 복합키) [추측]"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드 (3110/3120). MSBS_PLANT 조인 가능 [추측]"
+
+      - name: work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || FA_WC_CD"
+        description: "작업장 (FA_WC_CD가 NULL인 경우도 있음). MSBS_WORK_CENTER 조인 가능 [추측]"
+
+      - name: sub_wc
+        type: foreign
+        expr: SUB_WC_CD
+        description: "서브 라인/작업장 코드 (샘플: CTM01, FGA33). 정의서엔 '라인정보'"
+
+      - name: op
+        type: foreign
+        expr: OP_CD
+        description: "공정 코드 (샘플: PHH, FGA). MSBS 코드 마스터 조인 가능 [추측]"
+
+      - name: pb
+        type: foreign
+        expr: PB_CD
+        description: "PLANT 빌딩 코드 (샘플: CKP-B, B, E, F)"
+
+    dimensions:
+      - name: inspect_point_id
+        type: categorical
+        expr: INSPECT_POINT_ID
+        description: "인스펙션 포인트 ID (샘플: IN-CTM01-O, HI-FGA33-P, BC-FGA18-O — 패턴: [type]-[wc]-[ilo])"
+
+      - name: inspect_point_name
+        type: categorical
+        expr: INSPECT_POINT_NAME
+        description: "인스펙션 포인트 명 (샘플: 'IN CTM MC01', 'HI E-33')"
+
+      - name: resource_no
+        type: categorical
+        expr: RESOURCE_NO
+        description: "SAP 자동 I/F (정의서). 샘플: MC001, 33, 34"
+
+      - name: resource_type
+        type: categorical
+        expr: RESOURCE_TYPE
+        description: "리소스 타입 (샘플: MC=Machine, LN=Line)"
+
+      - name: ilo_place_cd
+        type: categorical
+        expr: ILO_PLACE_CD
+        description: "ILO Place 코드 (SAP 자동 I/F). 샘플: O"
+
+      - name: mline_cd
+        type: categorical
+        expr: MLINE_CD
+        description: "미니라인 정보 (샘플: '-' 또는 NULL)"
+
+      - name: pb_name
+        type: categorical
+        expr: PB_NAME
+        description: "PLANT 빌딩 명 (샘플: 'CKP Plant B', 'Plant E')"
+
+      - name: ref_caption
+        type: categorical
+        expr: REF_CAPTION
+        description: "REF 컬럼 의미 정의 (SAP I/F). 샘플: 'WC_CD|VL_BT_TYPE', 'WC_GROUP_CD|WC_GROUP_NAME'"
+
+      - name: ref_value01
+        type: categorical
+        expr: REF_VALUE01
+        description: "REF 값 1 (REF_CAPTION의 첫 키에 대응). 샘플: PHH01, E1, F1"
+
+      - name: ref_value02
+        type: categorical
+        expr: REF_VALUE02
+        description: "REF 값 2. 샘플: BT, E1, F1"
+
+      - name: ref_value03
+        type: categorical
+        expr: REF_VALUE03
+        description: "REF 값 3 (NULL 다수)"
+
+      - name: memo
+        type: categorical
+        expr: MEMO
+        description: "메모"
+
+      - name: sort_seq
+        type: categorical
+        expr: SORT_SEQ
+        description: "정렬 순서 (NUMBER, 샘플: 0, 5030, 6010)"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 일자 (DATE)"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 일자 (DATE)"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC"
+
+    measures:
+      - name: inspect_point_count
+        agg: count
+        expr: INSPECT_POINT_ID
+        description: "인스펙션 포인트 개수"

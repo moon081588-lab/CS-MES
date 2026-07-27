@@ -1,0 +1,287 @@
+semantic_models:
+  - name: pop_pcard_scan
+    description: "바코드 스캔 로그 — POP 디바이스에서 발생한 패스카드 스캔 이력 (5.9M행). MSPD_PCARD_RESULT의 원천"
+    model: OCI.POP_PCARD_SCAN
+
+    entities:
+      - name: scan
+        type: primary
+        expr: "PLANT_CD || '|' || BARCODE_KEY || '|' || SCAN_YMD || '|' || SCAN_HMS || '|' || SCAN_SEQ"
+        description: "스캔 식별자 (Plant + 바코드 + 시간 + 차수 복합) [추측: 정의서에 PK 명시 없음]"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드. MSBS_PLANT 조인 가능 [추측]"
+
+      - name: device
+        type: foreign
+        expr: "PLANT_CD || '|' || DEVICE_ID"
+        description: "스캔 디바이스. POP_DEVICE와 조인. [확정: 프로시저 검증. 단 키는 DEVICE_ID 단일컬럼으로 발견됨, PLANT_CD 복합 여부는 추가 확인 필요]"
+
+      - name: pcard
+        type: foreign
+        expr: "PLANT_CD || '|' || PCARD_NAME"
+        description: "패스카드. MSPD_PCARD와 조인 가능 [추측]"
+
+      - name: style
+        type: foreign
+        expr: STYLE_CD
+        description: "스타일 코드"
+
+      - name: work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || WC_CD"
+        description: "워크센터. MSBS_WORK_CENTER 조인 가능 [추측]"
+
+      - name: fa_work_center
+        type: foreign
+        expr: "PLANT_CD || '|' || FA_WC_CD"
+        description: "제조 라인"
+
+      - name: prod_group
+        type: foreign
+        expr: "PLANT_CD || '|' || PROD_GROUP_NO"
+        description: "생산 그룹"
+
+    dimensions:
+      - name: device_id
+        type: categorical
+        expr: DEVICE_ID
+        description: "스캔 포인터 (디바이스 ID, 샘플: JJ_OSP_PROD)"
+
+      - name: scan_ymd
+        type: time
+        expr: "TO_DATE(SCAN_YMD, 'YYYYMMDD')"
+        description: "스캔 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: scan_hms
+        type: categorical
+        expr: SCAN_HMS
+        description: "스캔 시간 (VARCHAR2(6) HHMMSS, 샘플: 51841)"
+
+      - name: op_cd
+        type: categorical
+        expr: OP_CD
+        description: "공정 코드 (샘플: OSP)"
+
+      - name: itpo_type
+        type: categorical
+        expr: ITPO_TYPE
+        description: "물류 구분 (1자리, 샘플: P)"
+
+      - name: scan_seq
+        type: categorical
+        expr: SCAN_SEQ
+        description: "스캔 차수 (NUMBER)"
+
+      - name: barcode_key
+        type: categorical
+        expr: BARCODE_KEY
+        description: "바코드 키 (샘플: P3110L040120260327OS011H014)"
+
+      - name: barcode_seq
+        type: categorical
+        expr: BARCODE_SEQ
+        description: "바코드 차수"
+
+      - name: pcard_name
+        type: categorical
+        expr: PCARD_NAME
+        description: "패스카드 명 (정의서 오타: '피카드')"
+
+      - name: result_date
+        type: time
+        expr: "TO_DATE(RESULT_DATE, 'YYYYMMDD')"
+        description: "Shift3일 때 전일자 기록 [정의서 명시] (VARCHAR2(8))"
+
+      - name: wc_cd
+        type: categorical
+        expr: WC_CD
+        description: "워크센터 코드 (샘플: OSP01)"
+
+      - name: wh_cd
+        type: categorical
+        expr: WH_CD
+        description: "창고 코드 (샘플: 51BT)"
+
+      - name: item_class
+        type: categorical
+        expr: ITEM_CLASS
+        description: "반제 코드 (샘플: OS01)"
+
+      - name: barcode_item_class
+        type: categorical
+        expr: BARCODE_ITEM_CLASS
+        description: "바코드 반제 코드"
+
+      - name: size_cd
+        type: categorical
+        expr: SIZE_CD
+        description: "사이즈 (VARCHAR2(5), 샘플: 9)"
+
+      - name: fa_wc_cd
+        type: categorical
+        expr: FA_WC_CD
+        description: "제조 라인 (샘플: FGA04)"
+
+      - name: fa_date
+        type: time
+        expr: "TO_DATE(FA_DATE, 'YYYYMMDD')"
+        description: "제조 일자 (VARCHAR2(8))"
+
+      - name: prod_group_no
+        type: categorical
+        expr: PROD_GROUP_NO
+        description: "프로덕션 그룹 번호"
+
+      - name: plant_from
+        type: categorical
+        expr: PLANT_FROM
+        description: "로케이션 FROM"
+
+      - name: plant_to
+        type: categorical
+        expr: PLANT_TO
+        description: "로케이션 TO"
+
+      - name: car_no
+        type: categorical
+        expr: CAR_NO
+        description: "차량 번호"
+
+      - name: driver_phone
+        type: categorical
+        expr: DRIVER_PHONE
+        description: "운전자 전화번호"
+
+      - name: result_apply_yn
+        type: categorical
+        expr: RESULT_APPLY_YN
+        description: "MSPD_PCARD_RESULT에 적용 여부 (Y/N)"
+
+      - name: result_apply_date
+        type: time
+        expr: RESULT_APPLY_DATE
+        description: "MSPD_PCARD_RESULT에 적용 일자 (DATE)"
+
+      - name: result_apply_msg
+        type: categorical
+        expr: RESULT_APPLY_MSG
+        description: "MSPD_PCARD_RESULT 적용 메시지"
+
+      - name: upload_yn
+        type: categorical
+        expr: UPLOAD_YN
+        description: "전송 여부 (로컬 DB 적용)"
+
+      - name: upload_date
+        type: time
+        expr: UPLOAD_DATE
+        description: "전송 일자 (DATE)"
+
+      - name: cancel_flag
+        type: categorical
+        expr: CANCEL_FLAG
+        description: "취소 표시 (1자리, 샘플: S)"
+
+      - name: cancel_down
+        type: categorical
+        expr: CANCEL_DOWN
+        description: "취소"
+
+      - name: memo
+        type: categorical
+        expr: "DBMS_LOB.SUBSTR(MEMO, 200, 1)"
+        description: "메모 (NVARCHAR2(2000) — 200자 truncate)"
+
+      - name: etc_fld1
+        type: categorical
+        expr: ETC_FLD1
+        description: "기타 필드 1"
+
+      - name: etc_fld2
+        type: categorical
+        expr: ETC_FLD2
+        description: "출고 정보 [정의서 명시]"
+
+      - name: etc_fld3
+        type: categorical
+        expr: ETC_FLD3
+        description: "공정 코드 [정의서 명시]"
+
+      - name: etc_fld4
+        type: categorical
+        expr: ETC_FLD4
+        description: "[정의서: 사용하지 않음]"
+
+      - name: etc_fld5
+        type: categorical
+        expr: ETC_FLD5
+        description: "[정의서: 사용하지 않음]"
+
+      - name: org_wc_cd
+        type: categorical
+        expr: ORG_WC_CD
+        description: "오리지널 워크센터"
+
+      - name: org_op_cd
+        type: categorical
+        expr: ORG_OP_CD
+        description: "오리지널 반제 코드 (정의서 표기 그대로 — '오리지날 반제코드')"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자 (샘플: IP 주소)"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 일자 (DATE)"
+
+      - name: create_mac
+        type: categorical
+        expr: CREATE_MAC
+        description: "생성 PC Mac 주소"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 일자 (DATE)"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC"
+
+    measures:
+      - name: scan_count
+        agg: count
+        expr: PCARD_NAME
+        description: "스캔 행 수"
+
+      - name: prod_qty
+        agg: sum
+        expr: PROD_QTY
+        description: "생산 수량 합계 (NUMBER)"
+
+      - name: total_cnt
+        agg: sum
+        expr: TOTAL_CNT
+        description: "총 건수"
+
+      - name: success_cnt
+        agg: sum
+        expr: SUCCESS_CNT
+        description: "성공 건수"

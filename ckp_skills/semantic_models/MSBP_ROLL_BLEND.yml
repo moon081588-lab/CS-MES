@@ -1,0 +1,112 @@
+semantic_models:
+  - name: msbp_roll_blend
+    description: "롤 블렌딩 실적 — 배치 단위 입출 이력. YMD 기준. '혼합/블렌딩' 자연어 → 이 테이블 (사용자 지침 우선순위)"
+    model: OCI.MSBP_ROLL_BLEND
+
+    entities:
+      - name: blend
+        type: primary
+        expr: "FACTORY || '|' || BATCH_NO || '|' || YMD || '|' || HMS || '|' || IO_DIV"
+        description: "블렌딩 이력 식별자 (FACTORY + BATCH_NO + 시간 + 입출 복합) [추측: 정의서에 PK 없음]"
+
+      - name: factory
+        type: foreign
+        expr: FACTORY
+        description: "공장 코드 (샘플: JJ)"
+
+      - name: batch
+        type: foreign
+        expr: BATCH_NO
+        description: "배치 번호 (VARCHAR2(12), 샘플: B1511026, B1511037)"
+
+    dimensions:
+      - name: area_cd
+        type: categorical
+        expr: AREA_CD
+        description: "위치 코드 (B1=JJ, B2=CKP) [정의서 명시]"
+
+      - name: ymd
+        type: time
+        expr: "TO_DATE(YMD, 'YYYYMMDD')"
+        description: "연월일 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: hms
+        type: categorical
+        expr: HMS
+        description: "시간 (VARCHAR2(6) HHMMSS, 샘플: 102324, 135347)"
+
+      - name: io_div
+        type: categorical
+        expr: IO_DIV
+        description: "입출 구분 (1자리, 샘플: I=Input)"
+
+      - name: locate_cd
+        type: categorical
+        expr: LOCATE_CD
+        description: "위치 코드 (VARCHAR2(10), 샘플은 공백)"
+
+      - name: locate_div
+        type: categorical
+        expr: LOCATE_DIV
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: upd_user
+        type: categorical
+        expr: UPD_USER
+        description: "수정자 (샘플: 'IO-B1511026-1-BIN' — 입출 트리거 ID 형태)"
+
+      - name: upd_ymd
+        type: time
+        expr: UPD_YMD
+        description: "수정 일자 (DATE)"
+
+      - name: download_yn
+        type: categorical
+        expr: DOWNLOAD_YN
+        description: "다운로드 유무 (Y/N)"
+
+      - name: upload_yn
+        type: categorical
+        expr: UPLOAD_YN
+        description: "업로드 유무 (Y/N)"
+
+      - name: cart_no
+        type: categorical
+        expr: CART_NO
+        description: "카트 번호 (VARCHAR2(10), NULL 가능)"
+
+      - name: remark
+        type: categorical
+        expr: REMARK
+        description: "비고 (샘플: 'Slab : ')"
+
+      - name: input_proc
+        type: categorical
+        expr: INPUT_PROC
+        description: "사용하는 Procedure 명 (샘플: 'Update In: Pkg_Smt_Aging_Touch.ROLL_SCAN_IN_OUT_BLEND')"
+
+    measures:
+      - name: blend_count
+        agg: count
+        expr: BATCH_NO
+        description: "블렌딩 이력 행 수"
+
+      - name: batch_distinct_count
+        agg: count_distinct
+        expr: BATCH_NO
+        description: "고유 배치 개수 (사용자 지침: '배치 건수' = COUNT(DISTINCT BATCH_NO))"
+
+      - name: weight
+        agg: sum
+        expr: WEIGHT
+        description: "중량 합계 (NUMBER(10,3))"
+
+      - name: cart_weight
+        agg: sum
+        expr: CART_WEIGHT
+        description: "카트 수량 합계 (NUMBER(7,2). 정의서엔 '카트수량'이지만 컬럼명은 weight)"
+
+      - name: tot_weight
+        agg: sum
+        expr: TOT_WEIGHT
+        description: "총 수량 합계 (NUMBER(7,2))"

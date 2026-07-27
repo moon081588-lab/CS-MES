@@ -1,0 +1,202 @@
+# =============================================================================
+# Domain: O-I Cross Check (Outgoing-Incoming Cross Check)
+# Screen ID: SCR-004
+# Source Procedure: LMES.P_MSPD52000S_Q_V39
+# Main Table: OCI.MSPD_PCARD_RESULT (1층: mspd_pcard_result)
+#
+# 화면 설명: 반제품의 출고-입고 내역 수량 크로스체크 (Plant간 자재 이동 정합성)
+# 프로시저 V_P_WORK_TYPE 분기:
+#   - MAIN (라인 88): Line별 CH Plan / Out-In OK / Out Only / In Only / In / 완료% ★ 핵심
+#   - DETAIL (라인 699): 라인별 상세
+#   - DETAIL_SIZE (라인 1290): Size Info
+#   - DETAIL_SIZE_DETAIL (라인 1899): 더 상세
+#   - SCAN_DATA (라인 2496): Out/In Scan 내역
+#
+# 핵심 비즈니스 룰 (P_MSPD52000S_Q_V39 본문 검증 완료):
+# - 출고 (OUT): PROD_MOVE_TYPE='PROD' + OUT_DATE=조회일 + END_ROUTING_YN='Y' + RESULT_TYPE='SCAN'
+# - 입고 (IN):  PROD_MOVE_TYPE='MOVE' + IN_DATE=조회일 + END_ROUTING_YN='Y' + RESULT_TYPE='SCAN'
+#   → 출고는 PROD 이벤트, 입고는 MOVE 이벤트 (다른 PROD_MOVE_TYPE!)
+# - 매칭 키: PCARD_NAME + ITEM_CD (출고와 입고는 같은 PCARD를 양 Plant에서 스캔)
+# - 추가 필터: OP_CD <> UPC가 아니라 IPI/PHH는 Cross-plant MOVE EXISTS인 것만
+# - OUT-IN OK 판정: OUT_PCARD_QTY > 0 AND OUT_PCARD_QTY = IN_PCARD_QTY AND IN_QTY = 0
+# - sentinel 활용: OUT_DATE < '20010101' = 미출고, IN_DATE > '20010101' = 입고 발생
+#
+# 사용 안내:
+# - 일자 조건은 metric에 박지 않음 (LLM이 동적으로)
+# - PROD_ORDER_TYPE 'ZCP'/'ZSH'/'ZST'는 BOMLEVEL <> 0 추가 필터 필요
+# - JJ Insole(FA_PLANT_CD='3110' AND ITEM_CLASS_TYPE='SL')는 표시 제외
+# =============================================================================
+
+metrics:
+
+  # ---------------------------------------------------------------------------
+  # 1. 라인별 CH 계획 수량 (SCR-003과 동일)
+  # ---------------------------------------------------------------------------
+
+  - name: ch_plan_qty
+    label: 라인별 CH 계획 수량
+    type: simple
+    type_params:
+      measure: pcard_qty   # placeholder; 실제는 MSBS_SHIFT 서브쿼리
+    description: |
+      라인별 일자 기준 Cutting House 계획 수량 (화면 CH PLAN 컬럼).
+      P-O 화면의 ch_plan_qty 와 동일 정의 — 자세한 내용은 `metrics/po_cross_check.yml#ch_plan_qty` 참조.
+      [확정: P_MSPD52000S_Q_V39 라인 129 + reference/FN_GET_CH_PLAN.txt + 2026-03-02 ~ 03-06 화면 캡쳐 5 일치 실측 검증 (2026-05-19)]
+
+      ## 핵심 사실
+      - 원천: `LMES.FN_GET_CH_PLAN(YYYYMMDD, GMES_WC_CD)` (reference/FN_GET_CH_PLAN.txt)
+      - 함수 본체가 참조하는 `MSBS_SHIFT` 테이블은 **OCI 에 존재**
+      - OCI 환경에서는 함수 자체는 부재하므로 본체 SELECT 문을 인라인 서브쿼리로 호출해야 함:
+        ```sql
+        (SELECT NVL(DECODE(MAX(CST.DESCRIPTION),'0',NULL,MAX(CST.DESCRIPTION)), 0)
+           FROM OCI.MSBS_SHIFT CST
+          WHERE CST.PLAN_DATE        = :V_DATE
+            AND CST.SHIFT_TYPE       = '1'
+            AND CST.PROCESSSEGMENTID = 'FGA'
+            AND CST.ISUSABLE         = 'Usable'
+            AND 'FGA'||SUBSTR(CST.LINE_CD,-2) = BS_WC.WC_CD)
+        ```
+
+      ## 주의
+      - SHIFT_TYPE='1' / PROCESSSEGMENTID='FGA' / ISUSABLE='Usable' 만 조회 — 다른 공정 미지원
+      - DESCRIPTION 컬럼이 plan_qty 의 실제 값. '0' 이면 NULL 처리 → 최종 NVL(...,0).
+    filter: ""
+
+  # ---------------------------------------------------------------------------
+  # 2. Out-In OK: 출고-입고 매칭 완료 수량
+  # ---------------------------------------------------------------------------
+
+  - name: out_in_ok_qty
+    label: 출고-입고 매칭 완료 수량
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      출고와 입고가 모두 발생하고 수량이 일치한 PCARD의 수량 합계.
+      판정: OUT_PCARD_QTY > 0 AND OUT_PCARD_QTY = IN_PCARD_QTY AND IN_QTY = 0
+      → 출고/입고 1:1 매칭 완료 + 추가 검수(IN_QTY)는 발생 안 함
+      화면 'Out-In OK' 컬럼.
+      [확정: P_MSPD52000S_Q_V39 라인 393 (OI_PR 정의) 검증]
+      참고: 출고와 입고는 서로 다른 PROD_MOVE_TYPE(PROD vs MOVE)에서 같은 PCARD_NAME을 매칭.
+            현재 구현은 1층 measure(pcard_qty)에 비즈니스 룰 필터만 적용.
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+      AND EXISTS (
+        SELECT 1 FROM OCI.MSPD_PCARD_RESULT IN_T
+         WHERE IN_T.PCARD_NAME = MSPD_PCARD_RESULT.PCARD_NAME
+           AND IN_T.ITEM_CD = MSPD_PCARD_RESULT.ITEM_CD
+           AND IN_T.PROD_MOVE_TYPE = 'MOVE'
+           AND IN_T.END_ROUTING_YN = 'Y'
+           AND IN_T.IN_DATE > '20010101'
+           AND IN_T.RESULT_TYPE = 'SCAN'
+      )
+
+  # ---------------------------------------------------------------------------
+  # 3. Out Only: 출고만 있고 입고 없음
+  # ---------------------------------------------------------------------------
+
+  - name: out_only_qty
+    label: 출고만 있는 수량 (입고 없음, Out Only)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      출고는 했는데 받는 Plant에서 입고 스캔 안 된 수량.
+      판정: OUT_DATE = 조회일 + 매칭 IN_T가 NOT EXISTS (PROD_MOVE_TYPE='MOVE'인 입고 없음)
+      이게 많으면 자재 분실/지연/스캔누락 의심.
+      화면 'Out Only' 컬럼.
+      [확정: P_MSPD52000S_Q_V39 라인 264-285 (ONLY OUT) 검증]
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'PROD'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+      AND NOT EXISTS (
+        SELECT 1 FROM OCI.MSPD_PCARD_RESULT IN_T
+         WHERE IN_T.PCARD_NAME = MSPD_PCARD_RESULT.PCARD_NAME
+           AND IN_T.ITEM_CD = MSPD_PCARD_RESULT.ITEM_CD
+           AND IN_T.PROD_MOVE_TYPE = 'MOVE'
+           AND IN_T.END_ROUTING_YN = 'Y'
+           AND IN_T.IN_DATE > '20010101'
+           AND IN_T.RESULT_TYPE = 'SCAN'
+      )
+
+  # ---------------------------------------------------------------------------
+  # 4. In Only: 입고만 있고 출고 없음
+  # ---------------------------------------------------------------------------
+
+  - name: in_only_qty
+    label: 입고만 있는 수량 (출고 없음, In Only)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      입고는 했는데 보낸 Plant에서 출고 스캔이 미발생(OUT_DATE < '20010101' = sentinel)인 수량.
+      이게 많으면 출고 스캔 누락 의심.
+      화면 'In Only' 컬럼.
+      [확정: P_MSPD52000S_Q_V39 라인 296-340 (ONLY IN) 검증]
+      필터: IN_DATE = 조회일 AND PROD_MOVE_TYPE='MOVE' + 매칭 OUT_T.OUT_DATE < '20010101'
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'MOVE'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+      AND EXISTS (
+        SELECT 1 FROM OCI.MSPD_PCARD_RESULT OUT_T
+         WHERE OUT_T.PCARD_NAME = MSPD_PCARD_RESULT.PCARD_NAME
+           AND OUT_T.ITEM_CD = MSPD_PCARD_RESULT.ITEM_CD
+           AND OUT_T.PROD_MOVE_TYPE = 'PROD'
+           AND OUT_T.END_ROUTING_YN = 'Y'
+           AND OUT_T.OUT_DATE < '20010101'
+           AND OUT_T.RESULT_TYPE = 'SCAN'
+      )
+
+  # ---------------------------------------------------------------------------
+  # 5. In: 실제 입고 수량
+  # ---------------------------------------------------------------------------
+
+  - name: in_qty
+    label: 실제 입고 수량 (In)
+    type: simple
+    type_params:
+      measure: pcard_qty
+    description: |
+      입고일자 기준의 모든 입고 수량 합계 (PROD_MOVE_TYPE='MOVE').
+      화면 'In' 컬럼.
+      [확정: P_MSPD52000S_Q_V39 라인 359 (IN_QTY 컬럼) 검증]
+      참고: 입고는 PROD_MOVE_TYPE='MOVE' (생산 PROD와 다른 이벤트 타입).
+    filter: |
+      {{ Dimension('prod_move_type') }} = 'MOVE'
+      AND {{ Dimension('end_routing_yn') }} = 'Y'
+      AND {{ Dimension('result_type') }} = 'SCAN'
+
+  # ---------------------------------------------------------------------------
+  # 6. 매칭 완료율 (RT)
+  # ---------------------------------------------------------------------------
+
+  - name: oi_match_rate
+    label: 출고-입고 매칭 완료율 (%)
+    type: derived
+    type_params:
+      expr: out_in_ok_qty / (out_in_ok_qty + out_only_qty + in_only_qty) * 100
+      metrics:
+        - name: out_in_ok_qty
+        - name: out_only_qty
+        - name: in_only_qty
+    description: |
+      출고-입고 매칭 완료율 (%).
+      프로시저 정의: OI_PR / (OI_PR + O_PR + I_PR) * 100, 분모 0이면 0.
+      의미: 전체(완료+OutOnly+InOnly) 중 매칭 완료 비율.
+      → 100%면 모든 출고/입고가 1:1 매칭, 100% 미만이면 미매칭 발생.
+      화면 '완료(%)' 컬럼.
+      [확정: P_MSPD52000S_Q_V39 라인 431 검증]
+
+      ## 분모 0 케이스의 화면 NVL 디폴트 (★ P-O 와 다름)
+      Out=0, OutOnly=0, InOnly=0 모두 0 인 경우 metric 산식 자체는 NULL 산출. 화면 NVL 디폴트는 도메인별로 다름:
+        - **P-O 화면 (po_match_rate)**: NULL → **100.00** 으로 표시
+        - **O-I 화면 (이 metric)**: NULL → **0.00** 으로 표시 (빈 라인 = 0.00)
+      [확정: 2026-03-02 ~ 03-06 5 일치 캡쳐 검증 — L 39/40/41 (활동 0 라인) O-I 화면의 % 컬럼 = 0.00 표시. L 18 (CH PLAN=0, 활동 0) 도 0.00]
+      → 답변 시 "% 컬럼이 0.00 인 라인 의미" 질문 들어오면 "활동 없음(분모 0)" 이라고 답함. "매칭 실패" 와 의미 다름.
+
+      주의: 분모 0 케이스 LLM SQL 에서 NULLIF/CASE 처리 필요.
+      화면 재현 SQL 작성 시 `NVL(CASE WHEN (OI_PR+O_PR+I_PR)<>0 THEN OI_PR/(OI_PR+O_PR+I_PR)*100 ELSE NULL END, 0.00) AS OI_MATCH_RATE` 권장.

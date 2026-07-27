@@ -1,0 +1,64 @@
+semantic_models:
+  - name: msbs_sum_group_cd
+    description: |
+      화면 'W/C Group'/'Line' 표시값에 대한 정렬 순서·표시명 마스터.
+      MSBS_SUM_GROUP_WC 의 VIEW_GROUP_CD / SUB_TOTAL_CD 를 SUM_GROUP_CD 로 받음.
+      SUM_GROUP_TYPE 으로 어느 쪽 표시인지 구분.
+      [확정: P_MSPD29000S_Q_V06 검증 — SUM_GROUP_TYPE='VIEW_GROUP'/'SUB_TOTAL' 두 종류 조인 사용]
+    model: OCI.MSBS_SUM_GROUP_CD
+
+    entities:
+      - name: sum_group_cd
+        type: primary
+        expr: "COUNTRY_CD || '|' || FORM_ID || '|' || SUM_GROUP_CD || '|' || SUM_GROUP_TYPE"
+        description: "COUNTRY + FORM + GROUP_CD + GROUP_TYPE 복합키"
+
+      - name: country
+        type: foreign
+        expr: COUNTRY_CD
+        description: "국가 코드"
+
+    dimensions:
+      - name: country_cd
+        type: categorical
+        expr: COUNTRY_CD
+        description: "국가 코드 (예: 3000=Indonesia)"
+
+      - name: form_id
+        type: categorical
+        expr: FORM_ID
+        description: "화면 ID. Production Status 는 'MSPD22000S' 고정"
+
+      - name: sum_group_cd
+        type: categorical
+        expr: SUM_GROUP_CD
+        description: "그룹/라인 코드값 (MSBS_SUM_GROUP_WC.VIEW_GROUP_CD 또는 SUB_TOTAL_CD 와 매칭)"
+
+      - name: sum_group_type
+        type: categorical
+        expr: SUM_GROUP_TYPE
+        description: |
+          그룹 종류. enum:
+          - 'VIEW_GROUP' : 화면 'Line' 표시용 (MSBS_SUM_GROUP_WC.VIEW_GROUP_CD 매핑)
+          - 'SUB_TOTAL'  : 화면 'W/C Group' 표시용 (MSBS_SUM_GROUP_WC.SUB_TOTAL_CD 매핑)
+
+      - name: sum_group_mame
+        type: categorical
+        expr: SUM_GROUP_MAME
+        description: "표시명. ⚠ 원본 컬럼명 오타 그대로 (NAME 아님, MAME) [확정: 정의서 원문]"
+
+      - name: sort_seq
+        type: categorical
+        expr: SORT_SEQ
+        description: "정렬 순서 (화면 그리드 행 정렬에 사용)"
+
+      - name: use_yn
+        type: categorical
+        expr: USE_YN
+        description: "사용 여부. 필터: USE_YN='Y'"
+
+    measures:
+      - name: sum_group_cd_count
+        agg: count
+        expr: SUM_GROUP_CD
+        description: "마스터 행 수"

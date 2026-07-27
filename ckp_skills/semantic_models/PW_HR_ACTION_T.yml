@@ -1,0 +1,215 @@
+semantic_models:
+  - name: pw_hr_action_t
+    description: |
+      인사 발령/이동 이력(HR Action) — 사원 1명의 발령 이벤트 1건을 1행으로 보관하는 이력(history) 테이블.
+      워크포스(PW_) 계열 중 '인사(HR)' 도메인의 메인 테이블. 근태(PW_TL_DAILY_T)와는 EMPID 로 연결된다(같은 사람).
+      [확정: DB 검증] 19,517행 = distinct(EMPID, EFFDT, EFFSEQ). 사원 2,519명. EFFDT 범위 2010-10-15 ~ 2026-06-22(근태와 달리 장기 이력 보유).
+      행 단위(grain): (EMPID, EFFDT, EFFSEQ) 1행 = "그 사원의 그 발령 이벤트". 물리 PK 는 SERVICE_ID + ACTION_ID(NUMBER).
+      [확정: DB 검증] 한 사원이 여러 발령행을 가진다(입사 HIR → 이동 XFR → 인사변동 JOC 순으로 누적). 즉 '현재 상태'가 아니라 '발령 이력'이다. 사원의 현재 상태가 필요하면 EFFDT(그다음 EFFSEQ) 최신행을 ROW_NUMBER 로 골라야 한다.
+      코드형 컬럼이 많다(ACTION_TYPE/JOB_TITLE/JOB_POSITION/EMP_TYPE/HIRE_TYPE/PERS_TYPE/JOBCD/DEPT 등). 사람이 읽는 이름으로 바꾸려면 공통코드 PW_ZZ_CODE_T(번역표) + 직무 PW_HA_JOBCD_T + 부서 PW_HA_DEPT_T 와 조인한다. 디코드 규칙은 workflows/_common.md §11, SQL 골격은 functions/workforce.md 참조.
+      모든 컬럼 의미는 DB 실데이터 집계 + 사용자 제공 엑셀(인사 정보.xlsx)로 검증한 범위에서만 [확정]으로 표기한다. 검증 안 된 코드값은 의미를 단정하지 않고 '미확정'으로 둔다.
+    model: OCI.PW_HR_ACTION_T
+
+    entities:
+      - name: hr_action
+        type: primary
+        expr: "SERVICE_ID || '|' || ACTION_ID"
+        description: "발령 식별자 — SERVICE_ID + ACTION_ID(NUMBER) 가 물리 PK. 비즈니스 grain 은 (EMPID, EFFDT, EFFSEQ)."
+
+      - name: emp
+        type: foreign
+        expr: EMPID
+        description: |
+          사번. VARCHAR2(20). 이 발령의 대상 사원.
+          [확정: DB 검증] 근태 PW_TL_DAILY_T 와 같은 EMPID 체계 — 인사 2,519명 ∩ 근태 2,542명 = 2,515명 공유. 인사↔근태 조인키.
+
+      - name: supv_emp
+        type: foreign
+        expr: SUPV_EMPID
+        description: "직속 상위 관리자 사번. VARCHAR2(20). 같은 EMPID 체계라 셀프 조인으로 보고라인 추적 가능."
+
+      - name: dept
+        type: foreign
+        expr: DEPT
+        description: |
+          발령 부서 코드. VARCHAR2(20). 사람이 읽는 이름은 PW_HA_DEPT_T(부서 마스터)의 DEPT_NM/DEPT_FNM 으로 디코드(조인키 DEPT).
+          [확정: DB 검증] 인사에 등장하는 부서코드 394종 중 86종만 부서 마스터(91행)에 매칭된다 — 부서 마스터는 현행 조직 위주라 과거 발령의 폐지/구부서는 미매칭일 수 있다(LEFT JOIN 권장).
+
+      - name: jobcd
+        type: foreign
+        expr: JOBCD
+        description: "직무 코드. VARCHAR2(20). 예 'B326'. 사람이 읽는 직무명은 PW_HA_JOBCD_T(직무 마스터)의 JOBCD_NM 으로 디코드. 직무 마스터는 중복행이 있어 DISTINCT + EFF_STATUS='A' 필터 필요."
+
+    dimensions:
+      - name: effdt
+        type: time
+        expr: EFFDT
+        description: |
+          발령 효력 발생일(Effective Date). DATE 타입(TO_DATE 변환 불필요). 기간 필터는 DATE 리터럴로: EFFDT BETWEEN DATE '2026-01-01' AND DATE '2026-06-22'.
+          [확정: DB 검증] 범위 2010-10-15 ~ 2026-06-22. 입사·이동·발령 추이 분석의 기준 시간축. (근태 PW_TL_DAILY_T 가 2026년만 보유한 것과 달리 장기 이력)
+
+      - name: effseq
+        type: categorical
+        expr: EFFSEQ
+        description: "같은 EFFDT 안의 발령 순번(NUMBER). grain 의 일부. 같은 날 복수 발령 시 순서 구분. 현재 상태 추출 시 EFFDT DESC, EFFSEQ DESC 정렬."
+
+      - name: action_type
+        type: categorical
+        expr: ACTION_TYPE
+        description: |
+          발령 유형 코드. VARCHAR2(10).
+          [확정: DB 분포] XFR 12,483 / JOC 4,500 / HIR 2,516 / PAY 15 / ADL 3.
+          [확정: DB 검증 — PW_ZZ_CODE_T(SERVICE_ID='JJ') 디코드] 이 컬럼은 공통코드 여러 클래스의 합집합으로 풀린다:
+            · HIRE_ACTN_MODE: HIR=New Hire(신규입사), REH=Rehire(재입사), TRN=Transfers-in btw company(전입)
+            · MUTS_ACTN_TYPE: JOC=Personnel Changes(인사변동), XFR=Transfer(이동/전배)
+            · ABS_CLASS: PLA=Leave of Absence(휴직), VAC=Leave, BSN=Business Trip, DSP=Disciplinary, EDU=Training, SND=Dispatched  (※ 엑셀의 'ABS_CLAS' 는 오타, 실제 클래스명은 ABS_CLASS)
+            · PROBATION_POSITION: POS=Probation Position Divition(수습)
+          미확정: 실데이터의 'PAY'(15행), 'ADL'(3행) 은 위 클래스에서 디코드되지 않는다 → 의미 단정하지 말 것(소수, 라벨 보류).
+          디코드 SQL 은 functions/workforce.md#fn_decode_action_type 참조.
+
+      - name: action_rsn
+        type: categorical
+        expr: ACTION_RSN
+        description: "발령 사유 코드. VARCHAR2(10). 사유 코드 클래스는 미확정(검증 전) — 단정하지 말 것. 필요 시 PW_ZZ_CODE_T 코드 클래스 탐색 후 디코드."
+
+      - name: job_title
+        type: categorical
+        expr: JOB_TITLE
+        description: |
+          직책 코드. VARCHAR2(10). 사람이 읽는 이름은 PW_ZZ_CODE_T 의 CODE_CLASS_ID='JOB_TITLE'(32개 코드)로 디코드.
+          [확정: DB 검증 일부] 110=Chairman, 115=CEO, 130=Division Leader, 131=GM, 181=Head of Team, 192=Part Leader, 200=G/L, 201=Section Leader, 210=T/L, 211=조장 등.
+
+      - name: job_position
+        type: categorical
+        expr: JOB_POSITION
+        description: |
+          직급 코드. VARCHAR2(10). 사람이 읽는 이름은 PW_ZZ_CODE_T 의 CODE_CLASS_ID='JOB_POSITION'(47개 코드)로 디코드.
+          ⚠️ 'POSITION'(12개) 클래스가 아니라 'JOB_POSITION'(47개) 클래스를 쓴다. [확정: DB 검증 — 두 클래스 모두 250/248/246 매핑은 동일하나 JOB_POSITION 이 상위호환(전 코드 커버)].
+          [확정: DB 검증 일부] 250=T/M(작업자, 대다수), 248=T/L, 246=G/L, 230=Staff, 200=Assistant Manager, 190=Manager, 160=Director, 100=CEO 등. (근태 PW_TL_DAILY_T 의 JOB_POSITION_NM 과 같은 체계)
+
+      - name: jobcls
+        type: categorical
+        expr: JOBCLS
+        description: "직무 클래스 코드(직무 코드 JOBCD 의 상위, 예 'B32'). VARCHAR2(20). PW_HA_JOBCD_T.JOBCLS 와 동일 체계. ref/job_class_hierarchy.csv 의 J_JOB 단계."
+
+      - name: grade
+        type: categorical
+        expr: GRADE
+        description: |
+          급여 등급 코드. VARCHAR2(10). [확정: 사용자 메모 — GRADE = 급여 등급(salary grade)]. [확정: DB 분포] 대부분 공백(18,797), 그 외 D08(330)/D06(148)/B70(128)/B40(48)/B60(33)...
+          코드→이름 디코드: PW_ZZ_CODE_T 에 'GRADE' 클래스가 없어 발령 테이블 단독으론 명칭 불가. 이름이 필요하면 EMPID 로 사원 마스터 PW_HR_EMPLOYEES 를 조인해 GRADE_NM 을 가져온다.
+
+      - name: pph_flag
+        type: categorical
+        expr: PPH_FLAG
+        description: |
+          노무 구분 플래그. VARCHAR2(10). [확정: 사용자 회신 + 근태 동일 체계] 'D'=Direct(직접) / 'I'=Indirect(간접) / 'O'=Overhead(간접/관리).
+          [확정: DB 분포] D 12,924 / 공백 4,193 / I 1,389 / O 1,011. 공백 행 다수는 디코드/집계에서 별도 처리.
+
+      - name: emp_type
+        type: categorical
+        expr: EMP_TYPE
+        description: |
+          사원 유형 코드. VARCHAR2(10). 디코드 클래스 PW_ZZ_CODE_T CODE_CLASS_ID='EMP_TYPE'.
+          [확정: DB 검증] 10=Executives, 14=Office worker, 16=Production, 17=Special service.
+          [확정: DB 분포] 16(Production) 19,110 / 14(Office worker) 404 / 17(Special service) 3.
+
+      - name: hire_type
+        type: categorical
+        expr: HIRE_TYPE
+        description: |
+          고용 형태 코드. VARCHAR2(10). 디코드 클래스 'HIRE_TYPE'.
+          [확정: DB 검증] 14=Permanent(정규), 15=Contract(계약), 18=Entrustment(위촉), 24=Temporary(임시), 25=Dispatched(파견).
+          [확정: DB 분포] 14(Permanent) 19,516 / 15(Contract) 1.
+
+      - name: pers_type
+        type: categorical
+        expr: PERS_TYPE
+        description: |
+          인사 구분 코드. VARCHAR2(10). 디코드 클래스 'PERS_TYPE'.
+          [확정: DB 검증] EMP=Employee, CWR=Contingent worker, EXP=Expatriates(주재원), OTH=Others.
+          [확정: DB 분포] EMP 19,508 / EXP 9.
+
+      - name: emp_status
+        type: categorical
+        expr: EMP_STATUS
+        description: "재직 상태. VARCHAR2(1). [확정: 사용자 메모] 정의상 'A'=Active/'I'=Inactive. [확정: DB 검증 — 발령 데이터는 전 행 'A' 단일값]. 발령 이력 행은 전부 A 라 필터 의미 적음."
+
+      - name: hr_status
+        type: categorical
+        expr: HR_STATUS
+        description: "채용 상태. VARCHAR2(1). [확정: 사용자 메모] 정의상 'A'=Active/'I'=Inactive. [확정: DB 검증 — 발령 데이터는 전 행 'A' 단일값]. 단일값이라 분해 키로 의미 적음."
+
+      - name: job_ind
+        type: categorical
+        expr: JOB_IND
+        description: "직무 표시(Job indication). VARCHAR2(1). [확정: DB 검증 — 전 행 'P' 단일값]. 단일값."
+
+      - name: company
+        type: categorical
+        expr: COMPANY
+        description: "법인 코드. VARCHAR2(5). [확정: 사용자 메모] 값은 'JJ' 또는 'RJ' 두 법인. 근태 PW_TL_DAILY_T 와 마찬가지로 법인 코드이며 공장 코드가 아니다. 공장/조직 식별은 DEPT(→부서 마스터 DEPT_FNM)."
+
+      - name: estab
+        type: categorical
+        expr: ESTAB
+        description: "사업장(Business place) 코드. VARCHAR2(10). [확정: 사용자 메모] 17=KLARI / 그 외=CIKAMPEK. 발령 테이블은 근태(CKP 전용)와 달리 KLARI·CIKAMPEK 두 사업장을 함께 담는다 → 사업장 분해 가능. 이름 필요 시 사원 마스터 PW_HR_EMPLOYEES.ESTAB_NM 조인."
+
+      - name: action_title
+        type: categorical
+        expr: ACTION_TITLE
+        description: "발령 제목(Assignment title). VARCHAR2(100). 자유 텍스트."
+
+      - name: action_no
+        type: categorical
+        expr: ACTION_NO
+        description: "발령 번호(Assignment number). VARCHAR2(30)."
+
+      - name: expected_end_dt
+        type: time
+        expr: EXPECTED_END_DT
+        description: "예상 종료일(계약/파견 등). DATE. NULL 가능."
+
+      # ── DATASET_* 파티션 키 (디코드/조회 시 참고) ──
+      # 각 코드 컬럼에는 짝이 되는 DATASET_* 컬럼이 있다(DATASET_DEPT, DATASET_JOB_TITLE,
+      # DATASET_JOBCD, DATASET_JOB_POSITION, DATASET_GRADE, DATASET_EMP_TYPE, DATASET_HIRE_TYPE).
+      # 마스터/공통코드가 DATASET 으로 버전 분기될 때의 파티션 키다. 디코드는 (SERVICE_ID, CODE_CLASS_ID, CODE_ID)
+      # 만으로도 동작하나, 다중 DATASET 으로 중복 명칭이 나오면 DATASET 으로 좁히거나 집계(MAX)로 dedup 한다.
+      - name: dataset_dept
+        type: categorical
+        expr: DATASET_DEPT
+        description: "부서 데이터셋 파티션 키. VARCHAR2(10)."
+
+    measures:
+      - name: action_count
+        agg: count
+        expr: ACTION_ID
+        description: |
+          발령 건수 — 1행 = 발령 이벤트 1건. ACTION_TYPE 필터로 유형별 집계:
+          HIR→신규입사 건수, XFR→이동 건수, JOC→인사변동 건수, PLA(ABS_CLASS)→휴직 건수.
+          ⚠️ '인원수'가 아니라 '이벤트 수'다. 사람 수가 필요하면 distinct_emp_count 사용.
+
+      - name: distinct_emp_count
+        agg: count
+        expr: EMPID
+        description: "사원 수(중복 제거) — COUNT(DISTINCT EMPID). 발령행이 사람당 여러 개라, 해당 기간/조건에 '몇 명'인지 셀 때 사용. 대규모 아님(2,519명 규모)이라 DISTINCT 무방."
+
+      - name: hire_count
+        agg: count
+        expr: "CASE WHEN ACTION_TYPE = 'HIR' THEN ACTION_ID END"
+        description: "신규입사 건수 — ACTION_TYPE='HIR'. [확정: DB 분포 2,516]. 입사 추이는 EFFDT 로 GROUP BY. 재입사까지 포함하려면 ACTION_TYPE IN ('HIR','REH')."
+
+      - name: transfer_count
+        agg: count
+        expr: "CASE WHEN ACTION_TYPE = 'XFR' THEN ACTION_ID END"
+        description: "이동/전배 건수 — ACTION_TYPE='XFR'. [확정: DB 분포 12,483]. 부서 간 이동 흐름은 DEPT 디코드 + EFFDT 로 분석."
+
+      - name: personnel_change_count
+        agg: count
+        expr: "CASE WHEN ACTION_TYPE = 'JOC' THEN ACTION_ID END"
+        description: "인사변동 건수 — ACTION_TYPE='JOC'(Personnel Changes). [확정: DB 분포 4,500]."
+
+      - name: leave_count
+        agg: count
+        expr: "CASE WHEN ACTION_TYPE = 'PLA' THEN ACTION_ID END"
+        description: "휴직 발령 건수 — ACTION_TYPE='PLA'(Leave of Absence, ABS_CLASS). 실데이터 분포는 소수일 수 있어 결과로 재확인. (근태의 휴가 VC 와는 별개 개념 — 이쪽은 인사발령상 휴직)"

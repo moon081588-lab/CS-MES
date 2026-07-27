@@ -1,0 +1,261 @@
+# =============================================================================
+# Domain: External OS&D (Balance by Size + Return Rate)
+# Screen IDs: SCR-005 (Balance by Size) + SCR-006 (Return Rate New)
+# Source Procedures:
+#   - SCR-005: LMES.P_MSPQ38100S_Q
+#   - SCR-006: LMES.SP_GMES00142_Q_JJ_V5
+# Main Tables:
+#   - SCR-005: OCI.MSPQ_EX_OSND (1층: mspq_ex_osnd)
+#   - SCR-006: LMES.V_PQ_EX_OSND_V3 (OCI 부재 — functions/quality-osnd.md §V-2 재현 CTE 사용)
+#
+# 화면 설명:
+#   - SCR-005: CKP에서 나간 반제품 불량에 대한 보충 현황 조회
+#              사이즈별로 요청/출고/입고/잔량(Balance)을 매트릭스 형태로 표시
+#   - SCR-006: 입고일(IN_DATE) 기준 일자별 Return Rate (%) 차트 + 하단 6행 표
+#              (Incoming Qty / OS&D Qty / Replenishment / Replenishment Rate / OS&D Rate)
+# =============================================================================
+
+metrics:
+
+  # ---------------------------------------------------------------------------
+  # 1. 상태(Status)별 수량 — 화면 결과의 Status 컬럼 4개
+  # ---------------------------------------------------------------------------
+
+  - name: osnd_request_qty
+    label: OS&D 요청 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OS&D 발생 시 요청된 수량 합계 (취소되지 않은 모든 OS&D). 화면 Status='Request'에 해당. [출처: SCR-005 P_MSPQ38100S_Q]"
+    filter: |
+      {{ Dimension('cancel_yn') }} = 'N'
+
+  - name: osnd_outgoing_qty
+    label: OS&D 출고 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OS&D 출고 스캔이 완료된 수량 합계 (O_SCN_DT IS NOT NULL). 화면 Status='Outgoing'에 해당. [확정: P_MSPQ38100S_Q 라인 379 검증]"
+    filter: |
+      {{ Dimension('cancel_yn') }} = 'N'
+      AND {{ Dimension('o_scn_dt') }} IS NOT NULL
+
+  - name: osnd_incoming_qty
+    label: OS&D 입고 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OS&D 입고 스캔이 완료된 수량 합계 (I_SCN_DT IS NOT NULL). 화면 Status='Incoming'에 해당. [확정: P_MSPQ38100S_Q 라인 295 검증]"
+    filter: |
+      {{ Dimension('cancel_yn') }} = 'N'
+      AND {{ Dimension('i_scn_dt') }} IS NOT NULL
+
+  - name: osnd_balance_qty
+    label: OS&D 잔량 (Balance)
+    type: derived
+    type_params:
+      expr: osnd_request_qty - osnd_incoming_qty
+      metrics:
+        - name: osnd_request_qty
+        - name: osnd_incoming_qty
+    description: "요청 수량 - 입고 수량. 아직 보충되지 않은 OS&D 잔량. 화면 Status='Balance'에 해당. [출처: SCR-005 P_MSPQ38100S_Q]"
+
+  # ---------------------------------------------------------------------------
+  # 2. OS&D 타입별 수량
+  #    [확정: OCI DB 직접 조회 MSBS_CODE_MASTER CODE_CLASS_CD='PQ_OSND_TYPE' 2026-03-05]
+  #    실제 코드 매핑: D=Defective / I=Inline Defect / L=Lot Closing Shortage / O=Overrun / S=Shortage
+  #    ※ 기존 기록(D=Damage, L=Lost, I=Issue)은 오류였음 — 전면 교정
+  # ---------------------------------------------------------------------------
+
+  - name: osnd_defective_qty
+    label: OS&D Defective 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OSND_TYPE='D' (Defective) 수량 합계. [확정: OCI DB 직접 조회 2026-03-05. 기존 metric명 osnd_damage_qty / label 'Damage' 오류 → 교정. OSND_TYPE 코드는 MSBS_CODE_MASTER.CODE_CLASS_CD='PQ_OSND_TYPE'로 lookup됨]"
+    filter: |
+      {{ Dimension('osnd_type') }} = 'D'
+      AND {{ Dimension('cancel_yn') }} = 'N'
+
+  - name: osnd_inline_defect_qty
+    label: OS&D Inline Defect 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OSND_TYPE='I' (Inline Defect) 수량 합계. [확정: OCI DB 직접 조회 2026-03-05. 기존 metric명 osnd_issue_qty / label 'Issue' 오류 → 교정]"
+    filter: |
+      {{ Dimension('osnd_type') }} = 'I'
+      AND {{ Dimension('cancel_yn') }} = 'N'
+
+  - name: osnd_lot_closing_shortage_qty
+    label: OS&D Lot Closing Shortage 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OSND_TYPE='L' (Lot Closing Shortage) 수량 합계. [확정: OCI DB 직접 조회 2026-03-05. 기존 metric명 osnd_lost_qty / label 'Lost' 오류 → 교정]"
+    filter: |
+      {{ Dimension('osnd_type') }} = 'L'
+      AND {{ Dimension('cancel_yn') }} = 'N'
+
+  - name: osnd_overrun_qty
+    label: OS&D Overrun 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OSND_TYPE='O' (Overrun) 수량 합계. [확정: OCI DB 직접 조회 2026-03-05. 기존 누락 — 신규 추가]"
+    filter: |
+      {{ Dimension('osnd_type') }} = 'O'
+      AND {{ Dimension('cancel_yn') }} = 'N'
+
+  - name: osnd_shortage_qty
+    label: OS&D Shortage 수량
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: "OSND_TYPE='S' (Shortage) 수량 합계. [확정: OCI DB 직접 조회 2026-03-05. 기존 기록과 동일, 이상 없음]"
+    filter: |
+      {{ Dimension('osnd_type') }} = 'S'
+      AND {{ Dimension('cancel_yn') }} = 'N'
+
+  # ---------------------------------------------------------------------------
+  # 3. 보충(Rework) 관련 — 화면 결과 Replenishment에 해당
+  # ---------------------------------------------------------------------------
+
+  - name: osnd_rework_qty
+    label: OS&D 재작업 수량
+    type: simple
+    type_params:
+      measure: rework_qty
+    description: "OS&D 발생 후 재작업으로 처리된 수량 합계. [출처: SCR-005 P_MSPQ38100S_Q + 1층 컬럼 정의서]"
+    filter: |
+      {{ Dimension('cancel_yn') }} = 'N'
+
+  # ---------------------------------------------------------------------------
+  # 4. OS&D 발생 건수 (수량이 아닌 건수)
+  # ---------------------------------------------------------------------------
+
+  - name: osnd_event_count
+    label: OS&D 발생 건수
+    type: simple
+    type_params:
+      measure: osnd_count
+    description: "OS&D 발생 행 수 (취소된 건 제외). 수량이 아닌 '몇 건 발생했는지'. [출처: SCR-005 P_MSPQ38100S_Q]"
+    filter: |
+      {{ Dimension('cancel_yn') }} = 'N'
+  # ===========================================================================
+  # ============== SCR-006: External OS&D Return Rate (New) ==================
+  # ===========================================================================
+  # Source: LMES.SP_GMES00142_Q_JJ_V5 + LMES.V_PQ_EX_OSND_V3
+  # OCI 환경에서는 functions/quality-osnd.md §V-2 의 재현 CTE (OSND_V3_REPLICA)
+  # 위에서 동일 컬럼 (DEFECT_QTY, REPLEN_QTY, IN_QTY) 을 사용한다.
+  #
+  # 화면 하단 6행 표 ↔ metric 매핑:
+  #   Incoming Quantity (Prs)   → osnd_in_qty
+  #   OS&D Quantity (Prs)       → osnd_defect_qty   (= 차트 "C.GRADE RETURN" 막대)
+  #   Replenishment (Prs)       → osnd_replen_qty   (= 차트 "REPLENISHMENT" 막대)
+  #   Replenishment Rate (%)    → osnd_return_rate  (= 차트 자주색 % 선)
+  #   OS&D Rate (%)             → osnd_rate_pct
+  #
+  # ★ 핵심 차이 (SCR-005 vs SCR-006):
+  #   - 기준일: SCR-005 = OSND_DATE / SCR-006 = IN_DATE (실제 입고일)
+  #   - 수량 단위: SCR-005 = OSND_EX_QTY 원본 / SCR-006 = OSND_EX_QTY / 2 (L/R 켤레)
+  #   - 필터: SCR-006 은 OSND_TYPE IN ('D','S') 디폴트 (2025.09.22 이후)
+  # ===========================================================================
+
+  - name: osnd_defect_qty
+    label: OS&D DEFECT 수량 (켤레)
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: |
+      OS&D 발생 수량 — 켤레 환산 (OSND_EX_QTY / 2).
+      화면 하단표 "OS&D Quantity (Prs)" / 차트 막대 "C.GRADE RETURN" 에 해당.
+      OCI 환경에서는 functions/quality-osnd.md §V-2 재현 CTE 의 DEFECT_QTY 컬럼과 동일.
+      [확정: V_PQ_EX_OSND_V3 정의 라인 14, OSND_EX_QTY/2 검증]
+    filter: |
+      {{ Dimension('cancel_yn') }} = 'N'
+      AND {{ Dimension('cfm_dt') }} IS NOT NULL
+      AND {{ Dimension('osnd_type') }} IN ('D', 'S')
+
+  - name: osnd_replen_qty
+    label: OS&D 후보충 완료 수량 (켤레)
+    type: simple
+    type_params:
+      measure: osnd_ex_qty
+    description: |
+      입고 완료된 OS&D 수량 — 켤레 환산 (I_SCN_DT 가 있는 행의 OSND_EX_QTY / 2).
+      화면 하단표 "Replenishment (Prs)" / 차트 막대 "REPLENISHMENT" 에 해당.
+      OCI 재현 CTE 의 REPLEN_QTY 컬럼 (DECODE(I_SCN_DT, NULL, 0, OSND_EX_QTY)/2) 과 동일.
+      [확정: V_PQ_EX_OSND_V3 정의 라인 19, SP_GMES00142 라인 95 검증]
+    filter: |
+      {{ Dimension('cancel_yn') }} = 'N'
+      AND {{ Dimension('cfm_dt') }} IS NOT NULL
+      AND {{ Dimension('i_scn_dt') }} IS NOT NULL
+      AND {{ Dimension('osnd_type') }} IN ('D', 'S')
+
+  - name: osnd_return_rate
+    label: Return Rate (%)
+    type: derived
+    type_params:
+      expr: CASE WHEN osnd_defect_qty = 0 THEN 0 ELSE ROUND(osnd_replen_qty / osnd_defect_qty * 100, 2) END
+      metrics:
+        - name: osnd_defect_qty
+        - name: osnd_replen_qty
+    description: |
+      후보충 완료 비율 = REPLEN_QTY / DEFECT_QTY × 100 (소수점 둘째 자리).
+      화면 하단표 "Replenishment Rate (%)" / 차트의 자주색 % 라인에 해당.
+      DEFECT_QTY = 0 인 경우 0 으로 처리 (zero-division 보호 — DECODE 등가).
+      [확정: SP_GMES00142_Q_JJ_V5 라인 99 검증]
+      범위: 0 ≤ Return Rate ≤ 100 (REPLEN ≤ DEFECT 항상 성립).
+
+  - name: osnd_in_qty
+    label: Incoming Quantity (입고 수량, 켤레)
+    type: simple
+    type_params:
+      measure: osnd_ex_qty   # 자리 표시자 — 실제로는 functions §V-2 의 IN_QTY 컬럼 사용
+    description: |
+      그 IN_DATE 에 입고된 전체 수량 (PCARD/MOVE 입고 모두 포함).
+      화면 하단표 "Incoming Quantity (Prs)" 에 해당.
+      = 프로시저 CV_2 (SP_GMES00142_Q_JJ_V5 라인 89) 의 SUM(IN_QTY) AS PROD_QTY 별칭.
+
+      [중요] 이 metric 은 MSPQ_EX_OSND 한 테이블로 산출 불가:
+        - functions/quality-osnd.md §V-2 의 OSND_V3_REPLICA 4분기 UNION 중
+          분기 2 (MOVE_BR: MSPQ_MATERIAL_MOVE.MOVE_QTY),
+          분기 3 (PCARD_AFTER_CLOSE_BR: MSPD_PCARD_RESULT.PCARD_QTY),
+          분기 4 (PCARD_EX_BR: MSPD_PCARD_RESULT.PCARD_QTY) 의 IN_QTY 합산.
+        - 분기 1 (DEFECT_BR) 의 IN_QTY 는 0 으로 채워짐.
+      따라서 measure 정의는 자리 표시자이며, 실제 SQL 은 functions §V-2 의 PCARD_BR/MOVE_BR 분기를
+      직접 호출하거나 fn_return_rate_daily_full 함수 사용 필요.
+
+      [확정: V_PQ_EX_OSND_V3 정의 라인 26-62 IN_QTY 산출 로직 + SP_GMES00142_Q_JJ_V5 라인 89 검증]
+
+      ★ "EX-점검 입고만" 인가 "일반 입고 전체" 인가 — 양쪽 다 포함, 단 EX 점검 통로 한정:
+        - 분기 2/3: ERP 창고 코드 5%, RESULT_TYPE='SCAN' (분기2) 또는 PROD_MOVE_TYPE='MOVE' (분기3),
+          inspection_point LIKE 'EX%' 의 work_center 와 조인 → EX 워크센터로 입고된 모든 것.
+        - 분기 4: MSBS_CODE_MASTER.PQ_EX_ITEM_CLASS 에 등록된 ITEM_CLASS_TYPE 만.
+        즉 화면 Incoming Quantity = "EX 점검 통과 입고 전체 (분기 4 만 카테고리 한정)".
+        "EX 점검만 받은 입고" 가 아니라 "EX 통과 후 일반 입고" 도 포함됨.
+    filter: |
+      -- 이 filter 는 분기 2~4 의 OCI 재현 CTE 내부에 이미 적용됨
+      -- (close_end_date, ERP_WH_TO LIKE '5%', RESULT_TYPE='SCAN' 등)
+      -- 자유 분석 시 metric 단독 사용 불가 → §V-2 CTE 와 함께 사용
+      1=1
+
+  - name: osnd_rate_pct
+    label: OS&D Rate (%)
+    type: derived
+    type_params:
+      expr: CASE WHEN osnd_in_qty = 0 THEN 0 ELSE ROUND(osnd_defect_qty / osnd_in_qty * 100, 2) END
+      metrics:
+        - name: osnd_defect_qty
+        - name: osnd_in_qty
+    description: |
+      입고량 대비 OS&D 발생 비율 = DEFECT_QTY / IN_QTY × 100 (소수점 둘째 자리).
+      화면 하단표 "OS&D Rate (%)" 에 해당.
+      Replenishment Rate 와 다른 지표 — "그 날 입고된 양 중 몇 % 가 OS&D 였나" 를 봄.
+      IN_QTY = 0 인 경우 0 으로 처리.
+      [추측: 클라이언트 표현식. SP_GMES00142_Q_JJ_V5 프로시저 CV_2 (line 87-126) 검증 결과 — 
+       프로시저는 PER (= Replenishment Rate) 컬럼만 산출하고 OS&D Rate 컬럼은 산출하지 않음.
+       화면 그리드가 클라이언트 (DevExpress 등) 셀 표현식으로 DEFECT_QTY/PROD_QTY 를 직접 
+       계산하는 것으로 판단. 산식 자체는 형태상 표준이나 화면 실값과 한 번 대조 필요.]
+      산출 의존: osnd_in_qty 와 동일하게 functions §V-2 의 4분기 UNION 필요.

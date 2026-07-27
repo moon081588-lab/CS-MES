@@ -1,0 +1,93 @@
+semantic_models:
+  - name: pw_ha_dept_t
+    description: |
+      부서 마스터(Department) — 부서 코드(DEPT) → 부서명(DEPT_NM/DEPT_FNM) 디코드 + 조직 계층 정보. 워크포스에서 발령 부서를 이름으로 풀 때 쓴다.
+      [확정: DB 검증] 91행 = distinct DEPT 91종(중복 없음). 현행 조직 중심.
+      ⚠️ 커버리지 한계: 인사 PW_HR_ACTION_T.DEPT 에는 부서코드 394종이 등장하나 그중 86종만 이 마스터(91행)에 매칭된다 → 과거 발령의 폐지/구부서는 미매칭. 부서명 디코드는 LEFT JOIN 으로 하고, 미매칭은 코드 원본을 노출하거나 '(구부서/미등록)'로 표시.
+      [확정: 근태와 동일 표기 체계] DEPT_FNM 은 'CIKAMPEK ...' 처럼 공장/공정/그룹을 담은 전체명으로, 근태 PW_TL_DAILY_T.DEPT_FNM 과 같은 형식이다.
+    model: OCI.PW_HA_DEPT_T
+
+    entities:
+      - name: dept_key
+        type: primary
+        expr: "SERVICE_ID || '|' || DATASET || '|' || DEPT"
+        description: "부서 마스터 식별자. 비즈니스 디코드 키는 DEPT."
+
+      - name: dept
+        type: foreign
+        expr: DEPT
+        description: "부서 코드. VARCHAR2(80). 인사 PW_HR_ACTION_T.DEPT 와 조인하는 키."
+
+      - name: mng_emp
+        type: foreign
+        expr: MNG_EMPID
+        description: "부서장 사번. VARCHAR2(80). 사원/인사 테이블의 EMPID 와 같은 체계. NULL 가능."
+
+    dimensions:
+      - name: dept_nm
+        type: categorical
+        expr: DEPT_NM
+        description: "부서명(표시명). VARCHAR2(400). 디코드 기본 결과."
+
+      - name: dept_fnm
+        type: categorical
+        expr: DEPT_FNM
+        description: "부서 전체명. VARCHAR2(800). 예 'CIKAMPEK ...' — 공장/공정/그룹 포함. 근태 DEPT_FNM 과 같은 형식이라 부서 단위 집계 표시명으로 일관 사용."
+
+      - name: company
+        type: categorical
+        expr: COMPANY
+        description: "법인 코드. VARCHAR2(20). 공장 코드 아님(워크포스 공통 — 공장/조직 식별은 DEPT_FNM)."
+
+      - name: estab
+        type: categorical
+        expr: ESTAB
+        description: "사업장 코드. VARCHAR2(40). NULL 가능."
+
+      - name: org_lvl
+        type: categorical
+        expr: ORG_LVL
+        description: "조직 레벨. VARCHAR2(40). 조직 계층 깊이(상위/하위) 구분용. NULL 가능."
+
+      - name: org_div
+        type: categorical
+        expr: ORG_DIV
+        description: "조직 구분. VARCHAR2(40). NULL 가능."
+
+      - name: old_dept
+        type: categorical
+        expr: OLD_DEPT
+        description: |
+          이전(구) 부서 코드. VARCHAR2(20). 부서 개편 전 코드 → 현행 DEPT 로의 매핑 단서.
+          발령 이력의 부서코드 394종 중 86종만 현행 마스터에 매칭되는 커버리지 공백을, 구부서→현부서 연결로 일부 보완할 수 있다(OLD_DEPT 로 역매핑). NULL 가능.
+
+      - name: line
+        type: categorical
+        expr: LINE
+        description: "부서에 매핑된 생산 라인 코드. VARCHAR2(10). NULL 가능. 근태/사원 마스터의 LINE 과 같은 체계."
+
+      - name: unit
+        type: categorical
+        expr: UNIT
+        description: "생산 공정(Unit) 코드. VARCHAR2(10). NULL 가능."
+
+      - name: cell
+        type: categorical
+        expr: CELL
+        description: "셀(Cell) 코드. VARCHAR2(10). NULL 가능."
+
+      - name: eff_status
+        type: categorical
+        expr: EFF_STATUS
+        description: "효력 상태. VARCHAR2(4). 'A'=Active. 현행 부서만 보려면 EFF_STATUS='A'."
+
+      - name: effdt
+        type: time
+        expr: EFFDT
+        description: "효력일. DATE. [확정: DB 검증] 우리 OCI 에선 (SERVICE_ID, DEPT)당 1행뿐(EFFDT 버전 중복 없음, 91부서) → '최신 EFFDT 선택' 로직은 사실상 no-op. 원본 시스템처럼 부서 이력이 여러 EFFDT 로 쌓인 경우에만 MAX(EFFDT) 필터가 실제로 작동한다."
+
+    measures:
+      - name: dept_count
+        agg: count
+        expr: DEPT
+        description: "부서 수. 디코드/조직 조인용 차원. 부서 종수는 COUNT(DISTINCT DEPT)."

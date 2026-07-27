@@ -1,0 +1,352 @@
+semantic_models:
+  - name: msbp_roll_lot
+    description: "롤 LOT — 롤 공정의 LOT 단위 이력 (바코드 키 기준). SO 하위 단위. 정의서에 '데이터 존재하지 않음' 컬럼이 다수"
+    model: OCI.MSBP_ROLL_LOT
+
+    entities:
+      - name: lot
+        type: primary
+        expr: BAR_KEY
+        description: "바코드 Key (Unique 정보) — 정의서에 unique 명시. PK [추측: 정의서에 PK 명시 없으나 unique]"
+
+      - name: factory
+        type: foreign
+        expr: FACTORY
+        description: "공장 코드 (샘플: JJ)"
+
+      - name: so
+        type: foreign
+        expr: "SO_ID || '|' || SO_SEQ"
+        description: "Shop Order. MSBP_ROLL_SO와 조인 가능 [추측]"
+
+      - name: so_id
+        type: foreign
+        expr: SO_ID
+        description: "Shop Order ID"
+
+      - name: mcs
+        type: foreign
+        expr: MCS_CD
+        description: "MCS 코드. MSBP_MCS와 조인 가능 [추측]. NULL 가능"
+
+      - name: style
+        type: foreign
+        expr: STYLE_CD
+        description: "스타일 코드 (샘플: IB1895-107, CD6404-026)"
+
+      - name: parent_lot
+        type: foreign
+        expr: PARENT_LOT
+        description: "상위 LOT 바코드"
+
+      - name: child_lot
+        type: foreign
+        expr: CHILD_LOT
+        description: "하위 LOT 바코드"
+
+      - name: recycle_lot
+        type: foreign
+        expr: RECYCLE_LOT_ID
+        description: "Banbury 번호 [정의서 명시]"
+
+    dimensions:
+      - name: area_cd
+        type: categorical
+        expr: AREA_CD
+        description: "위치 코드 (샘플: B1)"
+
+      - name: op_cd
+        type: categorical
+        expr: OP_CD
+        description: "공정 코드 (샘플: OS)"
+
+      - name: mcs_color
+        type: categorical
+        expr: MCS_COLOR
+        description: "MCS 색상 (샘플: 'SUMMIT WHITE(12J)', 'BLACK(00A)')"
+
+      - name: mcs_option
+        type: categorical
+        expr: MCS_OPTION
+        description: "MCS 참고 정보 (샘플: '30PHR(15%) REGRIND', 'NO REGRIND')"
+
+      - name: roll_mc
+        type: categorical
+        expr: ROLL_MC
+        description: "롤 설비 번호 (샘플: 3, NULL)"
+
+      - name: roll_op_cd
+        type: categorical
+        expr: ROLL_OP_CD
+        description: "롤 공정 코드 (샘플: COMP, CALD1)"
+
+      - name: prev_op_cd
+        type: categorical
+        expr: PREV_OP_CD
+        description: "전 롤 공정 코드 (샘플: ROLL2)"
+
+      - name: next_op_cd
+        type: categorical
+        expr: NEXT_OP_CD
+        description: "후 롤 공정 코드 (샘플: BANB, AGNG)"
+
+      - name: press_op_cd
+        type: categorical
+        expr: PRESS_OP_CD
+        description: "차기 공정 코드 (샘플: OS)"
+
+      - name: status
+        type: categorical
+        expr: STATUS
+        description: "상태 (1자리, 샘플: 1, 7)"
+
+      - name: lot_no
+        type: categorical
+        expr: LOT_NO
+        description: "Lot 번호"
+
+      - name: lot_no_seq
+        type: categorical
+        expr: LOT_NO_SEQ
+        description: "Lot 번호 차수"
+
+      - name: lot_type
+        type: categorical
+        expr: LOT_TYPE
+        description: "Lot 타입 (NULL 가능)"
+
+      - name: io_div
+        type: categorical
+        expr: IO_DIV
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: locate_cd
+        type: categorical
+        expr: LOCATE_CD
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: lot_ymd
+        type: time
+        expr: "TO_DATE(LOT_YMD, 'YYYYMMDD')"
+        description: "LOT 생성 일자 (VARCHAR2(8) YYYYMMDD)"
+
+      - name: lot_hms
+        type: categorical
+        expr: LOT_HMS
+        description: "LOT 생성 시간 (VARCHAR2(6) HHMMSS, 샘플: 756, 70434 — 앞 0 빠진 값)"
+
+      - name: lot_ymd_s
+        type: categorical
+        expr: LOT_YMD_S
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: lot_hms_s
+        type: categorical
+        expr: LOT_HMS_S
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: out_ymd
+        type: time
+        expr: "TO_DATE(OUT_YMD, 'YYYYMMDD')"
+        description: "2nd Roll 스캔 일자 (VARCHAR2(8))"
+
+      - name: out_hms
+        type: categorical
+        expr: OUT_HMS
+        description: "2nd Roll 스캔 시간 (VARCHAR2(6))"
+
+      - name: check_cd
+        type: categorical
+        expr: CHECK_CD
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: check_rs
+        type: categorical
+        expr: CHECK_RS
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: thickness
+        type: categorical
+        expr: THICKNESS
+        description: "두께 (VARCHAR2(30))"
+
+      - name: upd_user
+        type: categorical
+        expr: UPD_USER
+        description: "수정자 (샘플: Production, CALD3)"
+
+      - name: upd_ymd
+        type: time
+        expr: UPD_YMD
+        description: "수정 일자 (DATE)"
+
+      - name: download_yn
+        type: categorical
+        expr: DOWNLOAD_YN
+        description: "다운로드 유무 (Y/N)"
+
+      - name: upload_yn
+        type: categorical
+        expr: UPLOAD_YN
+        description: "업로드 유무 (Y/N)"
+
+      - name: print_dt
+        type: time
+        expr: PRINT_DT
+        description: "출력 일자 (DATE)"
+
+      - name: insert_proc
+        type: categorical
+        expr: INSERT_PROC
+        description: "[정의서: '데이터 존재하지 않음']. 샘플엔 'P_MSBP17000S_2_S_V02' 등 프로시저명 있음 [추측]"
+
+      - name: manual_nik
+        type: categorical
+        expr: MANUAL_NIK
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: lot_id
+        type: categorical
+        expr: LOT_ID
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: mcs_color1
+        type: categorical
+        expr: MCS_COLOR1
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: out_hms_e
+        type: categorical
+        expr: OUT_HMS_E
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: out_ymd_e
+        type: categorical
+        expr: OUT_YMD_E
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: product_definition_id
+        type: categorical
+        expr: PRODUCTDEFINITIONID
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: thickness_act
+        type: categorical
+        expr: THICKNESS_ACT
+        description: "[정의서: '데이터 존재하지 않음']"
+
+    measures:
+      - name: roll_lot_count
+        agg: count
+        expr: BAR_KEY
+        description: "롤 LOT 행 수 (바코드 기준)"
+
+      - name: lot_weight
+        agg: sum
+        expr: LOT_WEIGHT
+        description: "[정의서: '데이터 존재하지 않음']. LOT 중량으로 추정 [추측]"
+
+      - name: out_weight
+        agg: sum
+        expr: OUT_WEIGHT
+        description: "2nd Roll 스캔 중량 합계 (NUMBER(20,8))"
+
+      - name: st_er
+        agg: sum
+        expr: ST_ER
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: check_er
+        agg: sum
+        expr: CHECK_ER
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: count1
+        agg: sum
+        expr: COUNT1
+        description: "카운터 1 [정의서: '카운터']"
+
+      - name: count2
+        agg: sum
+        expr: COUNT2
+        description: "카운터 2"
+
+      - name: count3
+        agg: sum
+        expr: COUNT3
+        description: "카운터 3"
+
+      - name: time1
+        agg: avg
+        expr: TIME1
+        description: "시간 1 [정의서: '시간']. 합산보다는 평균"
+
+      - name: time2
+        agg: avg
+        expr: TIME2
+        description: "시간 2"
+
+      - name: time3
+        agg: avg
+        expr: TIME3
+        description: "시간 3"
+
+      - name: temp1
+        agg: avg
+        expr: TEMP1
+        description: "온도 1 [정의서: '온도']. 평균"
+
+      - name: temp2
+        agg: avg
+        expr: TEMP2
+        description: "온도 2"
+
+      - name: temp3
+        agg: avg
+        expr: TEMP3
+        description: "온도 3"
+
+      - name: speed1
+        agg: avg
+        expr: SPEED1
+        description: "속도 1 [정의서: '속도']. 평균"
+
+      - name: speed2
+        agg: avg
+        expr: SPEED2
+        description: "속도 2"
+
+      - name: speed3
+        agg: avg
+        expr: SPEED3
+        description: "속도 3"
+
+      - name: scrap_weight
+        agg: sum
+        expr: SCRAP_WEIGHT
+        description: "[정의서: '데이터 존재하지 않음']. 스크랩 중량으로 추정 [추측]"
+
+      - name: thickness_max
+        agg: max
+        expr: THICKNESS_MAX
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: thickness_min
+        agg: min
+        expr: THICKNESS_MIN
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: thickness_act_min
+        agg: min
+        expr: THICKNESS_ACT_MIN
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: thickness_act_max
+        agg: max
+        expr: THICKNESS_ACT_MAX
+        description: "[정의서: '데이터 존재하지 않음']"
+
+      - name: precure_weight
+        agg: sum
+        expr: PRECURE_WEIGHT
+        description: "[정의서: '데이터 존재하지 않음']"

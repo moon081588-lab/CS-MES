@@ -1,0 +1,152 @@
+semantic_models:
+  - name: pop_device
+    description: "POP 디바이스 마스터 — 바코드 스캔 단말기(스캐너) 정보 (PC 접속 정보, IP, URL 등)"
+    model: OCI.POP_DEVICE
+
+    entities:
+      - name: device
+        type: primary
+        expr: "PLANT_CD || '|' || DEVICE_ID"
+        description: "디바이스 식별자 (PLANT_CD + DEVICE_ID 복합키) [추측]"
+
+      - name: plant
+        type: foreign
+        expr: PLANT_CD
+        description: "공장 코드. MSBS_PLANT 조인 가능 [추측]"
+
+    dimensions:
+      - name: device_id
+        type: categorical
+        expr: DEVICE_ID
+        description: "POP 스캐너 ID (샘플: JJ_PLANTE_UPS_PROD_33)"
+
+      - name: device_name
+        type: categorical
+        expr: DEVICE_NAME
+        description: "POP 스캐너 명 (대부분 DEVICE_ID와 동일)"
+
+      - name: connect_sql
+        type: categorical
+        expr: CONNECT_SQL
+        description: "로컬 PC SQL Express 접속 문자열"
+
+      - name: connect_sql_old
+        type: categorical
+        expr: CONNECT_SQL_OLD
+        description: "[사용하지 않음 — 정의서 명시]"
+
+      - name: ip_address
+        type: categorical
+        expr: IP_ADDRESS
+        description: "IP 주소 (샘플: 10.10.17.218)"
+
+      - name: web_url
+        type: categorical
+        expr: WEB_URL
+        description: "웹 서비스 URL"
+
+      - name: scan_procedure
+        type: categorical
+        expr: SCAN_PROCEDURE
+        description: "스캔 처리 프로시저명 (샘플: PKG_POP_PCARD_SCAN.SP_POP_PCARD_SCAN_S_CLOB)"
+
+      - name: scan_procedure_old
+        type: categorical
+        expr: SCAN_PROCEDURE_OLD
+        description: "[사용하지 않음 — 정의서 명시]"
+
+      - name: view_form
+        type: categorical
+        expr: VIEW_FORM
+        description: "용도 구분 (생산/이동). 샘플 값: PROD, MOVE"
+
+      - name: monitor_no
+        type: categorical
+        expr: MONITOR_NO
+        description: "모니터 번호 (1로 셋팅 — 정의서 명시)"
+
+      - name: port_info
+        type: categorical
+        expr: PORT_INFO
+        description: "포트 정보 (샘플: USB, COM4/9600/N/8/1, NULL)"
+
+      - name: debug_mode
+        type: categorical
+        expr: DEBUG_MODE
+        description: "[사용하지 않음 — 정의서 명시]. 샘플은 Y만"
+
+      - name: thread_time
+        type: categorical
+        expr: THREAD_TIME
+        description: "강제 셋팅 값 (INTEGER, 샘플: 60)"
+
+      - name: pop_apply_time
+        type: categorical
+        expr: POP_APPLY_TIME
+        description: "강제 셋팅 값 (INTEGER, 샘플: 10)"
+
+      - name: use_yn
+        type: categorical
+        expr: USE_YN
+        description: "사용 여부 (Y/N)"
+
+      - name: pop_down
+        type: categorical
+        expr: POP_DOWN
+        description: "다운로드 여부 (Y/N)"
+
+      - name: pop_down_dt
+        type: time
+        expr: POP_DOWN_DT
+        description: "다운로드 일시 (DATE)"
+
+      - name: memo
+        type: categorical
+        expr: MEMO
+        description: "메모"
+
+      - name: creator
+        type: categorical
+        expr: CREATOR
+        description: "생성자"
+
+      - name: create_dt
+        type: time
+        expr: CREATE_DT
+        description: "생성 시간 (DATE)"
+
+      - name: updater
+        type: categorical
+        expr: UPDATER
+        description: "수정자"
+
+      - name: update_dt
+        type: time
+        expr: UPDATE_DT
+        description: "수정 시간 (DATE)"
+
+      - name: create_pc
+        type: categorical
+        expr: CREATE_PC
+        description: "생성 PC"
+
+      - name: update_pc
+        type: categorical
+        expr: UPDATE_PC
+        description: "수정 PC"
+
+      - name: pop_exec_dt
+        type: time
+        expr: POP_EXEC_DT
+        description: "[사용하지 않음 — 정의서 명시]"
+
+      - name: wc_list_yn
+        type: categorical
+        expr: WC_LIST_YN
+        description: "[사용하지 않음 — 정의서 명시]"
+
+    measures:
+      - name: device_count
+        agg: count
+        expr: DEVICE_ID
+        description: "디바이스 개수"

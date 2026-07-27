@@ -1,0 +1,64 @@
+semantic_models:
+  - name: msbs_organization_sub
+    description: |
+      조직 상하위 매핑. Production Status 에서는 PLANT → COUNTRY 역매핑에 사용.
+      MSBS_SUM_GROUP_WC 가 COUNTRY 단위로 라인 마스터를 보관하므로,
+      PLANT 입력 → COUNTRY 변환이 필수.
+
+      [확정 매핑 — 현재 운영 환경 4개 PLANT 전부 COUNTRY 3000(Indonesia)]
+        SUB_ORG_TYPE='GMES_PLANT', SUB_ORG_CD='3110' (JJ)  → ORG_CD='3000'
+        SUB_ORG_TYPE='GMES_PLANT', SUB_ORG_CD='3120' (CKP) → ORG_CD='3000'
+        SUB_ORG_TYPE='GMES_PLANT', SUB_ORG_CD='3210' (RJ)  → ORG_CD='3000'
+        SUB_ORG_TYPE='GMES_PLANT', SUB_ORG_CD='3220' (JJS) → ORG_CD='3000'
+
+      [SQL 사용 패턴]
+        SELECT ORG_CD AS COUNTRY_CD
+          FROM OCI.MSBS_ORGANIZATION_SUB
+         WHERE SUB_ORG_TYPE = 'GMES_PLANT'
+           AND SUB_ORG_CD = :V_PLANT;
+
+      [확정: P_MSPD29000S_Q_V06 V_P_COUNTRY_CD 도출 경로 검증]
+    model: OCI.MSBS_ORGANIZATION_SUB
+
+    entities:
+      - name: organization_sub
+        type: primary
+        expr: "ORG_TYPE || '|' || ORG_CD || '|' || SUB_ORG_TYPE || '|' || SUB_ORG_CD"
+        description: "상위+하위 조직 복합키"
+
+      - name: parent_org
+        type: foreign
+        expr: "ORG_TYPE || '|' || ORG_CD"
+        description: "상위 조직 (예: COUNTRY)"
+
+      - name: sub_org
+        type: foreign
+        expr: "SUB_ORG_TYPE || '|' || SUB_ORG_CD"
+        description: "하위 조직 (예: PLANT)"
+
+    dimensions:
+      - name: org_type
+        type: categorical
+        expr: ORG_TYPE
+        description: "상위 조직 종류. PLANT→COUNTRY 매핑 시 'COUNTRY' [추측: 정의서 미확인]"
+
+      - name: org_cd
+        type: categorical
+        expr: ORG_CD
+        description: "상위 조직 코드 (예: '3000' = Indonesia)"
+
+      - name: sub_org_type
+        type: categorical
+        expr: SUB_ORG_TYPE
+        description: "하위 조직 종류. PLANT 역매핑 시 'GMES_PLANT' [확정]"
+
+      - name: sub_org_cd
+        type: categorical
+        expr: SUB_ORG_CD
+        description: "하위 조직 코드 (PLANT 코드: 3110/3120/3210/3220)"
+
+    measures:
+      - name: organization_sub_count
+        agg: count
+        expr: SUB_ORG_CD
+        description: "매핑 행 수"

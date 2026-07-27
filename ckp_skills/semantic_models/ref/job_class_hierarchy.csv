@@ -1,0 +1,656 @@
+JOBCD,JOBCD_NM,JOBCLS,JOBCD_LVL,PPH_FLAG,J_FAMILY_CD,J_FAMILY_NM,J_FUNCTION_CD,J_FUNCTION_NM,J_JOB_NAME,EMP_CLS_KPI,OH_TYPE
+X624,Explorer L2,X62,4,O,X00,Development,X60,Innovation,Explorer,Office Worker,-
+X625,Explorer L1,X62,5,O,X00,Development,X60,Innovation,Explorer,Office Worker,-
+X626,Explorer Associate,X62,6,O,X00,Development,X60,Innovation,Explorer,Office Worker,-
+X631,Innovation PE Executive,X63,1,O,X00,Development,X60,Innovation,Innovation PE,Office Worker,-
+X632,Innovation PE Lead,X63,2,O,X00,Development,X60,Innovation,Innovation PE,Office Worker,-
+X633,Innovation PE Senior,X63,3,O,X00,Development,X60,Innovation,Innovation PE,Office Worker,-
+X634,Innovation PE L2,X63,4,O,X00,Development,X60,Innovation,Innovation PE,Office Worker,-
+X635,Innovation PE L1,X63,5,O,X00,Development,X60,Innovation,Innovation PE,Office Worker,-
+X636,Innovation PE Associate,X63,6,O,X00,Development,X60,Innovation,Innovation PE,Office Worker,-
+X641,Innovation CM Executive,X64,1,O,X00,Development,X60,Innovation,Innovation CM,Office Worker,-
+X642,Innovation CM Lead,X64,2,O,X00,Development,X60,Innovation,Innovation CM,Office Worker,-
+X643,Innovation CM Senior,X64,3,O,X00,Development,X60,Innovation,Innovation CM,Office Worker,-
+X644,Innovation CM L2,X64,4,O,X00,Development,X60,Innovation,Innovation CM,Office Worker,-
+X645,Innovation CM L1,X64,5,O,X00,Development,X60,Innovation,Innovation CM,Office Worker,-
+X646,Innovation CM Associate,X64,6,O,X00,Development,X60,Innovation,Innovation CM,Office Worker,-
+X651,Innovation IE Executive,X65,1,O,X00,Development,X60,Innovation,Innovation IE,Office Worker,-
+X652,Innovation IE Lead,X65,2,O,X00,Development,X60,Innovation,Innovation IE,Office Worker,-
+X653,Innovation IE Senior,X65,3,O,X00,Development,X60,Innovation,Innovation IE,Office Worker,-
+X654,Innovation IE L2,X65,4,O,X00,Development,X60,Innovation,Innovation IE,Office Worker,-
+X655,Innovation IE L1,X65,5,O,X00,Development,X60,Innovation,Innovation IE,Office Worker,-
+X656,Innovation IE Associate,X65,6,O,X00,Development,X60,Innovation,Innovation IE,Office Worker,-
+X661,Innovation TE Executive,X66,1,O,X00,Development,X60,Innovation,Innovation TE,Office Worker,-
+X662,Innovation TE Lead,X66,2,O,X00,Development,X60,Innovation,Innovation TE,Office Worker,-
+X663,Innovation TE Senior,X66,3,O,X00,Development,X60,Innovation,Innovation TE,Office Worker,-
+X664,Innovation TE L2,X66,4,O,X00,Development,X60,Innovation,Innovation TE,Office Worker,-
+X665,Innovation TE L1,X66,5,O,X00,Development,X60,Innovation,Innovation TE,Office Worker,-
+X666,Innovation TE Associate,X66,6,O,X00,Development,X60,Innovation,Innovation TE,Office Worker,-
+X671,Innovation CE Executive,X67,1,O,X00,Development,X60,Innovation,Innovation CE,Office Worker,-
+X672,Innovation CE Lead,X67,2,O,X00,Development,X60,Innovation,Innovation CE,Office Worker,-
+X673,Innovation CE Senior,X67,3,O,X00,Development,X60,Innovation,Innovation CE,Office Worker,-
+X674,Innovation CE L2,X67,4,O,X00,Development,X60,Innovation,Innovation CE,Office Worker,-
+X675,Innovation CE L1,X67,5,O,X00,Development,X60,Innovation,Innovation CE,Office Worker,-
+X676,Innovation CE Associate,X67,6,O,X00,Development,X60,Innovation,Innovation CE,Office Worker,-
+X711,Product Manager Assistant Exec,X71,1,O,X00,Development,X70,Product Manager Assistant,Product Manager Assistant,Office Worker,-
+X712,Product Manager Assistant Lead,X71,2,O,X00,Development,X70,Product Manager Assistant,Product Manager Assistant,Office Worker,SOH
+X713,Product Manager Assistant Seni,X71,3,O,X00,Development,X70,Product Manager Assistant,Product Manager Assistant,Office Worker,SOH
+X714,Product Manager Assistant L2,X71,4,O,X00,Development,X70,Product Manager Assistant,Product Manager Assistant,Office Worker,-
+X715,Product Manager Assistant L1,X71,5,O,X00,Development,X70,Product Manager Assistant,Product Manager Assistant,Office Worker,SOH
+X716,Product Manager Assistant Ass,X71,6,O,X00,Development,X70,Product Manager Assistant,Product Manager Assistant,Office Worker,SOH
+X811,MDE Executive,X81,1,O,X00,Development,X80,Modernization,MDE,Office Worker,-
+X812,MDE Lead,X81,2,O,X00,Development,X80,Modernization,MDE,Office Worker,-
+X813,MDE Senior,X81,3,O,X00,Development,X80,Modernization,MDE,Office Worker,-
+X814,MDE L2,X81,4,O,X00,Development,X80,Modernization,MDE,Office Worker,-
+X815,MDE L1,X81,5,O,X00,Development,X80,Modernization,MDE,Office Worker,-
+X816,MDE Associate,X81,6,O,X00,Development,X80,Modernization,MDE,Office Worker,-
+X821,MCE Executive,X82,1,O,X00,Development,X80,Modernization,MCE,Office Worker,-
+X822,MCE Lead,X82,2,O,X00,Development,X80,Modernization,MCE,Office Worker,-
+X823,MCE Senior,X82,3,O,X00,Development,X80,Modernization,MCE,Office Worker,-
+X824,MCE L2,X82,4,O,X00,Development,X80,Modernization,MCE,Office Worker,-
+X825,MCE L1,X82,5,O,X00,Development,X80,Modernization,MCE,Office Worker,-
+X826,MCE Associate,X82,6,O,X00,Development,X80,Modernization,MCE,Office Worker,-
+X831,MSE Executive,X83,1,O,X00,Development,X80,Modernization,MSE,Office Worker,-
+X832,MSE Lead,X83,2,O,X00,Development,X80,Modernization,MSE,Office Worker,-
+X833,MSE Senior,X83,3,O,X00,Development,X80,Modernization,MSE,Office Worker,-
+X834,MSE L2,X83,4,O,X00,Development,X80,Modernization,MSE,Office Worker,-
+X835,MSE L1,X83,5,O,X00,Development,X80,Modernization,MSE,Office Worker,-
+X836,MSE Associate,X83,6,O,X00,Development,X80,Modernization,MSE,Office Worker,-
+X841,FEA Executive,X84,1,O,X00,Development,X80,Modernization,FEA,Office Worker,-
+X842,FEA Lead,X84,2,O,X00,Development,X80,Modernization,FEA,Office Worker,-
+X843,FEA Senior,X84,3,O,X00,Development,X80,Modernization,FEA,Office Worker,-
+X844,FEA L2,X84,4,O,X00,Development,X80,Modernization,FEA,Office Worker,-
+X845,FEA L1,X84,5,O,X00,Development,X80,Modernization,FEA,Office Worker,-
+X846,FEA Associate,X84,6,O,X00,Development,X80,Modernization,FEA,Office Worker,-
+X851,ME Executive,X85,1,O,X00,Development,X80,Modernization,ME,Office Worker,-
+X852,ME Lead,X85,2,O,X00,Development,X80,Modernization,ME,Office Worker,-
+X853,ME Senior,X85,3,O,X00,Development,X80,Modernization,ME,Office Worker,-
+X854,ME L2,X85,4,O,X00,Development,X80,Modernization,ME,Office Worker,-
+X855,ME L1,X85,5,O,X00,Development,X80,Modernization,ME,Office Worker,-
+X856,ME Associate,X85,6,O,X00,Development,X80,Modernization,ME,Office Worker,-
+X861,Deployment Executive,X86,1,O,X00,Development,X80,Modernization,Deployment,Office Worker,-
+X862,Deployment Lead,X86,2,O,X00,Development,X80,Modernization,Deployment,Office Worker,-
+X863,Deployment Senior,X86,3,O,X00,Development,X80,Modernization,Deployment,Office Worker,-
+X864,Deployment L2,X86,4,O,X00,Development,X80,Modernization,Deployment,Office Worker,-
+X865,Deployment L1,X86,5,O,X00,Development,X80,Modernization,Deployment,Office Worker,-
+X866,Deployment Associate,X86,6,O,X00,Development,X80,Modernization,Deployment,Office Worker,-
+X912,Sample Shipping Lead,X91,2,O,X00,Development,X90,Sample Manage,Sample Shipping,Office Worker,SOH
+X916,Sample Shipping Associate,X91,6,O,X00,Development,X90,Sample Manage,Sample Shipping,Office Worker,SOH
+X922,Sample Room Admin Lead,X92,2,O,X00,Development,X90,Sample Manage,Sample Room Admin,Office Worker,SOH
+X926,Sample Room Admin Associate,X92,6,O,X00,Development,X90,Sample Manage,Sample Room Admin,Office Worker,SOH
+XA12,Sample cutting Lead,XA1,2,O,X00,Development,XA0,Sample Production,Sample cutting,Office Worker,SOH
+XA16,Sample cutting Associate,XA1,6,O,X00,Development,XA0,Sample Production,Sample cutting,Production Worker,SOH
+XA22,Sample Stitching Lead,XA2,2,O,X00,Development,XA0,Sample Production,Sample Stitching,Office Worker,SOH
+XA26,Sample Stitching Associate,XA2,6,O,X00,Development,XA0,Sample Production,Sample Stitching,Production Worker,SOH
+XA36,Sample Stockfit Associate,XA3,6,O,X00,Development,XA0,Sample Production,Sample Stockfit,Production Worker,SOH
+XA42,Sample Assembly Lead,XA4,2,O,X00,Development,XA0,Sample Production,Sample Assembly,Office Worker,SOH
+XA46,Sample Assembly Associate,XA4,6,O,X00,Development,XA0,Sample Production,Sample Assembly,Production Worker,SOH
+XA52,Sample Bottom Lead,XA5,2,O,X00,Development,XA0,Sample Production,Sample Bottom,Office Worker,SOH
+XA56,Sample Bottom Associate,XA5,6,O,X00,Development,XA0,Sample Production,Sample Bottom,Office Worker,SOH
+Y111,Finance Executive,Y11,1,O,Y00,Support,Y10,Fin./Acct.,Finance,Office Worker,-
+Y112,Finance Lead,Y11,2,O,Y00,Support,Y10,Fin./Acct.,Finance,Office Worker,SG&A
+Y113,Finance Senior,Y11,3,O,Y00,Support,Y10,Fin./Acct.,Finance,Office Worker,-
+Y114,Finance L2,Y11,4,O,Y00,Support,Y10,Fin./Acct.,Finance,Office Worker,-
+Y115,Finance L1,Y11,5,O,Y00,Support,Y10,Fin./Acct.,Finance,Office Worker,SG&A
+Y116,Finance Associate,Y11,6,O,Y00,Support,Y10,Fin./Acct.,Finance,Office Worker,SG&A
+Y121,Accounting Executive,Y12,1,O,Y00,Support,Y10,Fin./Acct.,Accounting,Office Worker,SG&A
+Y122,Accounting Lead,Y12,2,O,Y00,Support,Y10,Fin./Acct.,Accounting,Office Worker,SG&A
+Y123,Accounting Senior,Y12,3,O,Y00,Support,Y10,Fin./Acct.,Accounting,Office Worker,SG&A
+Y124,Accounting L2,Y12,4,O,Y00,Support,Y10,Fin./Acct.,Accounting,Office Worker,SG&A
+Y125,Accounting L1,Y12,5,O,Y00,Support,Y10,Fin./Acct.,Accounting,Office Worker,SG&A
+Y126,Accounting Associate,Y12,6,O,Y00,Support,Y10,Fin./Acct.,Accounting,Office Worker,SG&A
+Y131,Pricing Executive,Y13,1,O,Y00,Support,Y10,Fin./Acct.,Pricing,Office Worker,-
+Y132,Pricing Lead,Y13,2,O,Y00,Support,Y10,Fin./Acct.,Pricing,Office Worker,-
+Y133,Pricing Senior,Y13,3,O,Y00,Support,Y10,Fin./Acct.,Pricing,Office Worker,-
+Y134,Pricing L2,Y13,4,O,Y00,Support,Y10,Fin./Acct.,Pricing,Office Worker,-
+Y135,Pricing L1,Y13,5,O,Y00,Support,Y10,Fin./Acct.,Pricing,Office Worker,-
+Y136,Pricing Associate,Y13,6,O,Y00,Support,Y10,Fin./Acct.,Pricing,Office Worker,-
+Y211,Administration Executive,Y21,1,O,Y00,Support,Y20,Administration,Administration,Office Worker,SG&A
+Y212,Administration Lead,Y21,2,O,Y00,Support,Y20,Administration,Administration,Office Worker,SG&A
+Y213,Administration Senior,Y21,3,O,Y00,Support,Y20,Administration,Administration,Office Worker,SG&A
+Y214,Administration L2,Y21,4,O,Y00,Support,Y20,Administration,Administration,Office Worker,SG&A
+Y215,Administration L1,Y21,5,O,Y00,Support,Y20,Administration,Administration,Office Worker,SG&A
+Y216,Administration Associate,Y21,6,O,Y00,Support,Y20,Administration,Administration,Office Worker,SG&A
+Y221,External Relationship Exec,Y22,1,O,Y00,Support,Y20,Administration,External Relationship,Office Worker,-
+Y222,External Relationship Lead,Y22,2,O,Y00,Support,Y20,Administration,External Relationship,Office Worker,SG&A
+Y223,External Relationship Senior,Y22,3,O,Y00,Support,Y20,Administration,External Relationship,Office Worker,-
+Y224,External Relationship L2,Y22,4,O,Y00,Support,Y20,Administration,External Relationship,Office Worker,SG&A
+Y225,External Relationship L1,Y22,5,O,Y00,Support,Y20,Administration,External Relationship,Office Worker,SG&A
+Y226,External Relationship Ass,Y22,6,O,Y00,Support,Y20,Administration,External Relationship,Office Worker,SG&A
+Y311,HR Strategy Executive,Y31,1,O,Y00,Support,Y30,HR Planning,HR Strategy,Office Worker,-
+Y312,HR Strategy Lead,Y31,2,O,Y00,Support,Y30,HR Planning,HR Strategy,Office Worker,SG&A
+Y313,HR Strategy Senior,Y31,3,O,Y00,Support,Y30,HR Planning,HR Strategy,Office Worker,SG&A
+Y314,HR Strategy L2,Y31,4,O,Y00,Support,Y30,HR Planning,HR Strategy,Office Worker,SG&A
+Y315,HR Strategy L1,Y31,5,O,Y00,Support,Y30,HR Planning,HR Strategy,Office Worker,SG&A
+Y316,HR Strategy Associate,Y31,6,O,Y00,Support,Y30,HR Planning,HR Strategy,Office Worker,SG&A
+Y321,Industrial Relation Executive,Y32,1,O,Y00,Support,Y30,HR Planning,Industrial Relation,Office Worker,-
+Y322,Industrial Relation Lead,Y32,2,O,Y00,Support,Y30,HR Planning,Industrial Relation,Office Worker,SG&A
+Y323,Industrial Relation Senior,Y32,3,O,Y00,Support,Y30,HR Planning,Industrial Relation,Office Worker,-
+Y324,Industrial Relation L2,Y32,4,O,Y00,Support,Y30,HR Planning,Industrial Relation,Office Worker,SG&A
+Y325,Industrial Relation L1,Y32,5,O,Y00,Support,Y30,HR Planning,Industrial Relation,Office Worker,SG&A
+Y326,Industrial Relation Associate,Y32,6,O,Y00,Support,Y30,HR Planning,Industrial Relation,Office Worker,SG&A
+Y331,Organization Management Exec,Y33,1,O,Y00,Support,Y30,HR Planning,Organization Management,Office Worker,-
+Y332,Organization Management Lead,Y33,2,O,Y00,Support,Y30,HR Planning,Organization Management,Office Worker,-
+Y333,Organization Management Senior,Y33,3,O,Y00,Support,Y30,HR Planning,Organization Management,Office Worker,-
+Y334,Organization Management L2,Y33,4,O,Y00,Support,Y30,HR Planning,Organization Management,Office Worker,-
+Y335,Organization Management L1,Y33,5,O,Y00,Support,Y30,HR Planning,Organization Management,Office Worker,-
+Y336,Organization Management Ass,Y33,6,O,Y00,Support,Y30,HR Planning,Organization Management,Office Worker,SG&A
+Y411,Recruit Executive,Y41,1,O,Y00,Support,Y40,HR Execution,Recruit,Office Worker,-
+Y412,Recruit Lead,Y41,2,O,Y00,Support,Y40,HR Execution,Recruit,Office Worker,SG&A
+Y413,Recruit Senior,Y41,3,O,Y00,Support,Y40,HR Execution,Recruit,Office Worker,-
+Y414,Recruit L2,Y41,4,O,Y00,Support,Y40,HR Execution,Recruit,Office Worker,-
+Y415,Recruit L1,Y41,5,O,Y00,Support,Y40,HR Execution,Recruit,Office Worker,SG&A
+Y416,Recruit Associate,Y41,6,O,Y00,Support,Y40,HR Execution,Recruit,Office Worker,SG&A
+Y421,Evaluation Executive,Y42,1,O,Y00,Support,Y40,HR Execution,Evaluation,Office Worker,-
+Y422,Evaluation Lead,Y42,2,O,Y00,Support,Y40,HR Execution,Evaluation,Office Worker,-
+Y423,Evaluation Senior,Y42,3,O,Y00,Support,Y40,HR Execution,Evaluation,Office Worker,-
+Y424,Evaluation L2,Y42,4,O,Y00,Support,Y40,HR Execution,Evaluation,Office Worker,-
+Y425,Evaluation L1,Y42,5,O,Y00,Support,Y40,HR Execution,Evaluation,Office Worker,-
+Y426,Evaluation Associate,Y42,6,O,Y00,Support,Y40,HR Execution,Evaluation,Office Worker,-
+Y431,Compensation Executive,Y43,1,O,Y00,Support,Y40,HR Execution,Compensation,Office Worker,-
+Y432,Compensation Lead,Y43,2,O,Y00,Support,Y40,HR Execution,Compensation,Office Worker,SG&A
+Y433,Compensation Senior,Y43,3,O,Y00,Support,Y40,HR Execution,Compensation,Office Worker,-
+Y434,Compensation L2,Y43,4,O,Y00,Support,Y40,HR Execution,Compensation,Office Worker,-
+Y435,Compensation L1,Y43,5,O,Y00,Support,Y40,HR Execution,Compensation,Office Worker,SG&A
+Y436,Compensation Associate,Y43,6,O,Y00,Support,Y40,HR Execution,Compensation,Office Worker,SG&A
+Y441,Promotion & Career Executive,Y44,1,O,Y00,Support,Y40,HR Execution,Promotion & Career,Office Worker,-
+Y442,Promotion & Career Lead,Y44,2,O,Y00,Support,Y40,HR Execution,Promotion & Career,Office Worker,OH Indirect
+Y443,Promotion & Career Senior,Y44,3,O,Y00,Support,Y40,HR Execution,Promotion & Career,Office Worker,-
+Y444,Promotion & Career L2,Y44,4,O,Y00,Support,Y40,HR Execution,Promotion & Career,Office Worker,-
+Y445,Promotion & Career L1,Y44,5,O,Y00,Support,Y40,HR Execution,Promotion & Career,Office Worker,-
+Y446,Promotion & Career Associate,Y44,6,O,Y00,Support,Y40,HR Execution,Promotion & Career,Office Worker,OH Indirect
+Y451,Communication Executive,Y45,1,O,Y00,Support,Y40,HR Execution,Communication,Office Worker,-
+Y452,Communication Lead,Y45,2,O,Y00,Support,Y40,HR Execution,Communication,Office Worker,SG&A
+Y453,Communication Senior,Y45,3,O,Y00,Support,Y40,HR Execution,Communication,Office Worker,-
+Y454,Communication L2,Y45,4,O,Y00,Support,Y40,HR Execution,Communication,Office Worker,-
+Y455,Communication L1,Y45,5,O,Y00,Support,Y40,HR Execution,Communication,Office Worker,-
+Y456,Communication Associate,Y45,6,O,Y00,Support,Y40,HR Execution,Communication,Office Worker,SG&A
+Y511,TNA Executive,Y51,1,O,Y00,Support,Y50,HR Development,TNA,Office Worker,-
+Y512,TNA Lead,Y51,2,O,Y00,Support,Y50,HR Development,TNA,Office Worker,SG&A
+Y513,TNA Senior,Y51,3,O,Y00,Support,Y50,HR Development,TNA,Office Worker,-
+Y514,TNA L2,Y51,4,O,Y00,Support,Y50,HR Development,TNA,Office Worker,-
+Y515,TNA L1,Y51,5,O,Y00,Support,Y50,HR Development,TNA,Office Worker,-
+Y516,TNA Associate,Y51,6,O,Y00,Support,Y50,HR Development,TNA,Office Worker,SG&A
+Y521,Training execution Executive,Y52,1,O,Y00,Support,Y50,HR Development,Training execution,Office Worker,-
+Y522,Training execution Lead,Y52,2,O,Y00,Support,Y50,HR Development,Training execution,Office Worker,OH Indirect
+Y523,Training execution Senior,Y52,3,O,Y00,Support,Y50,HR Development,Training execution,Office Worker,OH Indirect
+Y524,Training execution L2,Y52,4,O,Y00,Support,Y50,HR Development,Training execution,Office Worker,OH Indirect
+Y525,Training execution L1,Y52,5,O,Y00,Support,Y50,HR Development,Training execution,Office Worker,OH Indirect
+Y526,Training execution Associate,Y52,6,O,Y00,Support,Y50,HR Development,Training execution,Office Worker,OH Indirect
+Y611,RSM Executive,Y61,1,O,Y00,Support,Y60,RSM,RSM,Office Worker,SG&A
+Y612,RSM Lead,Y61,2,O,Y00,Support,Y60,RSM,RSM,Office Worker,SG&A
+Y613,RSM Senior,Y61,3,O,Y00,Support,Y60,RSM,RSM,Office Worker,SG&A
+Y614,RSM L2,Y61,4,O,Y00,Support,Y60,RSM,RSM,Office Worker,SG&A
+Y615,RSM L1,Y61,5,O,Y00,Support,Y60,RSM,RSM,Office Worker,SG&A
+Y616,RSM Associate,Y61,6,O,Y00,Support,Y60,RSM,RSM,Office Worker,SG&A
+Y711,Strategic Planning Executive,Y71,1,O,Y00,Support,Y70,Strategic Planning,Strategic Planning,Office Worker,-
+Y712,Strategic Planning Lead,Y71,2,O,Y00,Support,Y70,Strategic Planning,Strategic Planning,Office Worker,SG&A
+Y713,Strategic Planning Senior,Y71,3,O,Y00,Support,Y70,Strategic Planning,Strategic Planning,Office Worker,SG&A
+Y714,Strategic Planning L2,Y71,4,O,Y00,Support,Y70,Strategic Planning,Strategic Planning,Office Worker,-
+Y715,Strategic Planning L1,Y71,5,O,Y00,Support,Y70,Strategic Planning,Strategic Planning,Office Worker,-
+Y716,Strategic Planning Associate,Y71,6,O,Y00,Support,Y70,Strategic Planning,Strategic Planning,Office Worker,SG&A
+Y721,Strategic Management Executive,Y72,1,O,Y00,Support,Y70,Strategic Planning,Strategic Management,Office Worker,-
+Y722,Strategic Management Lead,Y72,2,O,Y00,Support,Y70,Strategic Planning,Strategic Management,Office Worker,SG&A
+Y723,Strategic Management Senior,Y72,3,O,Y00,Support,Y70,Strategic Planning,Strategic Management,Office Worker,-
+Y724,Strategic Management L2,Y72,4,O,Y00,Support,Y70,Strategic Planning,Strategic Management,Office Worker,SG&A
+Y725,Strategic Management L1,Y72,5,O,Y00,Support,Y70,Strategic Planning,Strategic Management,Office Worker,SG&A
+Y726,Strategic Management Associate,Y72,6,O,Y00,Support,Y70,Strategic Planning,Strategic Management,Office Worker,SG&A
+Y731,Strategic & Communication Exec,Y73,1,O,Y00,Support,Y70,Strategic Planning,Strategic & Communciation,Office Worker,-
+Y732,Strategic & Communication Lead,Y73,2,O,Y00,Support,Y70,Strategic Planning,Strategic & Communciation,Office Worker,-
+Y733,Strategic & Communication Seni,Y73,3,O,Y00,Support,Y70,Strategic Planning,Strategic & Communciation,Office Worker,-
+Y734,Strategic & Communication L2,Y73,4,O,Y00,Support,Y70,Strategic Planning,Strategic & Communciation,Office Worker,SG&A
+Y735,Strategic & Communication L1,Y73,5,O,Y00,Support,Y70,Strategic Planning,Strategic & Communciation,Office Worker,-
+Y736,Strategic & Communication Ass,Y73,6,O,Y00,Support,Y70,Strategic Planning,Strategic & Communciation,Office Worker,SG&A
+Y811,Security Executive,Y81,1,O,Y00,Support,Y80,Security,Security,Office Worker,-
+Y812,Security Lead,Y81,2,O,Y00,Support,Y80,Security,Security,Office Worker,-
+Y813,Security Senior,Y81,3,O,Y00,Support,Y80,Security,Security,Office Worker,-
+Y814,Security L2,Y81,4,O,Y00,Support,Y80,Security,Security,Office Worker,-
+Y815,Security L1,Y81,5,O,Y00,Support,Y80,Security,Security,Office Worker,-
+Y816,Security Associate,Y81,6,O,Y00,Support,Y80,Security,Security,Office Worker,-
+Y911,Lean/Nos Executive,Y91,1,O,Y00,Support,Y90,Lean/Nos,Lean/Nos,Office Worker,-
+Y912,Lean/Nos Lead,Y91,2,O,Y00,Support,Y90,Lean/Nos,Lean/Nos,Office Worker,OH Indirect
+Y913,Lean/Nos Senior,Y91,3,O,Y00,Support,Y90,Lean/Nos,Lean/Nos,Office Worker,OH Indirect
+Y914,Lean/Nos L2,Y91,4,O,Y00,Support,Y90,Lean/Nos,Lean/Nos,Office Worker,OH Indirect
+Y915,Lean/Nos L1,Y91,5,O,Y00,Support,Y90,Lean/Nos,Lean/Nos,Office Worker,OH Indirect
+Y916,Lean/Nos Associate,Y91,6,O,Y00,Support,Y90,Lean/Nos,Lean/Nos,Office Worker,OH Indirect
+YA11,Facility Engineer Executive,YA1,1,O,Y00,Support,YA0,Facility Engineer,Facility Engineer,Office Worker,-
+YA12,Facility Engineer Lead,YA1,2,O,Y00,Support,YA0,Facility Engineer,Facility Engineer,Office Worker,-
+YA13,Facility Engineer Senior,YA1,3,O,Y00,Support,YA0,Facility Engineer,Facility Engineer,Office Worker,-
+YA14,Facility Engineer L2,YA1,4,O,Y00,Support,YA0,Facility Engineer,Facility Engineer,Office Worker,-
+YA15,Facility Engineer L1,YA1,5,O,Y00,Support,YA0,Facility Engineer,Facility Engineer,Office Worker,-
+YA16,Facility Engineer Associate,YA1,6,O,Y00,Support,YA0,Facility Engineer,Facility Engineer,Office Worker,-
+YB11,Biz.&Sales Executive,YB1,1,O,Y00,Support,YB0,Business & Sales,Biz.&Sales,Office Worker,SG&A
+YB12,Biz.&Sales Lead,YB1,2,O,Y00,Support,YB0,Business & Sales,Biz.&Sales,Office Worker,SG&A
+YB13,Biz.&Sales Senior,YB1,3,O,Y00,Support,YB0,Business & Sales,Biz.&Sales,Office Worker,-
+YB14,Biz.&Sales L2,YB1,4,O,Y00,Support,YB0,Business & Sales,Biz.&Sales,Office Worker,SG&A
+YB15,Biz.&Sales L1,YB1,5,O,Y00,Support,YB0,Business & Sales,Biz.&Sales,Office Worker,SG&A
+Z112,Secretary Lead,Z11,2,O,Z00,Service,Z10,Secretary,Secretary,Office Worker,-
+Z116,Secretary Associate,Z11,6,O,Z00,Service,Z10,Secretary,Secretary,Office Worker,-
+Z212,Receptionist Lead,Z21,2,O,Z00,Service,Z20,Receptionist,Receptionist,Office Worker,-
+Z216,Receptionist Associate,Z21,6,O,Z00,Service,Z20,Receptionist,Receptionist,Office Worker,-
+Z312,Car Driver Lead,Z31,2,O,Z00,Service,Z30,Car Driver,Car Driver,Office Worker,-
+Z316,Car Driver Associate,Z31,6,O,Z00,Service,Z30,Car Driver,Car Driver,Office Worker,SG&A
+Z412,Cook Lead,Z41,2,O,Z00,Service,Z40,Cook,Cook,Office Worker,SG&A
+Z416,Cook Associate,Z41,6,O,Z00,Service,Z40,Cook,Cook,Office Worker,SG&A
+Z422,Nutritionist Lead,Z42,2,O,Z00,Service,Z40,Cook,Nutritionist,Office Worker,-
+Z426,Nutritionist Associate,Z42,6,O,Z00,Service,Z40,Cook,Nutritionist,Office Worker,SG&A
+Z512,Guard (security) Lead,Z51,2,O,Z00,Service,Z50,Guard (security),Guard (security),Office Worker,-
+Z516,Guard (security) Associate,Z51,6,O,Z00,Service,Z50,Guard (security),Guard (security),Office Worker,-
+Z611,Labor Union Executive,Z61,1,O,Z00,Service,Z60,Labor Union,Labor Union,Office Worker,-
+Z612,Labor Union Lead,Z61,5,O,Z00,Service,Z60,Labor Union,Labor Union,Office Worker,OH Indirect
+Z613,Labor Union Senior,Z61,4,O,Z00,Service,Z60,Labor Union,Labor Union,Office Worker,-
+Z614,Labor Union L2,Z61,4,O,Z00,Service,Z60,Labor Union,Labor Union,Office Worker,-
+Z615,Labor Union L1,Z61,5,O,Z00,Service,Z60,Labor Union,Labor Union,Office Worker,-
+Z616,Labor Union Associate,Z61,6,O,Z00,Service,Z60,Labor Union,Labor Union,Office Worker,OH Indirect
+Z712,Translator Lead,Z71,2,O,Z00,Service,Z70,Translator,Translator,Office Worker,OH Indirect
+Z716,Translator Associate,Z71,6,O,Z00,Service,Z70,Translator,Translator,Office Worker,OH Indirect
+Z812,Cleaning Lead,Z81,2,O,Z00,Service,Z80,Cleaning,Cleaning,Office Worker,-
+Z816,Cleaning Associate,Z81,6,O,Z00,Service,Z80,Cleaning,Cleaning,Office Worker,SG&A
+Z822,Landscape Lead,Z82,2,O,Z00,Service,Z80,Cleaning,Landscape,Office Worker,-
+Z826,Landscape Associate,Z82,6,O,Z00,Service,Z80,Cleaning,Landscape,Office Worker,-
+Z832,Recycle Lead,Z83,2,O,Z00,Service,Z80,Cleaning,Recycle,Office Worker,-
+Z836,Recycle Associate,Z83,6,O,Z00,Service,Z80,Cleaning,Recycle,Office Worker,OH Indirect
+Z842,Line Cleaning Lead,Z84,2,O,Z00,Service,Z80,Cleaning,Line Cleaning,Office Worker,-
+A112,Assembly Lead,A11,2,I,A00,Assembly,A10,Assembly,Assembly,Office Worker,-
+A116,Assembly Associate,A11,6,D,A00,Assembly,A10,Assembly,Assembly,Production Worker,-
+B112,Bottom Laser Sipping Lead,B11,2,I,B00,Bottom,B10,Bottom,Bottom Laser Sipping,Office Worker,-
+B116,Bottom Laser Sipping Ass,B11,6,D,B00,Bottom,B10,Bottom,Bottom Laser Sipping,Office Worker,-
+B122,Midsole Pad Print Lead,B12,2,I,B00,Bottom,B10,Bottom,Midsole Pad Print,Office Worker,-
+B126,Midsole Pad Print Associate,B12,6,D,B00,Bottom,B10,Bottom,Midsole Pad Print,Production Worker,-
+B212,Outsole Roll Lead,B21,2,I,B00,Bottom,B20,Outsole,Outsole Roll,Office Worker,-
+B216,Outsole Roll Associate,B21,6,D,B00,Bottom,B20,Outsole,Outsole Roll,Production Worker,-
+B222,Outsole Cutting Lead,B22,2,I,B00,Bottom,B20,Outsole,Outsole Cutting,Office Worker,-
+B226,Outsole Cutting Associate,B22,6,D,B00,Bottom,B20,Outsole,Outsole Cutting,Production Worker,-
+B232,Outsole Press Lead,B23,2,I,B00,Bottom,B20,Outsole,Outsole Press,Office Worker,-
+B242,Outsole Trimming Lead,B24,2,I,B00,Bottom,B20,Outsole,Outsole Trimming,Office Worker,-
+B246,Outsole Trimming Associate,B24,6,D,B00,Bottom,B20,Outsole,Outsole Trimming,Production Worker,-
+B312,IP Compounding Lead,B31,2,I,B00,Bottom,B30,IP,IP Compounding,Office Worker,-
+B316,IP Compounding Associate,B31,6,D,B00,Bottom,B30,IP,IP Compounding,Production Worker,-
+B322,IP Injection Lead,B32,2,I,B00,Bottom,B30,IP,IP Injection,Office Worker,-
+B326,IP Injection Associate,B32,6,D,B00,Bottom,B30,IP,IP Injection,Production Worker,-
+B332,IP UV Lead,B33,2,I,B00,Bottom,B30,IP,IP UV,Office Worker,-
+B336,IP UV Associate,B33,6,D,B00,Bottom,B30,IP,IP UV,Production Worker,-
+B342,IP Hot Knife Lead,B34,2,I,B00,Bottom,B30,IP,IP Hot Knife,Office Worker,-
+B346,IP Hot Knife Associate,B34,6,D,B00,Bottom,B30,IP,IP Hot Knife,Production Worker,-
+B352,IP Midsole Spray Lead,B35,2,I,B00,Bottom,B30,IP,IP Midsole Spray,Office Worker,-
+B356,IP Midsole Spray Associate,B35,6,D,B00,Bottom,B30,IP,IP Midsole Spray,Office Worker,-
+B412,Cold Shot Compounding Lead,B41,2,I,B00,Bottom,B40,Cold Shot,Cold Shot Compounding,Office Worker,-
+B416,Cold Shot Compounding Ass,B41,6,D,B00,Bottom,B40,Cold Shot,Cold Shot Compounding,Office Worker,-
+B422,Cold Shot Press Lead,B42,2,I,B00,Bottom,B40,Cold Shot,Cold Shot Press,Office Worker,-
+B426,Cold Shot Press Associate,B42,6,D,B00,Bottom,B40,Cold Shot,Cold Shot Press,Office Worker,-
+B512,AMSP Lead,B51,2,I,B00,Bottom,B50,MSP,AMSP,Office Worker,-
+B516,AMSP Associate,B51,6,D,B00,Bottom,B50,MSP,AMSP,Office Worker,-
+B612,PU Compounding Lead,B61,2,I,B00,Bottom,B60,PU,PU Compounding,Office Worker,-
+B616,PU Compounding Associate,B61,6,D,B00,Bottom,B60,PU,PU Compounding,Production Worker,-
+B622,PU Auto Pouring Lead,B62,2,I,B00,Bottom,B60,PU,PU Auto Pouring,Office Worker,-
+B626,PU Auto Pouring Associate,B62,6,D,B00,Bottom,B60,PU,PU Auto Pouring,Production Worker,-
+B632,PU Manual Pouring Lead,B63,2,I,B00,Bottom,B60,PU,PU Maunal Pouring,Office Worker,-
+B636,PU Manual Pouring Associate,B63,6,D,B00,Bottom,B60,PU,PU Maunal Pouring,Production Worker,-
+B642,PU Airbag Spray Lead,B64,2,I,B00,Bottom,B60,PU,PU Airbag Spray,Office Worker,-
+B646,PU Airbag Spray Associate,B64,6,D,B00,Bottom,B60,PU,PU Airbag Spray,Production Worker,-
+B652,PU Midsole Spray Lead,B65,2,I,B00,Bottom,B60,PU,PU Midsole Spray,Office Worker,-
+B656,PU Midsole Spray Associate,B65,6,D,B00,Bottom,B60,PU,PU Midsole Spray,Production Worker,-
+B712,Phylon Compounding Lead,B71,2,I,B00,Bottom,B70,Phylon,Phylon Compounding,Office Worker,-
+B716,Phylon Compounding Associate,B71,6,D,B00,Bottom,B70,Phylon,Phylon Compounding,Production Worker,-
+B722,CMP Press Lead,B72,2,I,B00,Bottom,B70,Phylon,CMP Press,Office Worker,-
+B726,CMP Press Associate,B72,6,D,B00,Bottom,B70,Phylon,CMP Press,Production Worker,-
+B732,Phylon Press Lead,B73,2,I,B00,Bottom,B70,Phylon,Phylon Press,Office Worker,-
+B742,Phylon UV Lead,B74,2,I,B00,Bottom,B70,Phylon,Phylon UV,Office Worker,-
+B746,Phylon UV Associate,B74,6,D,B00,Bottom,B70,Phylon,Phylon UV,Production Worker,-
+B752,Auto UV Lead,B75,2,I,B00,Bottom,B70,Phylon,Auto UV,Office Worker,-
+B756,Auto UV Associate,B75,6,D,B00,Bottom,B70,Phylon,Auto UV,Production Worker,-
+B762,Phylon Spray Lead,B76,2,I,B00,Bottom,B70,Phylon,Phylon Spray,Office Worker,-
+B766,Phylon Spray Associate,B76,6,D,B00,Bottom,B70,Phylon,Phylon Spray,Office Worker,-
+B772,EVA Roll Lead,B77,2,I,B00,Bottom,B70,Phylon,EVA Roll,Office Worker,-
+B776,EVA Roll Associate,B77,6,D,B00,Bottom,B70,Phylon,EVA Roll,Production Worker,-
+B786,EVA Skiving Associate,B78,6,D,B00,Bottom,B70,Phylon,EVA Skiving,Production Worker,-
+B792,CMP Grinding Lead,B79,2,I,B00,Bottom,B70,Phylon,CMP Grinding,Office Worker,-
+B796,CMP Grinding Associate,B79,6,D,B00,Bottom,B70,Phylon,CMP Grinding,Office Worker,-
+B812,DMP Press Lead,B81,2,I,B00,Bottom,B80,DMP,DMP Press,Office Worker,-
+B816,DMP Press Associate,B81,6,D,B00,Bottom,B80,DMP,DMP Press,Office Worker,-
+B822,DMP UV Lead,B82,2,I,B00,Bottom,B80,DMP,DMP UV,Office Worker,-
+B826,DMP UV Associate,B82,6,D,B00,Bottom,B80,DMP,DMP UV,Office Worker,-
+B832,DMP Midsole Spray Lead,B83,2,I,B00,Bottom,B80,DMP,DMP Midsole Spray,Office Worker,-
+B836,DMP Midsole Spray Associate,B83,6,D,B00,Bottom,B80,DMP,DMP Midsole Spray,Office Worker,-
+B842,DMP Hot Knife Lead,B84,2,I,B00,Bottom,B80,DMP,DMP Hot Knife,Office Worker,-
+B846,DMP Hot Knife Associate,B84,6,D,B00,Bottom,B80,DMP,DMP Hot Knife,Office Worker,-
+C112,Maternity Holiday Lead,C11,2,O,C00,Common,C10,Common,Maternity holiday,Office Worker,SG&A
+C116,Maternity holiday Associate,C11,6,O,C00,Common,C10,Common,Maternity holiday,Office Worker,SG&A
+C126,Not assigned Associate,C12,6,O,C00,Common,C10,Common,Not assigned,Office Worker,OH Indirect
+C136,Long term Sickness Associate,C13,6,O,C00,Common,C10,Common,Long term Sickness,Office Worker,SG&A
+E112,IT Label Lead,E11,2,I,E00,IT,E10,IT Label,IT Label,Office Worker,-
+E116,IT Label Associate,E11,6,I,E00,IT,E10,IT Label,IT Label,Production Worker,-
+E211,IT Planning Executive,E21,1,O,E00,IT,E20,IT Planning,IT Planning,Office Worker,-
+E212,IT Planning Lead,E21,2,O,E00,IT,E20,IT Planning,IT Planning,Office Worker,SG&A
+E213,IT Planning Senior,E21,3,O,E00,IT,E20,IT Planning,IT Planning,Office Worker,-
+E214,IT Planning L2,E21,4,O,E00,IT,E20,IT Planning,IT Planning,Office Worker,SG&A
+E215,IT Planning L1,E21,5,O,E00,IT,E20,IT Planning,IT Planning,Office Worker,-
+E216,IT Planning Associate,E21,6,O,E00,IT,E20,IT Planning,IT Planning,Office Worker,-
+E311,IT Hardware Executive,E31,1,O,E00,IT,E30,IT Maintenance,IT Hardware,Office Worker,-
+E312,IT Hardware Lead,E31,2,O,E00,IT,E30,IT Maintenance,IT Hardware,Office Worker,SG&A
+E314,IT Hardware L2,E31,4,O,E00,IT,E30,IT Maintenance,IT Hardware,Office Worker,SG&A
+E315,IT Hardware L1,E31,5,O,E00,IT,E30,IT Maintenance,IT Hardware,Office Worker,SG&A
+E316,IT Hardware Associate,E31,6,O,E00,IT,E30,IT Maintenance,IT Hardware,Office Worker,SG&A
+E321,IT software Executive,E32,1,O,E00,IT,E30,IT Maintenance,IT software,Office Worker,-
+E322,IT software Lead,E32,2,O,E00,IT,E30,IT Maintenance,IT software,Office Worker,SG&A
+E323,IT software Senior,E32,3,O,E00,IT,E30,IT Maintenance,IT software,Office Worker,-
+E324,IT software L2,E32,4,O,E00,IT,E30,IT Maintenance,IT software,Office Worker,-
+E325,IT software L1,E32,5,O,E00,IT,E30,IT Maintenance,IT software,Office Worker,SG&A
+E326,IT software Associate,E32,6,O,E00,IT,E30,IT Maintenance,IT software,Office Worker,SG&A
+F111,Upper Material Executive,F11,1,O,F00,Material,F10,Upper Material,Upper Material,Office Worker,-
+F112,Upper Material Lead,F11,2,O,F00,Material,F10,Upper Material,Upper Material,Office Worker,OH Indirect
+F113,Upper Material Senior,F11,3,O,F00,Material,F10,Upper Material,Upper Material,Office Worker,OH Indirect
+F114,Upper Material L2,F11,4,O,F00,Material,F10,Upper Material,Upper Material,Office Worker,-
+F115,Upper Material L1,F11,5,O,F00,Material,F10,Upper Material,Upper Material,Office Worker,OH Indirect
+F116,Upper Material Associate,F11,6,O,F00,Material,F10,Upper Material,Upper Material,Office Worker,OH Indirect
+F211,Bottom Material Executive,F21,1,O,F00,Material,F20,Bottom Material,Bottom Material,Office Worker,-
+F212,Bottom Material Lead,F21,2,O,F00,Material,F20,Bottom Material,Bottom Material,Office Worker,OH Indirect
+F213,Bottom Material Senior,F21,3,O,F00,Material,F20,Bottom Material,Bottom Material,Office Worker,-
+F214,Bottom Material L2,F21,4,O,F00,Material,F20,Bottom Material,Bottom Material,Office Worker,OH Indirect
+F215,Bottom Material L1,F21,5,O,F00,Material,F20,Bottom Material,Bottom Material,Office Worker,-
+F216,Bottom Material Associate,F21,6,O,F00,Material,F20,Bottom Material,Bottom Material,Office Worker,OH Indirect
+F312,Material Admin Lead,F31,2,O,F00,Material,F30,Material Admin,Material Admin,Office Worker,OH Indirect
+F313,Material Admin Senior,F31,3,O,F00,Material,F30,Material Admin,Material Admin,Office Worker,OH Indirect
+F314,Material Admin L2,F31,4,O,F00,Material,F30,Material Admin,Material Admin,Office Worker,OH Indirect
+F315,Material Admin L1,F31,5,O,F00,Material,F30,Material Admin,Material Admin,Office Worker,OH Indirect
+F316,Material Admin Associate,F31,6,O,F00,Material,F30,Material Admin,Material Admin,Office Worker,OH Indirect
+F411,Material Driver Executive,F41,1,O,F00,Material,F40,Material Driver,Material Driver,Office Worker,-
+F412,Material Driver Lead,F41,2,O,F00,Material,F40,Material Driver,Material Driver,Office Worker,OH Indirect
+F413,Material Driver Senior,F41,3,O,F00,Material,F40,Material Driver,Material Driver,Office Worker,-
+F414,Material Driver L2,F41,4,O,F00,Material,F40,Material Driver,Material Driver,Office Worker,-
+F415,Material Driver L1,F41,5,O,F00,Material,F40,Material Driver,Material Driver,Office Worker,-
+F416,Material Driver Associate,F41,6,O,F00,Material,F40,Material Driver,Material Driver,Production Worker,OH Indirect
+F511,Material Packing Executive,F51,1,O,F00,Material,F50,Material Packing,Material Packing,Office Worker,-
+F512,Material Packing Lead,F51,2,O,F00,Material,F50,Material Packing,Material Packing,Office Worker,OH Indirect
+F513,Material Packing Senior,F51,3,O,F00,Material,F50,Material Packing,Material Packing,Office Worker,-
+F514,Material Packing L2,F51,4,O,F00,Material,F50,Material Packing,Material Packing,Office Worker,OH Indirect
+F515,Material Packing L1,F51,5,O,F00,Material,F50,Material Packing,Material Packing,Office Worker,OH Indirect
+F516,Material Packing Associate,F51,6,O,F00,Material,F50,Material Packing,Material Packing,Office Worker,OH Indirect
+F611,Material handler Executive,F61,1,O,F00,Material,F60,Material handler,Material handler,Office Worker,-
+F612,Material handler Lead,F61,2,I,F00,Material,F60,Material handler,Material handler,Office Worker,-
+F613,Material handler Senior,F61,3,I,F00,Material,F60,Material handler,Material handler,Office Worker,-
+F614,Material handler L2,F61,4,I,F00,Material,F60,Material handler,Material handler,Office Worker,-
+F615,Material handler L1,F61,5,I,F00,Material,F60,Material handler,Material handler,Office Worker,-
+F616,Material handler Associate,F61,6,I,F00,Material,F60,Material handler,Material handler,Production Worker,-
+I111,Industrial Engineer Executive,I11,1,O,I00,Industrial Engineer,I10,Industrial Engineer,Industrial Engineer,Office Worker,-
+I112,Industrial Engineer Lead,I11,2,O,I00,Industrial Engineer,I10,Industrial Engineer,Industrial Engineer,Office Worker,OH Indirect
+I113,Industrial Engineer Senior,I11,3,O,I00,Industrial Engineer,I10,Industrial Engineer,Industrial Engineer,Office Worker,OH Indirect
+I114,Industrial Engineer L2,I11,4,O,I00,Industrial Engineer,I10,Industrial Engineer,Industrial Engineer,Office Worker,OH Indirect
+I115,Industrial Engineer L1,I11,5,O,I00,Industrial Engineer,I10,Industrial Engineer,Industrial Engineer,Office Worker,OH Indirect
+I116,Industrial Engineer Associate,I11,6,O,I00,Industrial Engineer,I10,Industrial Engineer,Industrial Engineer,Office Worker,OH Indirect
+J112,Mold shop Lead,J11,2,O,J00,Jig/Tooling,J10,Mold,Mold shop,Office Worker,OH Indirect
+J116,Mold shop Associate,J11,6,O,J00,Jig/Tooling,J10,Mold,Mold shop,Office Worker,OH Indirect
+J122,Mold control Lead,J12,2,I,J00,Jig/Tooling,J10,Mold,Mold control,Office Worker,-
+J126,Mold control Associate,J12,6,I,J00,Jig/Tooling,J10,Mold,Mold control,Production Worker,-
+J212,Tooling control Lead,J21,2,I,J00,Jig/Tooling,J20,Tooling control,Tooling control,Office Worker,-
+J216,Tooling control Associate,J21,6,I,J00,Jig/Tooling,J20,Tooling control,Tooling control,Production Worker,-
+J312,Bottom tooling Lead,J31,2,O,J00,Jig/Tooling,J30,Bottom tooling,Bottom tooling,Office Worker,-
+J412,Dark Room Lead,J41,2,I,J00,Jig/Tooling,J40,Dark Room,Dark Room,Office Worker,-
+J416,Dark Room Associate,J41,6,I,J00,Jig/Tooling,J40,Dark Room,Dark Room,Production Worker,-
+J512,Last Lead,J51,2,O,J00,Jig/Tooling,J50,Last,Last,Office Worker,OH Indirect
+J516,Last Associate,J51,6,O,J00,Jig/Tooling,J50,Last,Last,Office Worker,OH Indirect
+L112,CE Lab Lead,L11,2,O,L00,CE Lap,L10,CE Lab,CE Lab,Office Worker,OH Indirect
+L116,CE Lab Associate,L11,6,O,L00,CE Lap,L10,CE Lab,CE Lab,Production Worker,OH Indirect
+L222,Chemical Delivery Lead,L22,2,O,L00,CE Lap,L20,Chemical Delivery,Chemical Delivery,Office Worker,OH Indirect
+L226,Chemical Delivery Associate,L22,6,I,L00,CE Lap,L20,Chemical Delivery,Chemical Delivery,Production Worker,-
+L332,Chemical mixing Lead,L33,2,I,L00,CE Lap,L30,Chemical mixing,Chemical mixing,Office Worker,-
+L336,Chemical mixing Associate,L33,6,D,L00,CE Lap,L30,Chemical mixing,Chemical mixing,Production Worker,-
+L442,CE Control Lead,L44,2,O,L00,CE Lap,L40,CE Control,CE Control,Office Worker,OH Indirect
+L446,CE Control Associate,L44,6,O,L00,CE Lap,L40,CE Control,CE Control,Office Worker,OH Indirect
+L511,CE Managing Executive,L51,6,O,L00,CE Lap,L50,CE Managing,CE Managing,Office Worker,-
+L512,CE Managing Lead,L51,2,O,L00,CE Lap,L50,CE Managing,CE Managing,Office Worker,OH Indirect
+L513,CE Managing Senior,L51,3,O,L00,CE Lap,L50,CE Managing,CE Managing,Office Worker,OH Indirect
+L514,CE Managing L2,L51,4,O,L00,CE Lap,L50,CE Managing,CE Managing,Office Worker,OH Indirect
+L515,CE Managing L1,L51,5,O,L00,CE Lap,L50,CE Managing,CE Managing,Office Worker,OH Indirect
+L516,CE Managing Associate,L51,6,O,L00,CE Lap,L50,CE Managing,CE Managing,Office Worker,OH Indirect
+M112,Maintenance Lead,M11,2,O,M00,MEP,M10,MEP,Maintenance,Office Worker,OH Indirect
+M113,Maintenance Senior,M11,3,O,M00,MEP,M10,MEP,Maintenance,Office Worker,OH Indirect
+M114,Maintenance L2,M11,4,O,M00,MEP,M10,MEP,Maintenance,Office Worker,OH Indirect
+M115,Maintenance L1,M11,5,O,M00,MEP,M10,MEP,Maintenance,Office Worker,OH Indirect
+M116,Maintenance Associate,M11,6,O,M00,MEP,M10,MEP,Maintenance,Production Worker,OH Indirect
+M121,WOODEN TOOL MAKER Executive,M12,1,O,M00,MEP,M10,MEP,WOODEN TOOL MAKER,Office Worker,-
+M122,WOODEN TOOL MAKER Lead,M12,2,O,M00,MEP,M10,MEP,WOODEN TOOL MAKER,Office Worker,OH Indirect
+M123,WOODEN TOOL MAKER Senior,M12,3,O,M00,MEP,M10,MEP,WOODEN TOOL MAKER,Office Worker,-
+M124,WOODEN TOOL MAKER L2,M12,4,O,M00,MEP,M10,MEP,WOODEN TOOL MAKER,Office Worker,-
+M125,WOODEN TOOL MAKER L1,M12,5,O,M00,MEP,M10,MEP,WOODEN TOOL MAKER,Office Worker,-
+M126,WOODEN TOOL MAKER Associate,M12,6,O,M00,MEP,M10,MEP,WOODEN TOOL MAKER,Office Worker,OH Indirect
+M131,Electrical Executive,M13,1,O,M00,MEP,M10,MEP,Electrical,Office Worker,-
+M132,Electrical Lead,M13,2,O,M00,MEP,M10,MEP,Electrical,Office Worker,OH Indirect
+M133,Electrical Senior,M13,3,O,M00,MEP,M10,MEP,Electrical,Office Worker,-
+M135,Electrical L1,M13,5,O,M00,MEP,M10,MEP,Electrical,Office Worker,OH Indirect
+M136,Electrical Associate,M13,6,O,M00,MEP,M10,MEP,Electrical,Office Worker,OH Indirect
+M141,Civil Maintenance Executive,M14,1,O,M00,MEP,M10,MEP,Civil Maintenance,Office Worker,-
+M143,Civil Maintenance Senior,M14,3,O,M00,MEP,M10,MEP,Civil Maintenance,Office Worker,-
+M144,Civil Maintenance L2,M14,4,O,M00,MEP,M10,MEP,Civil Maintenance,Office Worker,OH Indirect
+M145,Civil Maintenance L1,M14,5,O,M00,MEP,M10,MEP,Civil Maintenance,Office Worker,OH Indirect
+M146,Civil Maintenance Associate,M14,6,O,M00,MEP,M10,MEP,Civil Maintenance,Office Worker,OH Indirect
+P111,Planning Executive,P11,1,O,P00,Planning&Management,P10,Planning,Planning,Office Worker,-
+P112,Planning Lead,P11,2,O,P00,Planning&Management,P10,Planning,Planning,Office Worker,OH Indirect
+P113,Planning Senior,P11,3,O,P00,Planning&Management,P10,Planning,Planning,Office Worker,OH Indirect
+P114,Planning L2,P11,4,O,P00,Planning&Management,P10,Planning,Planning,Office Worker,OH Indirect
+P116,Planning Associate,P11,6,O,P00,Planning&Management,P10,Planning,Planning,Office Worker,OH Indirect
+P212,Line Managing Lead,P21,2,I,P00,Planning&Management,P20,Production Management,Line Managing,Office Worker,-
+P221,Production Management Exec,P22,1,O,P00,Planning&Management,P20,Production Management,Production Management,Office Worker,-
+P222,Production Management Lead,P22,2,O,P00,Planning&Management,P20,Production Management,Production Management,Office Worker,OH Indirect
+P223,Production Management Senior,P22,3,O,P00,Planning&Management,P20,Production Management,Production Management,Office Worker,OH Indirect
+P224,Production Management L2,P22,4,O,P00,Planning&Management,P20,Production Management,Production Management,Office Worker,OH Indirect
+P225,Production Management L1,P22,5,O,P00,Planning&Management,P20,Production Management,Production Management,Office Worker,OH Indirect
+P226,Production Management Ass,P22,6,O,P00,Planning&Management,P20,Production Management,Production Management,Office Worker,OH Indirect
+P312,JIT Lead,P31,2,O,P00,Planning&Management,P30,JIT,JIT,Office Worker,OH Indirect
+P316,JIT Associate,P31,6,O,P00,Planning&Management,P30,JIT,JIT,Office Worker,OH Indirect
+Q111,QC Executive,Q11,1,O,Q00,QA,Q10,QA,QC,Office Worker,-
+Q112,QC Lead,Q11,2,I,Q00,QA,Q10,QA,QC,Office Worker,-
+Q113,QC Senior,Q11,3,I,Q00,QA,Q10,QA,QC,Office Worker,-
+Q114,QC L2,Q11,4,I,Q00,QA,Q10,QA,QC,Office Worker,-
+Q115,QC L1,Q11,5,I,Q00,QA,Q10,QA,QC,Office Worker,-
+Q116,QC Associate,Q11,6,I,Q00,QA,Q10,QA,QC,Production Worker,-
+Q121,MA Executive,Q12,1,O,Q00,QA,Q10,QA,MA,Office Worker,-
+Q122,MA Lead,Q12,2,I,Q00,QA,Q10,QA,MA,Office Worker,-
+Q123,MA Senior,Q12,3,I,Q00,QA,Q10,QA,MA,Office Worker,-
+Q124,MA L2,Q12,4,I,Q00,QA,Q10,QA,MA,Office Worker,-
+Q125,MA L1,Q12,5,I,Q00,QA,Q10,QA,MA,Office Worker,-
+Q126,MA Associate,Q12,6,I,Q00,QA,Q10,QA,MA,Production Worker,-
+Q131,Reinspection Executive,Q13,1,O,Q00,QA,Q10,QA,Reinspection,Office Worker,-
+Q132,Reinspection Lead,Q13,2,I,Q00,QA,Q10,QA,Reinspection,Office Worker,-
+Q133,Reinspection Senior,Q13,3,I,Q00,QA,Q10,QA,Reinspection,Office Worker,-
+Q134,Reinspection L2,Q13,4,I,Q00,QA,Q10,QA,Reinspection,Office Worker,-
+Q135,Reinspection L1,Q13,5,I,Q00,QA,Q10,QA,Reinspection,Office Worker,-
+Q136,Reinspection Associate,Q13,6,I,Q00,QA,Q10,QA,Reinspection,Office Worker,-
+Q211,QA Trainer Executive,Q21,1,O,Q00,QA,Q20,QA Trainer,QA Trainer,Office Worker,-
+Q212,QA Trainer Lead,Q21,2,O,Q00,QA,Q20,QA Trainer,QA Trainer,Office Worker,OH Indirect
+Q213,QA Trainer Senior,Q21,3,O,Q00,QA,Q20,QA Trainer,QA Trainer,Office Worker,-
+Q214,QA Trainer L2,Q21,4,O,Q00,QA,Q20,QA Trainer,QA Trainer,Office Worker,OH Indirect
+Q215,QA Trainer L1,Q21,5,O,Q00,QA,Q20,QA Trainer,QA Trainer,Office Worker,-
+Q216,QA Trainer Associate,Q21,6,O,Q00,QA,Q20,QA Trainer,QA Trainer,Office Worker,OH Indirect
+Q311,NPI Executive,Q31,1,O,Q00,QA,Q30,CQM,NPI,Office Worker,-
+Q313,NPI Senior,Q31,3,O,Q00,QA,Q30,CQM,NPI,Office Worker,-
+Q314,NPI L2,Q31,4,O,Q00,QA,Q30,CQM,NPI,Office Worker,OH Indirect
+Q315,NPI L1,Q31,5,O,Q00,QA,Q30,CQM,NPI,Office Worker,OH Indirect
+Q316,NPI Associate,Q31,6,O,Q00,QA,Q30,CQM,NPI,Office Worker,OH Indirect
+Q411,QA Report Executive,Q41,1,O,Q00,QA,Q40,QA Report,QA Report,Office Worker,-
+Q412,QA Report Lead,Q41,2,O,Q00,QA,Q40,QA Report,QA Report,Office Worker,OH Indirect
+Q413,QA Report Senior,Q41,3,O,Q00,QA,Q40,QA Report,QA Report,Office Worker,OH Indirect
+Q414,QA Report L2,Q41,4,O,Q00,QA,Q40,QA Report,QA Report,Office Worker,OH Indirect
+Q416,QA Report Associate,Q41,6,O,Q00,QA,Q40,QA Report,QA Report,Office Worker,OH Indirect
+Q511,QA Room Executive,Q51,1,O,Q00,QA,Q50,QA Room,QA Room,Office Worker,-
+Q512,QA Room Lead,Q51,2,O,Q00,QA,Q50,QA Room,QA Room,Office Worker,-
+Q513,QA Room Senior,Q51,3,O,Q00,QA,Q50,QA Room,QA Room,Office Worker,-
+Q514,QA Room L2,Q51,4,O,Q00,QA,Q50,QA Room,QA Room,Office Worker,-
+Q515,QA Room L1,Q51,5,O,Q00,QA,Q50,QA Room,QA Room,Office Worker,-
+Q516,QA Room Associate,Q51,6,O,Q00,QA,Q50,QA Room,QA Room,Office Worker,OH Indirect
+Q611,MQA Executive,Q61,1,O,Q00,QA,Q60,MQA,MQA,Office Worker,-
+Q612,MQA Lead,Q61,2,O,Q00,QA,Q60,MQA,MQA,Office Worker,OH Indirect
+Q613,MQA Senior,Q61,3,O,Q00,QA,Q60,MQA,MQA,Office Worker,-
+Q614,MQA L2,Q61,4,O,Q00,QA,Q60,MQA,MQA,Office Worker,-
+Q615,MQA L1,Q61,5,O,Q00,QA,Q60,MQA,MQA,Office Worker,OH Indirect
+Q616,MQA Associate,Q61,6,O,Q00,QA,Q60,MQA,MQA,Office Worker,OH Indirect
+R112,Relief Lead,R11,2,I,R00,Relief,R10,Relief,Relief,Office Worker,-
+R116,Relief Associate,R11,6,D,R00,Relief,R10,Relief,Relief,Production Worker,-
+S112,Outsole Degreasing Lead,S11,2,I,S00,Stockfit,S10,Stockfit,Outsole Degreasing,Office Worker,-
+S116,Outsole Degreasing Associate,S11,6,D,S00,Stockfit,S10,Stockfit,Outsole Degreasing,Production Worker,-
+S122,Stockfit Lead,S12,2,I,S00,Stockfit,S10,Stockfit,Stockfit,Office Worker,-
+S126,Stockfit Associate,S12,6,D,S00,Stockfit,S10,Stockfit,Stockfit,Production Worker,-
+T111,Trading Executive,T11,1,O,T00,Trading,T10,Trading,Trading,Office Worker,-
+T112,Trading Lead,T11,2,O,T00,Trading,T10,Trading,Trading,Office Worker,-
+T113,Trading Senior,T11,3,O,T00,Trading,T10,Trading,Trading,Office Worker,-
+T114,Trading L2,T11,4,O,T00,Trading,T10,Trading,Trading,Office Worker,SG&A
+T116,Trading Associate,T11,6,O,T00,Trading,T10,Trading,Trading,Office Worker,OH Indirect
+U112,Lamination Lead,U11,2,I,U00,Upper,U10,Upper,Lamination,Office Worker,-
+U116,Lamination Associate,U11,6,D,U00,Upper,U10,Upper,Lamination,Office Worker,-
+U122,Material Layering Lead,U12,2,I,U00,Upper,U10,Upper,Material Layering,Office Worker,-
+U126,Material Layering Associate,U12,6,D,U00,Upper,U10,Upper,Material Layering,Office Worker,-
+U132,Cutting Lead,U13,2,I,U00,Upper,U10,Upper,Cutting,Office Worker,-
+U136,Cutting Associate,U13,6,D,U00,Upper,U10,Upper,Cutting,Production Worker,-
+U142,No-sew Lead,U14,2,I,U00,Upper,U10,Upper,No-sew,Office Worker,-
+U146,No-sew Associate,U14,6,D,U00,Upper,U10,Upper,No-sew,Production Worker,-
+U152,HF Welding Lead,U15,2,I,U00,Upper,U10,Upper,HF Welding,Office Worker,-
+U156,HF Welding Associate,U15,6,D,U00,Upper,U10,Upper,HF Welding,Production Worker,-
+U162,Screen Lead,U16,2,I,U00,Upper,U10,Upper,Screen,Office Worker,-
+U172,Upper pad print Lead,U17,2,I,U00,Upper,U10,Upper,Upper pad print,Office Worker,-
+U176,Upper pad print Associate,U17,6,D,U00,Upper,U10,Upper,Upper pad print,Office Worker,-
+U182,Embroidery Lead,U18,2,I,U00,Upper,U10,Upper,Embroidery,Office Worker,-
+U186,Embroidery Associate,U18,6,D,U00,Upper,U10,Upper,Embroidery,Production Worker,-
+U192,Compression Molding Lead,U19,2,I,U00,Upper,U10,Upper,Compression Molding,Office Worker,-
+U196,Compression Molding Associate,U19,6,D,U00,Upper,U10,Upper,Compression Molding,Office Worker,-
+U1A2,Laser Cutting Lead,U1A,2,I,U00,Upper,U10,Upper,Laser Cutting,Office Worker,-
+U1B2,Upper Laser Etching Lead,U1B,2,I,U00,Upper,U10,Upper,Upper Laser Etching,Office Worker,-
+U1B6,Upper Laser Etching Associate,U1B,6,D,U00,Upper,U10,Upper,Upper Laser Etching,Office Worker,-
+U1C2,Knit Spray Lead,U1C,2,I,U00,Upper,U10,Upper,Knit Spray,Office Worker,-
+U1C6,Knit Spray Associate,U1C,6,D,U00,Upper,U10,Upper,Knit Spray,Office Worker,-
+U1D2,Weaving Lead,U1D,2,I,U00,Upper,U10,Upper,Weaving,Office Worker,-
+U1D6,Weaving Associate,U1D,6,D,U00,Upper,U10,Upper,Weaving,Office Worker,-
+U1E2,Stitching Lead,U1E,2,I,U00,Upper,U10,Upper,Stitching,Office Worker,-
+U1E6,Stitching Associate,U1E,6,D,U00,Upper,U10,Upper,Stitching,Production Worker,-
+U1F2,DYE SUBLIMATION Lead,U1F,2,I,U00,Upper,U10,Upper,DYE SUBLIMATION,Office Worker,-
+U1F6,DYE SUBLIMATION Associate,U1F,6,D,U00,Upper,U10,Upper,DYE SUBLIMATION,Office Worker,-
+U1G2,Flywire Lead,U1G,2,I,U00,Upper,U10,Upper,Flywire,Office Worker,-
+U1G6,Flywire Associate,U1G,6,D,U00,Upper,U10,Upper,Flywire,Production Worker,-
+U212,EVA skiving Lead,U21,2,I,U00,Upper,U20,Sockliner,EVA skyving,Office Worker,-
+U216,EVA skiving Associate,U21,6,D,U00,Upper,U20,Sockliner,EVA skyving,Office Worker,-
+U222,EVA Lamination Lead,U22,2,I,U00,Upper,U20,Sockliner,EVA Lamination,Office Worker,-
+U226,EVA Lamination Associate,U22,6,D,U00,Upper,U20,Sockliner,EVA Lamination,Production Worker,-
+U232,Sockliner Cutting Lead,U23,2,I,U00,Upper,U20,Sockliner,Sockliner Cutting,Office Worker,-
+U242,Sockliner Press Lead,U24,2,I,U00,Upper,U20,Sockliner,Sockliner Press,Office Worker,-
+U246,Sockliner Press Associate,U24,6,D,U00,Upper,U20,Sockliner,Sockliner Press,Production Worker,-
+U312,Strobel Lead,U31,2,I,U00,Upper,U30,Strobel,Strobel,Office Worker,-
+U316,Strobel Associate,U31,6,D,U00,Upper,U30,Strobel,Strobel,Production Worker,-
+W112,Shipping goods Lead,W11,2,O,W00,Warehouse,W10,Warehouse,Shipping goods,Office Worker,OH Indirect
+W116,Shipping goods Associate,W11,6,O,W00,Warehouse,W10,Warehouse,Shipping goods,Office Worker,OH Indirect
+W122,Warehouse admin Lead,W12,2,I,W00,Warehouse,W10,Warehouse,Warehoues admin,Office Worker,-
+W126,Warehouse admin Associate,W12,6,I,W00,Warehouse,W10,Warehouse,Warehoues admin,Production Worker,-
+W132,Warehouse worker Lead,W13,2,I,W00,Warehouse,W10,Warehouse,Warehouse woker,Office Worker,-
+W136,Warehouse worker Associate,W13,6,I,W00,Warehouse,W10,Warehouse,Warehouse woker,Production Worker,-
+X111,Product Manager Executive,X11,1,O,X00,Development,X10,Development,Product Manager,Office Worker,-
+X112,Product Manager Lead,X11,2,O,X00,Development,X10,Development,Product Manager,Office Worker,SOH
+X113,Product Manager Senior,X11,3,O,X00,Development,X10,Development,Product Manager,Office Worker,SOH
+X114,Product Manager L2,X11,4,O,X00,Development,X10,Development,Product Manager,Office Worker,SOH
+X115,Product Manager L1,X11,5,O,X00,Development,X10,Development,Product Manager,Office Worker,SOH
+X116,Product Manager Associate,X11,6,O,X00,Development,X10,Development,Product Manager,Office Worker,SOH
+X121,FDPA Executive,X12,1,O,X00,Development,X10,Development,FDPA,Office Worker,-
+X122,FDPA Lead,X12,2,O,X00,Development,X10,Development,FDPA,Office Worker,SOH
+X123,FDPA Senior,X12,3,O,X00,Development,X10,Development,FDPA,Office Worker,-
+X124,FDPA L2,X12,4,O,X00,Development,X10,Development,FDPA,Office Worker,SOH
+X125,FDPA L1,X12,5,O,X00,Development,X10,Development,FDPA,Office Worker,-
+X126,FDPA Associate,X12,6,O,X00,Development,X10,Development,FDPA,Office Worker,SOH
+X211,PMM Executive,X21,1,O,X00,Development,X20,PMM,PMM,Office Worker,-
+X212,PMM Lead,X21,2,O,X00,Development,X20,PMM,PMM,Office Worker,SOH
+X213,PMM Senior,X21,3,O,X00,Development,X20,PMM,PMM,Office Worker,-
+X214,PMM L2,X21,4,O,X00,Development,X20,PMM,PMM,Office Worker,SOH
+X215,PMM L1,X21,5,O,X00,Development,X20,PMM,PMM,Office Worker,SOH
+X216,PMM Associate,X21,6,O,X00,Development,X20,PMM,PMM,Office Worker,SOH
+X221,Sample Material Executive,X22,1,O,X00,Development,X20,PMM,Sample Material,Office Worker,-
+X222,Sample Material Lead,X22,2,O,X00,Development,X20,PMM,Sample Material,Office Worker,SOH
+X223,Sample Material Senior,X22,3,O,X00,Development,X20,PMM,Sample Material,Office Worker,-
+X224,Sample Material L2,X22,4,O,X00,Development,X20,PMM,Sample Material,Office Worker,-
+X225,Sample Material L1,X22,5,O,X00,Development,X20,PMM,Sample Material,Office Worker,-
+X226,Sample Material Associate,X22,6,O,X00,Development,X20,PMM,Sample Material,Office Worker,SOH
+X312,Pattern Engineer Lead,X31,2,O,X00,Development,X30,Engineer,Pettern Engineer,Office Worker,SOH
+X313,Pattern Engineer Senior,X31,3,O,X00,Development,X30,Engineer,Pettern Engineer,Office Worker,-
+X314,Pattern Engineer L2,X31,4,O,X00,Development,X30,Engineer,Pettern Engineer,Office Worker,SOH
+X315,Pattern Engineer L1,X31,5,O,X00,Development,X30,Engineer,Pettern Engineer,Office Worker,SOH
+X316,Pattern Engineer Associate,X31,6,O,X00,Development,X30,Engineer,Pettern Engineer,Office Worker,SOH
+X321,Tooling Engineer Executive,X32,1,O,X00,Development,X30,Engineer,Tooling Engineer,Office Worker,-
+X322,Tooling Engineer Lead,X32,2,O,X00,Development,X30,Engineer,Tooling Engineer,Office Worker,SOH
+X323,Tooling Engineer Senior,X32,3,O,X00,Development,X30,Engineer,Tooling Engineer,Office Worker,SOH
+X324,Tooling Engineer L2,X32,4,O,X00,Development,X30,Engineer,Tooling Engineer,Office Worker,SOH
+X325,Tooling Engineer L1,X32,5,O,X00,Development,X30,Engineer,Tooling Engineer,Office Worker,SOH
+X326,Tooling Engineer Associate,X32,6,O,X00,Development,X30,Engineer,Tooling Engineer,Production Worker,SOH
+X331,Chemical Engineer Executive,X33,1,O,X00,Development,X30,Engineer,Cemical Engineer,Office Worker,-
+X332,Chemical Engineer Lead,X33,2,O,X00,Development,X30,Engineer,Cemical Engineer,Office Worker,OH Indirect
+X333,Chemical Engineer Senior,X33,3,O,X00,Development,X30,Engineer,Cemical Engineer,Office Worker,-
+X334,Chemical Engineer L2,X33,4,O,X00,Development,X30,Engineer,Cemical Engineer,Office Worker,-
+X335,Chemical Engineer L1,X33,5,O,X00,Development,X30,Engineer,Cemical Engineer,Office Worker,SOH
+X336,Chemical Engineer Associate,X33,6,O,X00,Development,X30,Engineer,Cemical Engineer,Office Worker,OH Indirect
+X341,Costing Executive,X34,1,O,X00,Development,X30,Engineer,Costing,Office Worker,-
+X342,Costing Lead,X34,2,O,X00,Development,X30,Engineer,Costing,Office Worker,-
+X343,Costing Senior,X34,3,O,X00,Development,X30,Engineer,Costing,Office Worker,-
+X344,Costing L2,X34,4,O,X00,Development,X30,Engineer,Costing,Office Worker,-
+X345,Costing L1,X34,5,O,X00,Development,X30,Engineer,Costing,Office Worker,-
+X346,Costing Associate,X34,6,O,X00,Development,X30,Engineer,Costing,Office Worker,SOH
+X351,YIELD Executive,X35,1,O,X00,Development,X30,Engineer,YIELD,Office Worker,-
+X352,YIELD Lead,X35,2,O,X00,Development,X30,Engineer,YIELD,Office Worker,-
+X353,YIELD Senior,X35,3,O,X00,Development,X30,Engineer,YIELD,Office Worker,-
+X354,YIELD L2,X35,4,O,X00,Development,X30,Engineer,YIELD,Office Worker,-
+X355,YIELD L1,X35,5,O,X00,Development,X30,Engineer,YIELD,Office Worker,SOH
+X356,YIELD Associate,X35,6,O,X00,Development,X30,Engineer,YIELD,Office Worker,SOH
+X361,PFC Executive,X36,1,O,X00,Development,X30,Engineer,PFC,Office Worker,-
+X362,PFC Lead,X36,2,O,X00,Development,X30,Engineer,PFC,Office Worker,SOH
+X363,PFC Senior,X36,3,O,X00,Development,X30,Engineer,PFC,Office Worker,-
+X364,PFC L2,X36,4,O,X00,Development,X30,Engineer,PFC,Office Worker,SOH
+X365,PFC L1,X36,5,O,X00,Development,X30,Engineer,PFC,Office Worker,SOH
+X366,PFC Associate,X36,6,O,X00,Development,X30,Engineer,PFC,Office Worker,SOH
+X411,Visual communicator Executive,X41,1,O,X00,Development,X40,Visual communicator,Visual communicator,Office Worker,-
+X412,Visual communicator Lead,X41,2,O,X00,Development,X40,Visual communicator,Visual communicator,Office Worker,-
+X413,Visual communicator Senior,X41,3,O,X00,Development,X40,Visual communicator,Visual communicator,Office Worker,-
+X414,Visual communicator L2,X41,4,O,X00,Development,X40,Visual communicator,Visual communicator,Office Worker,-
+X415,Visual communicator L1,X41,5,O,X00,Development,X40,Visual communicator,Visual communicator,Office Worker,-
+X416,Visual communicator Associate,X41,6,O,X00,Development,X40,Visual communicator,Visual communicator,Office Worker,-
+X511,Digital Creation Executive,X51,1,O,X00,Development,X50,Digital Creation,Digital Creation,Office Worker,-
+X512,Digital Creation Lead,X51,2,O,X00,Development,X50,Digital Creation,Digital Creation,Office Worker,-
+X513,Digital Creation Senior,X51,3,O,X00,Development,X50,Digital Creation,Digital Creation,Office Worker,-
+X514,Digital Creation L2,X51,4,O,X00,Development,X50,Digital Creation,Digital Creation,Office Worker,-
+X515,Digital Creation L1,X51,5,O,X00,Development,X50,Digital Creation,Digital Creation,Office Worker,-
+X516,Digital Creation Associate,X51,6,O,X00,Development,X50,Digital Creation,Digital Creation,Office Worker,-
+X611,Innovater Executive,X61,1,O,X00,Development,X60,Innovation,Innovater,Office Worker,-
+X612,Innovater Lead,X61,2,O,X00,Development,X60,Innovation,Innovater,Office Worker,-
+X613,Innovater Senior,X61,3,O,X00,Development,X60,Innovation,Innovater,Office Worker,-
+X614,Innovater L2,X61,4,O,X00,Development,X60,Innovation,Innovater,Office Worker,-
+X615,Innovater L1,X61,5,O,X00,Development,X60,Innovation,Innovater,Office Worker,-
+X616,Innovater Associate,X61,6,O,X00,Development,X60,Innovation,Innovater,Office Worker,-
+X621,Explorer Executive,X62,1,O,X00,Development,X60,Innovation,Explorer,Office Worker,-
+X622,Explorer Lead,X62,2,O,X00,Development,X60,Innovation,Explorer,Office Worker,-
+X623,Explorer Senior,X62,3,O,X00,Development,X60,Innovation,Explorer,Office Worker,-
+Z846,Line Cleaning Associate,Z84,6,O,Z00,Service,Z80,Cleaning,Line Cleaning,Office Worker,-
+Z912,Parking Lot Lead,Z91,2,O,Z00,Service,Z90,Parking Lot,Parking Lot,Office Worker,-
+Z916,Parking Lot Associate,Z91,6,O,Z00,Service,Z90,Parking Lot,Parking Lot,Office Worker,-
+ZA12,Doctor Lead,ZA1,2,O,Z00,Service,ZA0,Clinic,doctor,Office Worker,SG&A
+ZA16,Doctor Associate,ZA1,6,O,Z00,Service,ZA0,Clinic,doctor,Office Worker,SG&A
+ZA22,Nurse Lead,ZA2,2,O,Z00,Service,ZA0,Clinic,nurse,Office Worker,SG&A
+ZA26,Nurse Associate,ZA2,6,O,Z00,Service,ZA0,Clinic,nurse,Office Worker,SG&A
+B736,Phylon Press Associate,B73,6,D,B00,Bottom,B70,Phylon,Phylon Press,Production Worker,-
+B782,EVA Skiving Lead,B78,2,I,B00,Bottom,B70,Phylon,EVA Skiving,Office Worker,-
+U166,Screen Associate,U16,6,D,U00,Upper,U10,Upper,Screen,Production Worker,-
+U1A6,Laser Cutting Associate,U1A,6,D,U00,Upper,U10,Upper,Laser Cutting,Production Worker,-
+U236,Sockliner Cutting Associate,U23,6,D,U00,Upper,U20,Sockliner,Sockliner Cutting,Production Worker,-
+XA32,Sample Stockfit Lead,XA3,2,O,X00,Development,XA0,Sample Production,Sample Stockfit,Office Worker,SOH
+YB16,Biz.&Sales Associate,YB1,6,O,Y00,Support,YB0,Business & Sales,Biz.&Sales,Office Worker,SG&A
+B236,Outsole Press Associate,B23,6,D,B00,Bottom,B20,Outsole,Outsole Press,Production Worker,-
+E313,IT Hardware Senior,E31,3,O,E00,IT,E30,IT Maintenance,IT Hardware,Office Worker,SG&A
+F311,Material Admin Executive,F31,1,O,F00,Material,F30,Material Admin,Material Admin,Office Worker,-
+J316,Bottom tooling Associate,J31,6,O,J00,Jig/Tooling,J30,Bottom tooling,Bottom tooling,Office Worker,OH Indirect
+M111,Maintenance Executive,M11,1,O,M00,MEP,M10,MEP,Maintenance,Office Worker,-
+M134,Electrical L2,M13,4,O,M00,MEP,M10,MEP,Electrical,Office Worker,OH Indirect
+P115,Planning L1,P11,5,O,P00,Planning&Management,P10,Planning,Planning,Office Worker,OH Indirect
+Q312,NPI Lead,Q31,2,O,Q00,QA,Q30,CQM,NPI,Office Worker,OH Indirect
+Q415,QA Report L1,Q41,5,O,Q00,QA,Q40,QA Report,QA Report,Office Worker,OH Indirect
+T115,Trading L1,T11,5,O,T00,Trading,T10,Trading,Trading,Office Worker,OH Indirect
+X311,Pattern Engineer Executive,X31,1,O,X00,Development,X30,Engineer,Pettern Engineer,Office Worker,-
+M142,Civil Maintenance Lead,M14,2,O,M00,MEP,M10,MEP,Civil Maintenance,Office Worker,OH Indirect
+C132,Long term Sickness Lead,C13,2,O,C00,Common,C10,Common,Long term Sickness,Office Worker,SG&A
+X915,샘플발송 L1,X91,5,O,X00,Development,X90,Sample Manage,Sample Shipping,Office Worker,-
+C134,Long term Sickness L2,C13,4,O,C00,Common,C10,Common,Long term Sickness,Office Worker,-
+X914,샘플발송 L2,X91,4,O,X00,Development,X90,Sample Manage,Sample Shipping,Office Worker,-
+Z117,비서 L1,Z11,5,O,Z00,Service,Z10,Secretary,Secretary,Office Worker,-
+C135,Long term Sickness L1,C13,5,O,C00,Common,C10,Common,Long term Sickness,Office Worker,-
+C131,Long term Sickness Executive,C13,1,O,C00,Common,C10,Common,Long term Sickness,Office Worker,-
+C133,Long term Sickness Senior,C13,3,O,C00,Common,C10,Common,Long term Sickness,Office Worker,-

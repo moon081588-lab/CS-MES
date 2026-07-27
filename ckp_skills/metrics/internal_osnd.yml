@@ -1,0 +1,118 @@
+# =============================================================================
+# Domain: Internal OS&D (Bottom Internal OS&D Register)
+# Screen ID: SCR-007 (Internal OS&D by Process)
+# Source Procedure: Bottom Internal OS&D Register (MSPQ_IN_OSND_BT 메인)
+# Main Table: OCI.MSPQ_IN_OSND_BT (1층: mspq_in_osnd_bt)
+#
+# ★ External OS&D(SCR-005/006, external_osnd_balance.yml)와 별개. 테이블·KPI 모두 다름.
+#
+# 단위 규칙 [확정]:
+#   - 기본 = 낱개(원본, OSND_BT_QTY). 화면 Grand Total도 낱개.
+#   - 켤레(_prs) = 낱개/2. **근사치**(LR_CD로 L/R 분리적재, L+R 짝 보장 없음) — 병기용.
+#
+# 공정 롤업 [확정: DB 검증. 화면 Plant Building 필터와 일치]:
+#   - PB_CD='CKP-A' → IP     (IPI)
+#   - PB_CD='CKP-B' → Phylon (PHH=Phylon Press + PHM=CMP Press [+PHU])
+#   ⚠️ Phylon을 PHH만으로 잡으면 CMP Press(PHM) 누락 — 반드시 롤업.
+#
+# OSND_TYPE(=grade) 디코드: MSBS_CODE_MASTER CODE_CLASS_CD='PQ_GRADE_TYPE' (PLANT 스코프)
+#   13=Production-CTM,10=Production-UV,9=Production-Trim,15=Production-CMP … (PQ_OSND_TYPE 아님)
+# =============================================================================
+
+metrics:
+
+  # ---------------------------------------------------------------------------
+  # 1. 등록/후보충/잔량 — 낱개(기본)
+  # ---------------------------------------------------------------------------
+
+  - name: internal_osnd_qty
+    label: 내부 OS&D 등록 수량 (낱개)
+    type: simple
+    type_params:
+      measure: osnd_bt_qty
+    description: "내부 불량 등록 수량 합계(낱개). 화면 'OS&D Qty'. 불변값 → 화면 대조 기준. [확정: DB 재현 2026-07-11 CKP-B=4,411]"
+
+  - name: internal_repl_qty
+    label: 내부 OS&D 후보충 수량 (낱개)
+    type: simple
+    type_params:
+      measure: repl_qty
+    description: "후보충 완료 수량 합계(낱개). 화면 'Repl'. ⚠️라이브 갱신 컬럼(캡처 시점차 발생 가능)."
+
+  - name: internal_balance_qty
+    label: 내부 OS&D 잔량 (낱개)
+    type: simple
+    type_params:
+      measure: balance_qty
+    description: "잔량 = 등록 - 후보충 (낱개). 화면 'Bal'. [확정: procedure BALANCE 정의]. Repl 갱신에 따라 변동."
+
+  # ---------------------------------------------------------------------------
+  # 2. 켤레(÷2) 병기 — 근사치
+  # ---------------------------------------------------------------------------
+
+  - name: internal_osnd_qty_prs
+    label: 내부 OS&D 등록 수량 (켤레)
+    type: derived
+    type_params:
+      expr: internal_osnd_qty / 2
+      metrics:
+        - name: internal_osnd_qty
+    description: "등록 수량 켤레 환산(=낱개/2). **근사치**(L/R 짝 보장 없음). 병기용."
+
+  - name: internal_repl_qty_prs
+    label: 내부 OS&D 후보충 수량 (켤레)
+    type: derived
+    type_params:
+      expr: internal_repl_qty / 2
+      metrics:
+        - name: internal_repl_qty
+    description: "후보충 수량 켤레 환산(근사)."
+
+  - name: internal_balance_qty_prs
+    label: 내부 OS&D 잔량 (켤레)
+    type: derived
+    type_params:
+      expr: internal_balance_qty / 2
+      metrics:
+        - name: internal_balance_qty
+    description: "잔량 켤레 환산(근사)."
+
+  # ---------------------------------------------------------------------------
+  # 3. 후보충률 (Replenishment Rate) — 같은 스코프 내 자기완결
+  # ---------------------------------------------------------------------------
+
+  - name: internal_replen_rate
+    label: 내부 OS&D 후보충률 (%)
+    type: derived
+    type_params:
+      expr: CASE WHEN internal_osnd_qty = 0 THEN 0 ELSE ROUND(internal_repl_qty / internal_osnd_qty * 100, 2) END
+      metrics:
+        - name: internal_osnd_qty
+        - name: internal_repl_qty
+    description: |
+      후보충 완료율 = 후보충 / 등록 × 100. 한 테이블 안에서 자기완결(분자·분모 동일 스코프).
+      범위 0~100. [확정: DB. 예 07-11 IPI 100%(2826/2826), PHH 35.6%(1354/3801)]
+
+  # ---------------------------------------------------------------------------
+  # 4. 내부 불량율 (Internal Defect Rate) — ★분자·분모 동일 스코프 강제★
+  # ---------------------------------------------------------------------------
+
+  - name: internal_defect_rate
+    label: 내부 불량율 (%)
+    type: derived
+    type_params:
+      expr: CASE WHEN prod_qty = 0 THEN 0 ELSE ROUND(internal_osnd_qty / prod_qty * 100, 2) END
+      metrics:
+        - name: internal_osnd_qty
+        - name: prod_qty
+    description: |
+      내부 불량율 = 내부 불량(낱개) / 생산량(같은 단위) × 100.
+      ★★ 핵심 규칙(이전 버그의 원인) ★★
+        - 분자(불량)와 분모(생산)의 **공정 스코프가 반드시 동일**해야 한다.
+          예) Phylon 불량율이면 분자=PHH+PHM 불량, 분모=PHH+PHM 생산. (PHH 분자 ÷ PHH 전체 분모 같은
+          엇갈린 스코프 금지 — 무의미한 값이 나옴.)
+        - 단위 일치: 분자·분모 둘 다 낱개거나 둘 다 켤레. 섞지 말 것.
+      [분모(prod_qty) 출처] 이 테이블에 생산량 없음 → **생산 실적 도메인(production_status.yml /
+        MSPD_PCARD_RESULT, 같은 OSND_DATE·같은 공정 스코프)**에서 가져와 조인. 자유 분석 시 이 metric
+        단독 사용 불가 → functions/internal-osnd.md#fn_internal_defect_rate 와 함께 사용.
+      [확정: DB 2026-07-11 분자] Phylon(PHH+PHM) 불량 낱개 4,411 / IP(IPI) 2,826. 분모는 생산실적 조회 후 대입.
