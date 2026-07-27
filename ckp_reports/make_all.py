@@ -19,7 +19,7 @@ CKP Manual Report — 공식 11개 리포트 한 번에 생성
 양식 원칙: 사이즈·날짜(D-offset) 컬럼은 원본 고정 구조로 항상 렌더 → 데이터 0행이어도 열이 안 사라짐.
 결과: report/CKP_official/ 에 "NO) 리포트명.xlsx" 11개.
 """
-import os, sys, csv, io, subprocess, datetime
+import os, sys, csv, io, re, subprocess, datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BOM_DIR = os.path.join(HERE, "..", "balance_outgoing_mailer")
@@ -123,12 +123,20 @@ def resolve_conn(prefer=""):
         except Exception:
             break
     rows = []          # (연결이름, 그 줄 전체) — 접속문자열이 같은 줄에 오는 표 형식도 매칭되도록
+    HEADERS = ("sql>", "name", "user", "username", "connection", "connections", "connmgr")
     for l in listing.splitlines():
-        parts = l.split()
-        t = parts[0].strip('"').strip("'").strip(",") if parts else ""
-        if t and not t.startswith(("SQL>", "-", "=", "Name", "NAME", "USER", "Connection")) \
-               and "lmes" not in l.lower():
+        # SQLcl 은 연결 목록을 트리(│ ├ └ ─)로 그린다. 앞쪽 장식 문자를 걷어낸 뒤 토큰을 뽑는다.
+        s2 = re.sub(r"^[\s\u2500-\u257F|`+*\-]+", "", l).strip()
+        if "lmes" in l.lower():
+            continue
+        for tok in s2.split():
+            t = tok.strip('"').strip("'").strip(",")
+            if not re.fullmatch(r"[A-Za-z0-9_.\-]+", t or ""):   # 장식·기호 토큰은 이름이 아니다
+                continue
+            if t.lower() in HEADERS:
+                break
             rows.append((t, l.lower()))
+            break
     names = [t for t, _ in rows]
     def pick(pred):
         for t, line in rows:
@@ -164,9 +172,16 @@ def sqlcl_csv(sql, out_csv, conn):
     return len(rows)-1
 
 def fetch(sql, csvp, conn, mode):
-    """mode: sqlcl(직접실행) | plan(SQL만 저장) | build(기존 CSV 사용)"""
-    if mode == "plan":
+    """mode: sqlcl(직접실행) | plan(SQL만 저장) | build(기존 CSV 사용)
+
+    어느 모드든 실행한 SQL 을 CSV 옆에 .sql 로 남긴다. 예전에는 plan 모드에서만 써서
+    sql/*.sql 이 며칠 묵은 잔재로 남았고, 그걸 '오늘 실행된 쿼리'로 오해해 없는 버그를
+    쫓는 사고가 있었다(2026-07-27). 항상 덮어써서 잔재가 생기지 않게 한다."""
+    try:
         with open(csvp[:-4] + ".sql", "w", encoding="utf-8") as f: f.write(sql + "\n")
+    except Exception:
+        pass
+    if mode == "plan":
         return -1
     if mode == "build":
         if not os.path.exists(csvp):
