@@ -110,12 +110,28 @@ def _write_state(d):
         pass
 
 
+def _finished():
+    """로그의 완료/오류 표시. pid 생존보다 이쪽이 믿을 만하다 — 부모(MCP 서버)가
+    자식을 기다리지 않아 끝난 프로세스가 좀비로 남고, 그러면 os.kill(pid,0) 이
+    계속 성공해서 '실행 중' 으로 잘못 보인다(2026-07-27 확인)."""
+    try:
+        s = open(LOG, encoding="utf-8").read()
+        return ("<<< DONE" in s) or ("[오류]" in s)
+    except Exception:
+        return False
+
+
 def _alive(pid):
     if not pid: return False
     try:
-        os.kill(int(pid), 0); return True
+        os.waitpid(int(pid), os.WNOHANG)      # 좀비 수확(자식인 경우)
+    except Exception:
+        pass
+    try:
+        os.kill(int(pid), 0)
     except Exception:
         return False
+    return not _finished()
 
 
 # ---------------------------------------------------------------- 툴
@@ -144,13 +160,14 @@ def ckp_status(tail: int = 25) -> str:
         el = int(time.time() - st.get("started", time.time()))
         running = _alive(st.get("pid"))
         lines.append(f"작업     : {st.get('label')} (기준일 {st.get('date')})")
-        lines.append(f"상태     : {'⏳ 실행 중' if running else '✅ 종료됨'} — {el}초 경과, pid {st.get('pid')}")
+        lines.append(f"상태     : {'⏳ 실행 중 — %d초 경과' % el if running else '✅ 종료됨'}"
+                     f"{'' if running else ' — 소요 %d초 이내' % el}, pid {st.get('pid')}")
     try:
         log = open(LOG, encoding="utf-8").read().splitlines()
         done = any("<<< DONE" in l for l in log)
         err  = [l for l in log if "[오류]" in l or "Traceback" in l]
         if not st or not _alive((st or {}).get("pid")):
-            lines.append(f"완료표시 : {'있음' if done else '없음(중단되었을 수 있음)'}")
+            lines.append(f"완료표시 : {'있음(<<< DONE)' if done else '없음 — 중단되었을 수 있음'}")
         if err: lines.append(f"오류     : {len(err)}건 — 아래 로그 확인")
         lines.append(f"--- 로그 마지막 {tail}줄 ---")
         lines += log[-tail:]
