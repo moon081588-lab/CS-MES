@@ -41,7 +41,7 @@ def setup_log():
     fmt=logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
     sh=logging.StreamHandler(); sh.setFormatter(fmt); log.addHandler(sh)
     try:
-        fh=logging.FileHandler(os.path.join(HERE,"balance_outgoing.log"),encoding="utf-8"); fh.setFormatter(fmt); log.addHandler(fh)
+        fh=logging.FileHandler(os.path.join(HERE,"ckp_reports.log"),encoding="utf-8"); fh.setFormatter(fmt); log.addHandler(fh)
     except Exception: pass
     return log
 LOG=setup_log()

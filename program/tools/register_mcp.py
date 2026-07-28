@@ -26,9 +26,10 @@ MCP  = os.path.join(PKG, "ckp_mcp.py")
 # 이 프로젝트가 Claude 에 등록하는 서버들. 폴더를 옮기면 여기 경로가 전부 깨지므로
 # 하나만 고치면 나머지가 조용히 죽는다(2026-07-28 balance-outgoing 이 그렇게 끊겼다).
 SERVERS = [
-    ("ckp-reports",      os.path.join(PKG, "ckp_mcp.py")),
-    ("balance-outgoing", os.path.join(ROOT, "mailer", "report_only_mcp.py")),
+    ("ckp-reports", os.path.join(PKG, "ckp_mcp.py")),
 ]
+# 더 이상 쓰지 않는 서버. 설정에 남아 있으면 Claude 가 '연결 끊김' 경고를 띄우므로 지운다.
+RETIRED = ["balance-outgoing"]
 
 def line(c="="): print(c * 62)
 
@@ -118,7 +119,7 @@ def diagnose():
     if data is None:
         return False, "설정 파일을 읽지 못함"
     servers = data.get("mcpServers") or {}
-    bad = []
+    bad = [f"{n}: 안 쓰는 서버가 남아 있음" for n in RETIRED if n in servers]
     for name, script in SERVERS:
         if not os.path.isfile(script):
             continue                                    # 이 폴더에 없는 기능은 등록 대상이 아니다
@@ -196,7 +197,11 @@ def main(quiet=False):
             pass
 
     servers = data.setdefault("mcpServers", {})
-    before = json.dumps([servers.get(n) for n, _ in SERVERS], ensure_ascii=False)
+    before = json.dumps([servers.get(n) for n, _ in SERVERS] + [servers.get(n) for n in RETIRED],
+                        ensure_ascii=False)
+    for name in RETIRED:
+        if servers.pop(name, None) is not None:
+            print(f" 정리     : {name} 등록을 지웠습니다(더 이상 쓰지 않는 기능)")
 
     py = pick_python((servers.get("ckp-reports") or {}).get("command"))
     if not py:
@@ -220,7 +225,8 @@ def main(quiet=False):
             "env": {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
         }
         wrote.append((name, script))
-    after = json.dumps([servers.get(n) for n, _ in SERVERS], ensure_ascii=False)
+    after = json.dumps([servers.get(n) for n, _ in SERVERS] + [servers.get(n) for n in RETIRED],
+                       ensure_ascii=False)
 
     os.makedirs(os.path.dirname(cfgp), exist_ok=True)
     with open(cfgp, "w", encoding="utf-8") as f:

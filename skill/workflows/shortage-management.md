@@ -294,7 +294,6 @@ PCARD 의 `ITEM_CD` (예: `IM9013100CP01`) = STYLE_CD 하이픈 제거 + ITEM_CL
 3. **출력 형태 선택** (사용자 요청에 따라):
    - "엑셀로 / 다운로드" → **`xlsx` skill** 로 화면 레이아웃 그대로 .xlsx 생성.
    - "리포트 / 보고서 / Word" → **`data-analysis-report` skill** 연계 (사실/추정 분리 형식).
-   - "메일로 / Gmail" → **`gmail-report-email` skill** 연계.
    - "대시보드 / 매번 갱신 / 라이브" → Cowork **live artifact**(create_artifact)로 — 컨트롤(Plant·ICT·FA W/C·Div·기간) + 동적 PIVOT + 엑셀 다운로드 버튼. (이미 제작된 `mes-production-status` 아티팩트가 이 형태)
 
 추가 가공:

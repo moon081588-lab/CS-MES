@@ -78,8 +78,6 @@ def wallet_dir(cfg=None):
         return os.path.abspath(d)
     for c in (os.path.join(USER_ROOT, "wallet"),                            # 배포본 배치
               os.path.join(ROOT_DIR, "wallet"),
-              os.path.join(ROOT_DIR, "mailer", "wallet"),                    # 저장소 배치
-              os.path.join(ROOT_DIR, "balance_outgoing_mailer", "wallet"),   # 옛 폴더명
               os.path.join(PKG_DIR, "wallet")):
         got = find_wallet(c)          # zip 째·하위폴더째 넣어도 찾아낸다
         if got:

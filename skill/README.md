@@ -20,7 +20,7 @@
 | 스킬 | 프로그램 |
 |---|---|
 | `workflows/_common.md` §0 (연결 절차) | `ckp_reports/make_all.py` `resolve_conn()` |
-| `workflows/_common.md` §0-4 (지갑) | `balance_outgoing_mailer/setup_env.py` |
+| `workflows/_common.md` §0-4 (지갑) | `CKP.bat` 2 번 (program/tools/bootstrap.py) |
 | `workflows/reports-pipeline.md` §4 (리포트별 필터) | `ckp_reports/balance_sql.py` `REPORTS` |
 | `functions/shortage-management.md` (마감필터) | `ckp_reports/balance_sql.py` `_closing_pred()` |
 

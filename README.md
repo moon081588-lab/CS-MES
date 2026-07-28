@@ -33,7 +33,7 @@ DB 계정 입력, 방화벽 확인, 실제 접속 시험까지 한 번에 합니
 |---|---|
 | 파이썬 | 64비트 **3.11 ~ 3.14** (3.12 권장). 없거나 안 맞으면 2 번이 알려 줍니다 |
 | 라이브러리 | `openpyxl`, `oracledb` — 2 번이 알아서 설치 |
-| OCI 지갑 | `wallet/` 에 넣으면 됩니다. zip 째 넣어도 알아서 풉니다 |
+| OCI 지갑 | 저장소 루트 `wallet/` 에 넣으면 됩니다. zip 째 넣어도 알아서 풉니다 |
 | DB 계정 | 2 번에서 입력. **저장소·배포본 어디에도 비밀번호는 없습니다** |
 | SQLcl | 선택. 계정을 넣으면 드라이버로 직접 붙어 SQLcl·Java 가 필요 없습니다 |
 
@@ -74,7 +74,7 @@ program/       프로그램 본체
     reports/       리포트 11종 (r01 ~ r11)
     ckp_mcp.py     Claude 용 MCP 서버
   tools/         메뉴 · 설치 · 점검 · 연결 (ckp.py 가 창구)
-  mailer/        Balance Outgoing 메일 발송 (별도 기능, MCP 서버 포함)
+  .venv/         이 프로그램이 쓰는 파이썬 환경 (커밋 안 함)
   CKP Manual Report (종합).xlsx   서식·항목의 원본 수기 리포트
   사용법.txt
 skill/         Claude skill 원본 (v12.7)
@@ -89,13 +89,12 @@ report/        결과 엑셀 (커밋 안 함)
 `CKP.bat` → **4 번** → Claude 완전 종료 후 재시작 → `skill/` 을 `.skill` 로 묶어 업로드
 → 채팅창에 **"레포트 11개 작성해줘"**.
 
-4 번은 `claude_desktop_config.json` 에 아래 두 서버를 **지금 이 폴더의 절대경로**로
-등록합니다. 사람이 경로를 손으로 적지 않습니다.
+4 번은 `claude_desktop_config.json` 에 아래 서버를 **지금 이 폴더의 절대경로**로
+등록합니다. 사람이 경로를 손으로 적지 않습니다. 쓰지 않게 된 서버가 남아 있으면 지웁니다.
 
 | 서버 | 파일 |
 |---|---|
 | `ckp-reports` | `program/ckp_reports/ckp_mcp.py` |
-| `balance-outgoing` | `program/mailer/report_only_mcp.py` |
 
 Claude 를 쓰지 않아도 `CKP.bat` 1 번만으로 리포트는 똑같이 나옵니다.
 
@@ -108,7 +107,7 @@ Claude 를 쓰지 않아도 `CKP.bat` 1 번만으로 리포트는 똑같이 나�
 
 | 상황 | 프로그램이 하는 일 |
 |---|---|
-| 폴더를 옮겨 MCP 등록이 깨짐 | `CKP.bat` 실행 때마다 두 서버 경로를 점검해 자동 수정 (0.5초) |
+| 폴더를 옮겨 MCP 등록이 깨짐 | `CKP.bat` 실행 때마다 서버 경로를 점검해 자동 수정 (0.5초) |
 | 서버를 띄우는 파이썬에 `mcp` 가 없음 | 프로젝트 안의 기존 가상환경 라이브러리를 빌려 씀 (설치 안 함) |
 | 지갑 `sqlnet.ora` 에 남의 PC 경로가 박혀 있음 | 그 PC 경로로 다시 씀 |
 | 환경변수 `TNS_ADMIN` 이 없는 폴더를 가리킴 | 무시하고 자동 탐색 |

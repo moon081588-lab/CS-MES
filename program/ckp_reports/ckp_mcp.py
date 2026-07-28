@@ -3,7 +3,7 @@
 """
 CKP Manual Report — Claude Desktop용 로컬 MCP 서버
 ===================================================
-Claude Desktop이 "CKP 리포트 만들어줘 / 메일 보내줘" 한마디로 11개를 생성·발송하게 한다.
+Claude Desktop 에서 "레포트 11개 작성해줘" 한마디로 11개를 생성하게 한다.
 서버가 Mac 위에서 run_all.py 를 그대로 실행하므로,
 대용량 CSV가 Claude 컨텍스트를 지나가지 않는다(= 안정적). DB 조회는 make_all 이 내부에서
 저장된 SQLcl 연결(changshinincaipoc)로 처리 → Claude 는 SQL 을 나르지 않는다.
@@ -315,4 +315,4 @@ def ckp_reset(date: str = "") -> str:
 if __name__ == "__main__":
     _start_keepalive()   # DB 워밍업(keepalive) 백그라운드 시작 → 첫 호출 콜드 스타트 타임아웃 방지
     mcp.run()
-# async v2: ckp_make_all 즉시반환 + ckp_status 조회 (메일 발송 기능 제거됨)
+# async v2: ckp_make_all 즉시반환 + ckp_status 조회

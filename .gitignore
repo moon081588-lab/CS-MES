@@ -8,7 +8,6 @@ program/ckp_reports/sql/
 program/ckp_reports/*.csv
 program/ckp_reports/*.xlsx
 program/ckp_reports/last_run.*
-program/mailer/BALANCE_OUTGOING_*.xlsx
 *.log
 
 # ── 배포·임시 ──────────────────────────────────────────

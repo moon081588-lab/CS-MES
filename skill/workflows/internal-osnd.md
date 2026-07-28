@@ -125,4 +125,3 @@
 추가 가공:
 - "일보/리포트" → `data-analysis-report` 연계
 - "그래프" → visualize (플롯 라벨은 영어)
-- "메일" → Zapier

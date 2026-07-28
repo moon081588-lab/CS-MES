@@ -247,7 +247,6 @@ yaml 의 description 에 다음 마커가 있다. 답변에 그대로 반영.
 | 사용자 추가 요청 | 연계 skill |
 |---|---|
 | "리포트", "보고서", "Word", "docx" | `data-analysis-report` |
-| "이메일", "메일로 발송", "Gmail" | **Zapier 로 메일 발송** (연결된 Zap 사용 — Zapier MCP 의 write action 으로 Gmail 전송). 구 `gmail-report-email` 대체 |
 
 ## 10. 이 skill 범위 밖 (명시적 거절 대상)
 

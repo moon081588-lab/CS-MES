@@ -85,9 +85,9 @@ OCI Autonomous DB 는 지갑으로 붙는다. **지갑을 다른 PC 에서 복�
 
 - 원인: `sqlnet.ora` 의 `WALLET_LOCATION ... DIRECTORY` 에 **복사해 준 PC 의 절대경로**가 박혀 있다. 원본 zip 상태는 `DIRECTORY="?/network/admin"` 이고 파일이 약 114 bytes 다. 그보다 크면 누군가 경로를 박아둔 것이다.
 - 조치: `DIRECTORY` 를 **이 PC 의 실제 지갑 폴더**로 고친다. CS-MES 를 쓰고 있다면 자동이다 —
-  `python balance_outgoing_mailer/setup_env.py` 가 매 실행마다 교정한다.
+  `CKP.bat` 의 2 번(처음 설정)이 매 실행마다 교정한다.
 - **경로에 공백·한글·괄호를 쓰지 말 것.** SQLcl 은 자바라서 `연구참여 (2026-여름학기)` 같은 경로를 만나면 `ORA-17956` 을 낸다. OneDrive·Google Drive 동기화 폴더도 피한다(온라인 전용 파일·잠금 문제).
-- 권장 위치 — Windows `C:\oracle\wallet\changshinincaipoc`, macOS/Linux `~/CS-MES/balance_outgoing_mailer/wallet` 같은 ASCII 경로.
+- 권장 위치 — 프로그램 폴더의 `wallet\` (예: `C:\CKP-Report\wallet`). 한글·공백 없는 ASCII 경로여야 한다.
 
 **Windows 절차**
 1. 지갑 zip 을 `C:\oracle\wallet\changshinincaipoc` 에 푼다.
@@ -96,7 +96,7 @@ OCI Autonomous DB 는 지갑으로 붙는다. **지갑을 다른 PC 에서 복�
 4. **Claude Desktop 을 완전 종료(트레이 아이콘까지) 후 재시작.** 실행 중인 프로세스는 옛 환경변수를 계속 들고 있다.
 
 MCP 서버에 `env.TNS_ADMIN` 을 지정해 뒀다면, 폴더를 옮긴 뒤에는 손으로 고치지 말고
-`python balance_outgoing_mailer/setup_env.py --fix-claude` 를 쓴다(자기 위치 기준으로 재작성 + 백업).
+`CKP.bat` 의 4 번을 쓴다(지금 폴더 위치 기준으로 재작성 + 백업).
 
 ### 0-5. 증상별 조치표
 
