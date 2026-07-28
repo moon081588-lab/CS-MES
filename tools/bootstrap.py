@@ -52,6 +52,18 @@ def main():
 
     # ---------------------------------------------------------- 2) 라이브러리
     head("[2/5] 라이브러리 (인터넷 불필요)")
+    # vendor 에 담아 둔 것은 64비트 윈도우 · 파이썬 3.11~3.14 용이다.
+    # 여기서 먼저 걸러 주지 않으면 pip 이 뱉는 긴 영어 오류만 보게 된다.
+    import struct
+    vmaj, vmin = sys.version_info[:2]
+    bits = struct.calcsize("P") * 8
+    if os.name == "nt" and bits != 64:
+        print(f"  ❌ 32비트 파이썬입니다. 64비트 파이썬 3.12 를 설치해 주세요.")
+        print("     https://www.python.org/downloads/  ('Windows installer (64-bit)')")
+    elif (vmaj, vmin) < (3, 11) or (vmaj, vmin) > (3, 14):
+        print(f"  ❌ 파이썬 {vmaj}.{vmin} 은 이 폴더가 담고 있는 설치 파일과 맞지 않습니다.")
+        print("     3.11 ~ 3.14 중 하나가 필요합니다. 3.12 를 권합니다.")
+        print("     https://www.python.org/downloads/  (설치할 때 'Add python.exe to PATH' 체크)")
     whls = sorted(glob.glob(os.path.join(VENDOR, "*.whl")))
     need = []
     for mod, name in (("openpyxl", "openpyxl"), ("oracledb", "oracledb")):

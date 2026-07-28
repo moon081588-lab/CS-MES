@@ -26,7 +26,8 @@ OCI 재현. 색상은 MSPD_BATCH_PLAN BOM 인라인(EXACT + STYLE fallback).
           같은 워크북의 No.4 시트는 반대로 IP01~05 가 대부분이다. 즉 비대칭은 실재한다.
           DB 확인: ITEM_CLASS_TYPE = SUBSTR(ITEM_CLASS,1,2) 로 불일치 0건이므로
           시트의 II* 표기는 곧 ITEM_CLASS_TYPE='II' 를 뜻한다.
-          그 전까지 코드는 II+IP 였다 — 2026-07-13 기준으로 G-Total 4,529 → 2,971 로 줄어든다.
+          그 전까지 코드는 II+IP 였다. 실측(창 20260706~20260725, loose): II 3,104(166행) /
+          IP 1,558(60행) — 즉 IP 분 1,558 이 빠진다. 정확한 G-Total 은 실행 창에 따라 달라진다.
   No.4  3-2. Balance IP Outgoing by size  = by-size  ICT(II,IP)  DIV=Outgoing
   No.5  3-3. Balance IP Outgoing Market   = outgoing_market_sheet_sql / _dickp_sql / _scan_sql (이 파일)
   No.7  3-1. Balance CMP                  = by-date  ICT(CP)     DIV=Production
