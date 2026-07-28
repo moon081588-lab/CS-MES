@@ -34,6 +34,60 @@ def ask(prompt, default="", secret=False):
     return v or default
 
 
+# 윈도우를 처음 쓰는 사람에게 '폴더를 C 드라이브로 옮기기' 가 가장 어려운 단계다.
+# 경로가 나쁘면 프로그램이 대신 옮겨 준다. (실행 중인 폴더는 잠겨 있어 이동이 안 되므로
+#  복사해 두고 새 자리에서 다시 실행하게 안내한다.)
+DEST_DEFAULT = r"C:\CKP-Report"
+
+
+def _ignore(_dir, names):
+    return [n for n in names if n in ("__pycache__", ".venv", ".git") or n.endswith(".pyc")]
+
+
+def relocate(top):
+    """반환: 옮긴 새 경로(옮겼을 때) / "" (안 옮겼을 때)."""
+    import shutil
+    if os.name != "nt" and not os.environ.get("CKP_TEST_MOVE"):
+        return ""                                   # 윈도우에서만 제안한다
+    try:
+        if not sys.stdin.isatty():
+            return ""                               # 스케줄러 등 사람이 없는 실행에서는 건드리지 않는다
+    except Exception:
+        return ""
+    dest = os.environ.get("CKP_DEST") or DEST_DEFAULT
+    if os.path.abspath(top).rstrip("\\/").lower() == os.path.abspath(dest).rstrip("\\/").lower():
+        return ""
+    print()
+    print(f"  이 폴더를 {dest} 로 옮기면 해결됩니다.")
+    if ask("  지금 옮겨 드릴까요? 옮기려면 y, 그냥 두려면 n [y]: ", "y").lower() != "y":
+        print("  옮기지 않았습니다. 나중에 직접 옮기고 CKP.bat 을 다시 실행하세요.")
+        return ""
+    if os.path.exists(os.path.join(dest, "CKP.bat")):
+        print(f"  ⚠ {dest} 에 이미 프로그램이 있습니다.")
+        if ask("     덮어쓸까요? [n]: ", "n").lower() != "y":
+            print("  옮기지 않았습니다.")
+            return ""
+    try:
+        os.makedirs(dest, exist_ok=True)
+        shutil.copytree(top, dest, dirs_exist_ok=True, ignore=_ignore)
+    except Exception as e:
+        print(f"  ❌ 옮기지 못했습니다: {e}")
+        print(f"     탐색기에서 이 폴더를 {dest} 로 직접 옮겨 주세요.")
+        return ""
+    print(f"  ✅ 옮겼습니다 → {dest}")
+    print()
+    print("  ────────────────────────────────────────────────")
+    print("   이제 새 자리에서 다시 실행하세요.")
+    print(f"     {os.path.join(dest, 'CKP.bat')}  더블클릭")
+    print("   (지금 창은 닫으셔도 됩니다. 옛 폴더는 지우셔도 됩니다.)")
+    print("  ────────────────────────────────────────────────")
+    try:
+        os.startfile(dest)                          # 새 폴더를 탐색기로 열어 준다
+    except Exception:
+        pass
+    return dest
+
+
 def main():
     head("CKP 리포트 폴더 준비")
     print(f" 위치   : {TOP}")
@@ -47,7 +101,9 @@ def main():
     if "OneDrive" in TOP or "Google Drive" in TOP: bad.append("클라우드 동기화 폴더")
     if bad:
         print(f"  ⚠ 경로에 {' / '.join(bad)} 가 있습니다 → {TOP}")
-        print("    지갑을 읽을 때 문제가 생깁니다. C:\\CKP-Report 로 옮기고 다시 실행하세요.")
+        print("    이대로 두면 Oracle 지갑을 읽을 때 실패합니다(ORA-17956).")
+        if relocate(TOP):
+            return 0                                # 새 자리에서 다시 실행하면 된다
     else:
         print("  OK")
 
