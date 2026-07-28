@@ -36,6 +36,54 @@ def config_path():
     return os.path.expanduser("~/.config/Claude/claude_desktop_config.json")
 
 
+def can_import_mcp(exe):
+    """그 파이썬으로 실제로 서버가 뜰 수 있는지 확인한다.
+    이 서버는 mcp 패키지가 있어야 한다. 이걸 안 보고 경로만 적으면
+    Claude 는 '서버 연결 실패' 만 조용히 내고 원인을 안 알려 준다."""
+    if not exe:
+        return False
+    try:
+        import subprocess
+        r = subprocess.run([exe, "-c", "import mcp"], capture_output=True, timeout=25)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def project_venvs():
+    """이 프로젝트 안에 이미 있는 가상환경들. 새로 만들지 않고 있는 것을 쓴다.
+    (실제로 이 서버는 program\\mailer\\.venv 의 파이썬으로 돌고 있었다.)"""
+    import glob as _g
+    exe = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+    out = []
+    for d in (ROOT, os.path.dirname(ROOT)):
+        out += sorted(_g.glob(os.path.join(d, "*", ".venv", *exe.split("/"))))
+        out += sorted(_g.glob(os.path.join(d, ".venv", *exe.split("/"))))
+    return out
+
+
+def pick_python(previous=None):
+    """mcp 를 불러올 수 있는 파이썬을 고른다. 없으면 만들지 말고 그대로 알린다.
+    원래 설정값 > 프로젝트 안의 기존 가상환경 > 지금 이 스크립트를 돌린 파이썬 > PATH."""
+    import shutil, glob as _g
+    cands = [previous] + project_venvs() + [sys.executable]
+    for n in ("python3", "python", "python3.14", "python3.13", "python3.12", "python3.11"):
+        cands.append(shutil.which(n))
+    cands += sorted(_g.glob("/opt/homebrew/opt/python@3.*/bin/python3*"))
+    cands += sorted(_g.glob("/usr/local/opt/python@3.*/bin/python3*"))
+    seen = set()
+    for c in cands:
+        if not c or c in seen:
+            continue
+        seen.add(c)
+        if can_import_mcp(c):
+            if c != sys.executable:
+                print(f" 파이썬   : {c}")
+                print("            (지금 실행한 파이썬에는 mcp 가 없어 이쪽을 씁니다)")
+            return c
+    return ""
+
+
 def main():
     line(); print(" Claude 데스크톱 연결"); line()
     print(f" 이 폴더 : {ROOT}")
@@ -68,8 +116,20 @@ def main():
 
     servers = data.setdefault("mcpServers", {})
     before = json.dumps(servers.get("ckp-reports"), ensure_ascii=False)
+
+    py = pick_python(servers.get("ckp-reports", {}).get("command"))
+    if not py:
+        print()
+        print(" ❌ mcp 가 깔린 파이썬을 못 찾았습니다. 설정은 건드리지 않았습니다.")
+        print("    이 프로젝트 안의 가상환경을 먼저 확인해 보세요:")
+        for v in project_venvs():
+            print(f"      {v}")
+        print("    아무것도 없으면 쓰던 가상환경에 한 번만 넣으면 됩니다:")
+        print('      <그 가상환경>/bin/python -m pip install mcp')
+        return 1
+
     servers["ckp-reports"] = {
-        "command": sys.executable,
+        "command": py,
         "args": [MCP],
         "cwd": PKG,
         "env": {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
@@ -85,9 +145,27 @@ def main():
         print(" 이미 이 폴더로 연결돼 있었습니다. 바뀐 것 없음.")
     else:
         print(" 연결했습니다.")
-        print(f"   python : {sys.executable}")
+        print(f"   python : {py}")
         print(f"   서버   : {MCP}")
     line("-")
+    # 여기서 한 번 실제로 띄워 본다. Claude 는 서버가 죽어도 이유를 안 알려 준다.
+    try:
+        import subprocess
+        r = subprocess.run([py, MCP], cwd=PKG, capture_output=True, timeout=8,
+                           input=b"", env={**os.environ, "PYTHONUTF8": "1"})
+        err = (r.stderr or b"").decode("utf-8", "replace").strip()
+    except subprocess.TimeoutExpired:
+        err = ""            # 8초를 버텼다 = 정상적으로 대기 중
+    except Exception as e:
+        err = str(e)
+    if err and "Traceback" in err:
+        print(" ⚠ 서버를 띄워 봤더니 오류가 납니다 — 아래를 먼저 해결해야 합니다.")
+        print("   " + err.strip().splitlines()[-1])
+        print(f'   보통은:  "{py}" -m pip install mcp')
+        line("-")
+    else:
+        print(" 서버 시험 기동: 정상")
+        line("-")
     print(" 다음 순서")
     print("   1) Claude 를 완전히 종료했다가 다시 켜세요 (창만 닫으면 안 됩니다).")
     print("   2) 스킬 파일(CKP-skills-v12.7.skill)을 Claude 에 올리세요.")

@@ -15,7 +15,10 @@ claude_desktop_config.json 에 아래처럼 등록:
 import os, sys, subprocess, datetime, threading, time, json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
+# 결과는 run_all.py 와 같은 곳을 봐야 한다 — 코드가 program\ 안에 있으면 결과는 그 한 단계 위.
+_UP1   = os.path.abspath(os.path.join(HERE, ".."))
+_TOP   = os.path.dirname(_UP1) if os.path.basename(_UP1).lower() == "program" else _UP1
+OUTDIR = os.path.join(_TOP, "report", "CKP_official")
 
 # --- DB keepalive(워밍업) 설정 -------------------------------------------------
 # OCI Autonomous DB 는 유휴 상태에서 첫 접속 시 resume 지연이 커서, ckp_make_all 첫 호출이
@@ -38,14 +41,51 @@ RUN_TIMEOUT   = int(os.environ.get("CKP_RUN_TIMEOUT", "900"))                   
 STALE_AFTER   = int(os.environ.get("CKP_STALE_AFTER", str(RUN_TIMEOUT + 180)))   # 진행중 잡을 죽은걸로 간주하는 경과시간(초)
 SYNC_WAIT     = int(os.environ.get("CKP_SYNC_WAIT", "210"))                      # ckp_make_all 동기 대기 상한(초). 이 안에 끝나면 결과를 바로 반환(240초 클라 타임아웃 회피)
 
-from mcp.server.fastmcp import FastMCP
+# --- 라이브러리 위치 보정 -------------------------------------------------------
+# Claude 가 이 서버를 어떤 파이썬으로 띄울지는 claude_desktop_config.json 에 달려 있고,
+# 그 파이썬에 mcp·openpyxl·oracledb 가 없을 수 있다(맥 Homebrew 파이썬은 전역 설치를 막는다).
+# 그럴 때 새로 설치하지 않고, 이 프로젝트 안에 이미 있는 가상환경의 라이브러리를 빌려 쓴다.
+def _borrow_site_packages():
+    import glob
+    root = os.path.dirname(HERE)                      # program 폴더
+    # 파이썬 버전이 같은 것만 빌린다. 다른 버전의 site-packages 를 붙이면
+    # 컴파일된 모듈이 안 맞아 더 이상한 오류가 난다.
+    tag = "python%d.%d" % sys.version_info[:2]
+    pats = [os.path.join(root, "*", ".venv", "lib", tag, "site-packages"),
+            os.path.join(root, ".venv", "lib", tag, "site-packages"),
+            os.path.join(os.path.dirname(root), "*", ".venv", "lib", tag, "site-packages"),
+            os.path.join(root, "*", ".venv", "Lib", "site-packages")]   # 윈도우는 버전 폴더가 없다
+    found = []
+    for pat in pats:
+        for d in sorted(glob.glob(pat)):
+            if os.path.isdir(d) and d not in sys.path:
+                sys.path.append(d); found.append(d)
+    return found
+
+_BORROWED = []
+try:
+    from mcp.server.fastmcp import FastMCP
+except ModuleNotFoundError:
+    _BORROWED = _borrow_site_packages()
+    from mcp.server.fastmcp import FastMCP        # 그래도 없으면 여기서 정직하게 실패한다
+
 mcp = FastMCP("ckp-reports")
+
+def _child_env():
+    """자식(run_all.py)도 같은 라이브러리를 보게 한다. 위에서 빌려온 경로를 넘겨준다."""
+    env = dict(os.environ)
+    env.setdefault("PYTHONUTF8", "1"); env.setdefault("PYTHONIOENCODING", "utf-8")
+    if _BORROWED:
+        env["PYTHONPATH"] = os.pathsep.join(_BORROWED + [env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
+    return env
+
 
 def _run(script, date, *extra):
     args = [sys.executable, "-u", os.path.join(HERE, script)]
     if date: args.append(date)
     args += [x for x in extra if x]
     p = subprocess.run(args, capture_output=True, text=True, cwd=HERE,
+                       env=_child_env(),
                        timeout=RUN_TIMEOUT)   # 무한대기 방지: 초과 시 subprocess.TimeoutExpired 발생(자식은 강제종료됨)
     out = p.stdout or ""
     if p.returncode != 0:
