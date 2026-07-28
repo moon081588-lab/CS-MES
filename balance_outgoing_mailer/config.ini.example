@@ -54,6 +54,12 @@ plants          = 3110,3120,3210      ; No.5 Outgoing Market 에 포함할 공�
 window_before   = 3                    ; D+3 (납기 경과 며칠까지)
 window_after    = 7                    ; D-7 (선행 며칠까지)
 recipients      = name1@changshininc.com, name2@changshininc.com   ; 받는사람 (쉼표구분, 여러 명 가능)
+; 마감(CLOSING) 필터.  auto(권장) | loose | strict
+;   auto   = 실행할 때마다 MSPD_PROD_GROUP 커버리지를 재서 자동 선택.
+;            커버리지 90%% 이상이면 GMES 정식(strict), 미만이면 임시(loose).
+;            2026-07-28 기준 커버리지 0%% (마스터가 04-27 이후 미동기화) → loose 로 동작.
+;            원장 동기화가 끝나면 설정을 건드리지 않아도 자동으로 정식 필터로 넘어갑니다.
+closing_filter  = auto
 strict_outgoing = false                ; OCI 동기화 완료 후 true (GMES 정식 미출고 로직)
 
 ; 리포트 저장 폴더. **비우면 스크립트 상위의 report/ 를 자동 사용** (권장)

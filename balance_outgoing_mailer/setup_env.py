@@ -37,7 +37,7 @@ DEFAULTS = {
     "smtp":   {"host": "", "port": "587", "use_tls": "true", "user": "", "password": "", "from": ""},
     "report": {"plant": "3120", "plants": "3110,3120,3210", "window_before": "3", "window_after": "7",
                "recipients": "", "output_dir": "", "share_link": "", "site_timezone": "Asia/Seoul",
-               "strict_outgoing": "false", "src_workbook": ""},
+               "closing_filter": "auto", "strict_outgoing": "false", "src_workbook": ""},
 }
 
 

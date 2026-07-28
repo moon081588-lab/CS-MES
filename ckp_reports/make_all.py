@@ -254,6 +254,74 @@ def probe_site_offset(cfg, conn):
         cfg.set("report", "site_utc_offset_hours", f"{off:g}")
 
 
+def check_data_health(cfg, conn, d_from, d_to, today):
+    """복제 신선도 + 마감 마스터 커버리지를 점검하고, 마감필터(loose/strict)를 결정한다.
+
+    왜 필요한가 (2026-07-28 실측):
+      · OCI 는 복제본이고 실제로 07-25(토) 07:00 에 멈춰 있었다. 전 트랜잭션 테이블이
+        같은 시점에서 끊겼다 = 개별 테이블이 아니라 복제 잡이 멈춘 것.
+        이걸 모르고 '오늘' 리포트를 뽑으면 빈 결과를 실제 0 으로 오해한다.
+      · MSPD_PROD_GROUP(마감 마스터)은 04-27 이후 갱신이 없다. 6월 실적에 등장하는
+        생산그룹 381 개 중 마스터에 있는 것은 **0 개**. 그래서 GMES 정식 마감필터
+        (CLOSING_YN='N' IN 절)로 바꾸면 전 리포트가 0 행이 된다.
+    → 사람이 매번 판단하지 않도록, 커버리지를 재서 자동으로 고른다.
+      동기화가 정상화되면 별도 작업 없이 정식 필터로 넘어간다.
+
+    반환: (loose 여부, 경고 메시지 리스트)
+    """
+    mode_cfg = (cfg.get("report", "closing_filter", fallback="") or "auto").strip().lower()
+    warns = []
+    sql = (
+        "SELECT (SELECT TO_CHAR(MAX(CREATE_DT),'YYYY-MM-DD') FROM OCI.POP_PCARD_SCAN) LAST_DATA, "
+        "(SELECT COUNT(*) FROM (SELECT DISTINCT PROD_GROUP_NO,PLANT_CD FROM OCI.MSPD_PCARD_RESULT "
+        f"WHERE FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND PLANT_CD='{BS.PLANT}' AND PROD_MOVE_TYPE='PROD')) GRP_ALL, "
+        "(SELECT COUNT(*) FROM (SELECT DISTINCT PROD_GROUP_NO,PLANT_CD FROM OCI.MSPD_PCARD_RESULT "
+        f"WHERE FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND PLANT_CD='{BS.PLANT}' AND PROD_MOVE_TYPE='PROD') R "
+        "JOIN OCI.MSPD_PROD_GROUP M ON M.PROD_GROUP_NO=R.PROD_GROUP_NO AND M.PLANT_CD=R.PLANT_CD) GRP_IN_MASTER "
+        "FROM DUAL"
+    )
+    try:
+        csvp = os.path.join(SQLDIR, "health.csv")
+        fetch(sql, csvp, conn, "sqlcl")
+        row = next(csv.DictReader(io.StringIO(open(csvp, encoding="utf-8").read())), {})
+        row = {(k or "").strip().upper(): v for k, v in row.items()}
+        last = (row.get("LAST_DATA") or "").strip()
+        grp_all = int(row.get("GRP_ALL") or 0)
+        grp_in = int(row.get("GRP_IN_MASTER") or 0)
+    except Exception as e:
+        warns.append(f"[health] 점검 실패(무시하고 진행): {str(e)[:140]}")
+        return (True, warns)
+
+    # 1) 복제 신선도
+    if last:
+        try:
+            lastd = datetime.datetime.strptime(last, "%Y-%m-%d").date()
+            days = (BO.site_today(cfg) - lastd).days
+            if days >= 2:
+                warns.append(f"[health] ⚠ 복제 지연 {days}일 — OCI 최신 실적일 {last}. "
+                             f"최근 데이터가 필요한 리포트는 아직 비어 있을 수 있습니다.")
+            else:
+                print(f"[health] 복제 신선도 정상 (최신 실적일 {last})")
+        except Exception:
+            pass
+
+    # 2) 마감 마스터 커버리지 → 필터 선택
+    cov = (grp_in / grp_all * 100.0) if grp_all else 0.0
+    if mode_cfg == "loose":
+        loose = True;  why = "config 에서 loose 로 고정"
+    elif mode_cfg == "strict":
+        loose = False; why = "config 에서 strict 로 고정"
+    else:
+        loose = cov < 90.0
+        why = (f"자동 판정 — 마감 마스터 커버리지 {cov:.0f}% "
+               f"({grp_in}/{grp_all} 그룹)" + (" → 정식 필터 사용" if not loose else " → 임시(loose) 필터 유지"))
+    print(f"[health] 마감필터: {'loose(임시)' if loose else 'strict(정식)'} — {why}")
+    if loose and mode_cfg == "auto" and grp_all:
+        warns.append(f"[health] ⚠ MSPD_PROD_GROUP 동기화 미완 (커버리지 {cov:.0f}%). "
+                     f"동기화가 끝나면 이 판정이 자동으로 정식 필터로 바뀝니다.")
+    return (loose, warns)
+
+
 def main():
     a=list(sys.argv[1:]); src=DEFAULT_SRC; conn=os.environ.get("CKP_CONN","").strip(); mode="sqlcl"
     if "--src" in a:   i=a.index("--src");   src=a[i+1];  del a[i:i+2]
@@ -291,6 +359,10 @@ def main():
         src = _find_src()
     bal_b = BD.build_buckets(today, BAL_MAX_BEFORE, BAL_MAX_AFTER)
     d_from, d_to = bal_b[0][1], bal_b[-1][1]
+    LOOSE, HEALTH_WARNS = (True, [])
+    if mode == "sqlcl":
+        LOOSE, HEALTH_WARNS = check_data_health(cfg, conn, d_from, d_to, today)
+        for w in HEALTH_WARNS: print(w)
     om_buckets = BO.build_buckets(today, cfg.getint("report","window_before",fallback=3),
                                         cfg.getint("report","window_after",fallback=7))
     om_from = min(b[1] for b in om_buckets); om_to = max(b[1] for b in om_buckets)
@@ -299,7 +371,7 @@ def main():
     print(f"=== CKP 11개 [{mode}] {date} 부족분창 {d_from}~{d_to} → {OUTDIR}")
 
     for no,(m,fname,sheet) in BAL_SIZE.items():
-        _, sql = BS.build(no, d_from, d_to)
+        _, sql = BS.build(no, d_from, d_to, loose=LOOSE)
         c=os.path.join(SQLDIR,f"no{no}.csv"); n=fetch(sql,c,conn,mode)
         if BUILD:
             if m=="ph": run_builder("bysize_v2.py","ph",out(no,fname),sheet,c,"BALANCE IN MARKET")
@@ -307,7 +379,7 @@ def main():
             print(f"  No.{no} {fname}: {n}행")
 
     for no,(bef,aft,title,ket,fname,sheet) in BAL_DATE.items():
-        _, sql = BS.build(no, d_from, d_to)
+        _, sql = BS.build(no, d_from, d_to, loose=LOOSE)
         c=os.path.join(SQLDIR,f"no{no}.csv"); n=fetch(sql,c,conn,mode)
         if BUILD:
             args=["balance_bydate.py", out(no,fname), f"{sheet}={c}",
@@ -339,6 +411,7 @@ def main():
         run_builder("no2_zone.py", out("2","3-1. Balance IP Production"), src)
         print("  No.2 IP Production(zone)")
         print("완료: 11개 →", OUTDIR)
+        for w in HEALTH_WARNS: print(w)   # 로그 끝만 보는 경우를 위해 한 번 더
     else:
         print(f"SQL 저장 완료 → {SQLDIR}/no*.sql  (sqlcl 로 실행해 no*.csv 를 만든 뒤 --build)")
 
