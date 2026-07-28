@@ -26,7 +26,7 @@ MENU = [
 
 def choose(argv):
     for a in argv:
-        if a in ("1", "2", "3", "4"):
+        if a in ("0", "1", "2", "3", "4"):
             return a
     print()
     print("=" * 62)

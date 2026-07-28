@@ -19,9 +19,16 @@ for _s in (sys.stdout, sys.stderr):
     try: _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception: pass
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # program 폴더
 PKG  = os.path.join(ROOT, "ckp_reports")
 MCP  = os.path.join(PKG, "ckp_mcp.py")
+
+# 이 프로젝트가 Claude 에 등록하는 서버들. 폴더를 옮기면 여기 경로가 전부 깨지므로
+# 하나만 고치면 나머지가 조용히 죽는다(2026-07-28 balance-outgoing 이 그렇게 끊겼다).
+SERVERS = [
+    ("ckp-reports",      os.path.join(PKG, "ckp_mcp.py")),
+    ("balance-outgoing", os.path.join(ROOT, "mailer", "report_only_mcp.py")),
+]
 
 def line(c="="): print(c * 62)
 
@@ -36,18 +43,25 @@ def config_path():
     return os.path.expanduser("~/.config/Claude/claude_desktop_config.json")
 
 
+_MCP_CACHE = {}
+
+
 def can_import_mcp(exe):
     """그 파이썬으로 실제로 서버가 뜰 수 있는지 확인한다.
     이 서버는 mcp 패키지가 있어야 한다. 이걸 안 보고 경로만 적으면
     Claude 는 '서버 연결 실패' 만 조용히 내고 원인을 안 알려 준다."""
     if not exe:
         return False
+    if exe in _MCP_CACHE:                 # 같은 파이썬을 여러 번 묻지 않는다(자동 점검이 느려진다)
+        return _MCP_CACHE[exe]
     try:
         import subprocess
-        r = subprocess.run([exe, "-c", "import mcp"], capture_output=True, timeout=25)
-        return r.returncode == 0
+        r = subprocess.run([exe, "-c", "import mcp"], capture_output=True, timeout=8)
+        ok = (r.returncode == 0)
     except Exception:
-        return False
+        ok = False
+    _MCP_CACHE[exe] = ok
+    return ok
 
 
 def project_venvs():
@@ -96,24 +110,27 @@ def read_config():
 
 
 def diagnose():
-    """지금 Claude 설정이 이 폴더를 제대로 가리키는지 본다. 고치지는 않는다.
+    """지금 Claude 설정이 이 폴더를 제대로 가리키는지 본다(등록 대상 전부). 고치지는 않는다.
     반환: (문제없음?, 사람이 읽는 사유)"""
     cfgp, data = read_config()
     if not os.path.isdir(os.path.dirname(cfgp)):
         return True, "Claude 데스크톱 없음(점검 안 함)"      # Claude 를 안 쓰는 PC 는 정상
     if data is None:
         return False, "설정 파일을 읽지 못함"
-    ent = (data.get("mcpServers") or {}).get("ckp-reports")
-    if not ent:
-        return False, "ckp-reports 가 등록돼 있지 않음"
-    args = ent.get("args") or []
-    if not args or os.path.abspath(args[0]) != os.path.abspath(MCP):
-        return False, f"옛 경로를 가리킴 → {args[0] if args else '(없음)'}"
-    if not os.path.isfile(args[0]):
-        return False, f"등록된 파일이 없음 → {args[0]}"
-    if not can_import_mcp(ent.get("command")):
-        return False, f"등록된 파이썬에 mcp 가 없음 → {ent.get('command')}"
-    return True, "정상"
+    servers = data.get("mcpServers") or {}
+    bad = []
+    for name, script in SERVERS:
+        if not os.path.isfile(script):
+            continue                                    # 이 폴더에 없는 기능은 등록 대상이 아니다
+        ent = servers.get(name)
+        if not ent:
+            bad.append(f"{name}: 등록 안 됨"); continue
+        args = ent.get("args") or []
+        if not args or os.path.abspath(args[0]) != os.path.abspath(script):
+            bad.append(f"{name}: 옛 경로 → {args[0] if args else '(없음)'}"); continue
+        if not can_import_mcp(ent.get("command")):
+            bad.append(f"{name}: 그 파이썬에 mcp 없음 → {ent.get('command')}")
+    return (not bad), ("정상" if not bad else " / ".join(bad))
 
 
 def check_and_repair(verbose=False):
@@ -179,9 +196,9 @@ def main(quiet=False):
             pass
 
     servers = data.setdefault("mcpServers", {})
-    before = json.dumps(servers.get("ckp-reports"), ensure_ascii=False)
+    before = json.dumps([servers.get(n) for n, _ in SERVERS], ensure_ascii=False)
 
-    py = pick_python(servers.get("ckp-reports", {}).get("command"))
+    py = pick_python((servers.get("ckp-reports") or {}).get("command"))
     if not py:
         print()
         print(" ❌ mcp 가 깔린 파이썬을 못 찾았습니다. 설정은 건드리지 않았습니다.")
@@ -192,13 +209,18 @@ def main(quiet=False):
         print('      <그 가상환경>/bin/python -m pip install mcp')
         return 1
 
-    servers["ckp-reports"] = {
-        "command": py,
-        "args": [MCP],
-        "cwd": PKG,
-        "env": {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
-    }
-    after = json.dumps(servers["ckp-reports"], ensure_ascii=False)
+    wrote = []
+    for name, script in SERVERS:
+        if not os.path.isfile(script):
+            continue
+        servers[name] = {
+            "command": py,
+            "args": [script],
+            "cwd": os.path.dirname(script),
+            "env": {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+        }
+        wrote.append((name, script))
+    after = json.dumps([servers.get(n) for n, _ in SERVERS], ensure_ascii=False)
 
     os.makedirs(os.path.dirname(cfgp), exist_ok=True)
     with open(cfgp, "w", encoding="utf-8") as f:
@@ -210,16 +232,17 @@ def main(quiet=False):
     else:
         print(" 연결했습니다.")
         print(f"   python : {py}")
-        print(f"   서버   : {MCP}")
+        for name, script in wrote:
+            print(f"   {name:17s}: {script}")
     line("-")
     # 여기서 한 번 실제로 띄워 본다. Claude 는 서버가 죽어도 이유를 안 알려 준다.
     try:
         import subprocess
-        r = subprocess.run([py, MCP], cwd=PKG, capture_output=True, timeout=8,
+        r = subprocess.run([py, MCP], cwd=PKG, capture_output=True, timeout=5,
                            input=b"", env={**os.environ, "PYTHONUTF8": "1"})
         err = (r.stderr or b"").decode("utf-8", "replace").strip()
     except subprocess.TimeoutExpired:
-        err = ""            # 8초를 버텼다 = 정상적으로 대기 중
+        err = ""            # 5초를 버텼다 = 정상적으로 대기 중
     except Exception as e:
         err = str(e)
     if err and "Traceback" in err:
