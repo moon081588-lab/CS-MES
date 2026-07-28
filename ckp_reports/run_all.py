@@ -34,6 +34,13 @@ def _find_src():
     for c in _SRC_CANDIDATES:
         if os.path.exists(c):
             return c
+    # 파일명이 깨져 전달되는 일이 실제로 있었다(압축 해제 시 한글 손상).
+    # 이름이 정확하지 않아도 같은 자리에 있으면 찾아 쓴다.
+    import glob
+    for d in (os.path.join(HERE, ".."), os.path.join(HERE, "..", "report")):
+        for c in sorted(glob.glob(os.path.join(d, "CKP Manual Report*.xlsx"))):
+            if not os.path.basename(c).startswith("~$"):
+                return c
     return ""
 
 
