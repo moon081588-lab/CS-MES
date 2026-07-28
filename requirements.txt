@@ -1,0 +1,8 @@
+# CKP 리포트 생성 전용 정리본 의존성
+# 설치:  python -m venv .venv && .venv\Scripts\pip install -r requirements.txt   (Windows)
+mcp==1.28.1
+openpyxl==3.1.5
+
+# (선택) balance_outgoing_mailer.py 의 Oracle 직접접속(thick) 경로에서만 필요.
+# CKP 리포트 생성(No.1~11)은 SQLcl 서브프로세스로 DB를 조회하므로 아래는 없어도 동작함.
+# oracledb>=2.0

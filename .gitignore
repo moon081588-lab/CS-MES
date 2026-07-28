@@ -23,3 +23,12 @@ ckp_reports/last_run.json
 *.tgz
 _to_delete/
 _audit/
+
+# 통합 정리(2026-07-28)
+_legacy/
+_incoming/
+dist/*.zip
+dist/python/
+ckp_reports/sql/*.csv
+ckp_reports/sql/*.sql
+ckp_reports/config.ini

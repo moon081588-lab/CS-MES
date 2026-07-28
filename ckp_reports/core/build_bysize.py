@@ -31,7 +31,7 @@ PH_WO_C0 = 14   # WO 라벨 시작 컬럼
 NAVY="1F3A5F"; ALT="EAF1F8"; SUB="FFF2CC"; GT="D9E1F2"
 thin=Side(style="thin",color="BBBBBB"); BORDER=Border(left=thin,right=thin,top=thin,bottom=thin)
 def F(sz=9,b=False,col="222222"): return Font(name="Malgun Gothic",size=sz,bold=b,color=col)
-HDRF=F(9,True,"FFFFFF")
+HDRF=F(9,True,"FFFFFF"); HDRB=F(9,True,"000000")   # 흰/검 헤더폰트
 
 def _num(v):
     try: return int(float(v))
@@ -62,16 +62,16 @@ def _fmt_fa(d):
         return f"{int(d[6:8])}-{m[int(d[4:6])]}"
     return d
 
-def _hdr_cell(ws,r,c,val,fill=NAVY):
-    cell=ws.cell(r,c,val); cell.font=HDRF; cell.fill=PatternFill("solid",fgColor=fill)
+def _hdr_cell(ws,r,c,val,fill=NAVY,font=HDRF):
+    cell=ws.cell(r,c,val); cell.font=font; cell.fill=PatternFill("solid",fgColor=fill)
     cell.alignment=Alignment(horizontal="center",vertical="center",wrap_text=True); cell.border=BORDER
     return cell
 
 # =================== IP (단일축) ===================
 def build_ip(ws, rows):
     fixed=["Line","Model Name","Style Code","Item Class","MCS Color","FA Date","Div","Shortage"]
-    for c,h in enumerate(fixed,1): _hdr_cell(ws,1,c,h)
-    for i,s in enumerate(SIZE_IP): _hdr_cell(ws,1,9+i,s)
+    for c,h in enumerate(fixed,1): _hdr_cell(ws,1,c,h,fill="D3D3D3",font=HDRB)
+    for i,s in enumerate(SIZE_IP): _hdr_cell(ws,1,9+i,s,fill="D3D3D3",font=HDRB)
     sizecol={s:9+i for i,s in enumerate(SIZE_IP)}
     NC=8+len(SIZE_IP)
     key=lambda r:(r["line"],r["model"],r["style"],r["ic"],r["color"],r["fa"],r["div"])
@@ -120,10 +120,10 @@ def build_ph(ws, rows, title="BALANCE IN MARKET"):
     ws.cell(1,1,title).font=F(11,True,NAVY)
     fixed=["Line","Model Name","Style Code","Item Class","MCS Color","FA Date","Shortage"]
     for c,h in enumerate(fixed,1):
-        _hdr_cell(ws,2,c,h); ws.merge_cells(start_row=2,start_column=c,end_row=3,end_column=c)
-    _hdr_cell(ws,2,8,"ME"); _hdr_cell(ws,3,8,"WO")
-    for i,s in enumerate(PH_ME): _hdr_cell(ws,2,PH_ME_C0+i,s)
-    for i,s in enumerate(PH_WO): _hdr_cell(ws,3,PH_WO_C0+i,s)
+        _hdr_cell(ws,2,c,h,fill="000000"); ws.merge_cells(start_row=2,start_column=c,end_row=3,end_column=c)
+    _hdr_cell(ws,2,8,"ME",fill="000000"); _hdr_cell(ws,3,8,"WO",fill="000000")
+    for i,s in enumerate(PH_ME): _hdr_cell(ws,2,PH_ME_C0+i,s,fill="000000")
+    for i,s in enumerate(PH_WO): _hdr_cell(ws,3,PH_WO_C0+i,s,fill="000000")
     me_col={s:PH_ME_C0+i for i,s in enumerate(PH_ME)}
     wo_col={s:PH_WO_C0+i for i,s in enumerate(PH_WO)}
     NC=8+len(PH_ME)   # col 9..37

@@ -34,20 +34,20 @@ def main():
     ws.cell(3,1,"PHH (SCAN CTM PHYLON)").font=Fn(10,True,NAVY)
     # r4/r5 헤더
     for i,h in enumerate(FIXED,1):
-        c=ws.cell(4,i,h);c.font=Fn(9,True,"FFFFFF");c.fill=PatternFill("solid",fgColor=NAVY);c.alignment=Alignment(horizontal="center",vertical="center",wrap_text=True);c.border=BORDER
+        c=ws.cell(4,i,h);c.font=Fn(9,True,"002060");c.fill=PatternFill("solid",fgColor="BDD7EE");c.alignment=Alignment(horizontal="center",vertical="center",wrap_text=True);c.border=BORDER
         ws.merge_cells(start_row=4,start_column=i,end_row=5,end_column=i)
-        ws.cell(5,i).fill=PatternFill("solid",fgColor=NAVY);ws.cell(5,i).border=BORDER
+        ws.cell(5,i).fill=PatternFill("solid",fgColor="BDD7EE");ws.cell(5,i).border=BORDER
     for d in range(nd):
         c0=7+d*5
-        hc=ws.cell(4,c0,f"OUT {dates[d]}");hc.font=Fn(9,True,"FFFFFF");hc.fill=PatternFill("solid",fgColor=NAVY);hc.alignment=Alignment(horizontal="center");hc.border=BORDER
+        hc=ws.cell(4,c0,f"OUT {dates[d]}");hc.font=Fn(9,True,"002060");hc.fill=PatternFill("solid",fgColor="BDD7EE");hc.alignment=Alignment(horizontal="center");hc.border=BORDER
         ws.merge_cells(start_row=4,start_column=c0,end_row=4,end_column=c0+4)
         for j,s in enumerate(SUB):
-            cc=ws.cell(5,c0+j,s);cc.font=Fn(8,True,"FFFFFF");cc.fill=PatternFill("solid",fgColor=NAVY);cc.alignment=Alignment(horizontal="center",wrap_text=True);cc.border=BORDER
+            cc=ws.cell(5,c0+j,s);cc.font=Fn(8,True,"002060");cc.fill=PatternFill("solid",fgColor="BDD7EE");cc.alignment=Alignment(horizontal="center",wrap_text=True);cc.border=BORDER
     wk=7+nd*5
-    hc=ws.cell(4,wk,"WEEK 1");hc.font=Fn(9,True,"FFFFFF");hc.fill=PatternFill("solid",fgColor=NAVY);hc.alignment=Alignment(horizontal="center");hc.border=BORDER
+    hc=ws.cell(4,wk,"WEEK 1");hc.font=Fn(9,True,"002060");hc.fill=PatternFill("solid",fgColor="BDD7EE");hc.alignment=Alignment(horizontal="center");hc.border=BORDER
     ws.merge_cells(start_row=4,start_column=wk,end_row=4,end_column=wk+1)
     for j,s in enumerate(["TOTAL Prs","TOTAL Kg"]):
-        cc=ws.cell(5,wk+j,s);cc.font=Fn(8,True,"FFFFFF");cc.fill=PatternFill("solid",fgColor=NAVY);cc.alignment=Alignment(horizontal="center",wrap_text=True);cc.border=BORDER
+        cc=ws.cell(5,wk+j,s);cc.font=Fn(8,True,"002060");cc.fill=PatternFill("solid",fgColor="BDD7EE");cc.alignment=Alignment(horizontal="center",wrap_text=True);cc.border=BORDER
     # 데이터
     rr=6;alt=0;prev_line=None
     for r in rows:

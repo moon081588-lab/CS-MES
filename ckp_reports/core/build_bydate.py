@@ -22,10 +22,18 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 FIXED = ["Item Class", "FA W/C", "Style CD", "Style Name", "MCS Color", "SPRAY", "PAD", "PROD Total"]
-NAVY="1F3A5F"; ALT="EAF1F8"; GT="D9E1F2"
+NAVY="808080"; ALT="EAF1F8"; GT="D9E1F2"   # 헤더 회색(종합 No.7~10 동일: theme0 tint-0.5)
 thin=Side(style="thin", color="BBBBBB"); BORDER=Border(left=thin,right=thin,top=thin,bottom=thin)
 def F(sz=9,b=False,c="222222"): return Font(name="Malgun Gothic", size=sz, bold=b, color=c)
 HDR=F(9,True,"FFFFFF")
+# 날짜열 D-offset 존 색 (이미지 양식): D+ 블랙 / D-Day~D-2 레드 / D-3,4 옐로우 / D-5,6 그린 / D-7 무색
+ZRED="FF0000"; ZYEL="FFFF00"; ZGRN="92D050"; ZBLK="000000"
+def _zone(label):
+    if label.startswith("D+"):         return (ZBLK, "FFFFFF")
+    if label in ("D-Day","D-1","D-2"): return (ZRED, "FFFFFF")
+    if label in ("D-3","D-4"):         return (ZYEL, "000000")
+    if label in ("D-5","D-6"):         return (ZGRN, "000000")
+    return (None, None)                # D-7 등 = 무색
 
 def _num(v):
     try: return int(float(v))
@@ -71,7 +79,9 @@ def build_sheet(ws, rows, buckets, title, ket=False):
         c=9+i
         x=ws.cell(2,c,f"{d[4:6]}-{d[6:8]}"); x.font=HDR; x.fill=PatternFill("solid",fgColor=NAVY)
         x.alignment=Alignment(horizontal="center"); x.border=BORDER
-        y=ws.cell(3,c,lab); y.font=F(8,True,"FFFFFF"); y.fill=PatternFill("solid",fgColor=NAVY)
+        zf,zc=_zone(lab)                                   # r3 D-offset: D+·D-7 회색, 나머지 존색
+        hf,hc = (zf,zc) if (zf and not lab.startswith("D+")) else (NAVY,"FFFFFF")
+        y=ws.cell(3,c,lab); y.font=F(8,True,hc); y.fill=PatternFill("solid",fgColor=hf)
         y.alignment=Alignment(horizontal="center"); y.border=BORDER
     if ket:
         c=9+nb
@@ -93,7 +103,12 @@ def build_sheet(ws, rows, buckets, title, ket=False):
         if ket: vals.append(None)
         for c,v in enumerate(vals,1):
             x=ws.cell(rr,c,v); x.font=F(9); x.border=BORDER
-            if alt: x.fill=PatternFill("solid",fgColor=ALT)
+            if 9 <= c < 9+nb:                       # 날짜 열: 값 있으면 존 색, 없으면 무색(흰색)
+                zf,zc=_zone(buckets[c-9][0])
+                if v is not None and zf:
+                    x.fill=PatternFill("solid",fgColor=zf); x.font=F(9,True,zc)
+            elif alt:
+                x.fill=PatternFill("solid",fgColor=ALT)
         rr+=1
     # 데이터가 없어도 헤더/열은 그대로 유지된다.
     widths=[10,8,14,24,18,7,6,10]+[7]*nb+([8] if ket else [])

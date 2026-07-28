@@ -20,13 +20,11 @@ rows=list(csv.DictReader(io.StringIO(open(sys.argv[3],encoding="utf-8").read()))
 rows=[{k.strip().upper():v for k,v in r.items()} for r in rows if r.get("LINE") and "rows selected" not in str(r.get("LINE"))]
 wb=openpyxl.Workbook();ws=wb.active;ws.title=sys.argv[2][:31]
 NC=10+len(SIZES)
+ws.cell(1,1,"EXTERNAL OSND BALANCE BY SIZE IP & PH").font=Fn(11,True,NAVY)   # 제목행(종합 동일)
 for c,h in enumerate(FIXED,1):
-    x=ws.cell(1,c,h);x.font=Fn(9,True,"FFFFFF");x.fill=PatternFill("solid",fgColor=NAVY);x.border=BORDER;x.alignment=Alignment(horizontal="center",wrap_text=True)
+    x=ws.cell(2,c,h);x.font=Fn(9,True,"000000");x.fill=PatternFill("solid",fgColor="D3D3D3");x.border=BORDER;x.alignment=Alignment(horizontal="center",wrap_text=True)
 for i,s in enumerate(SIZES):
-    x=ws.cell(1,11+i,s);x.font=Fn(9,True,"FFFFFF");x.fill=PatternFill("solid",fgColor=NAVY);x.border=BORDER;x.alignment=Alignment(horizontal="center")
-for c in range(1,NC+1):
-    ws.cell(2,c).fill=PatternFill("solid",fgColor=GT);ws.cell(2,c).border=BORDER;ws.cell(2,c).font=Fn(9,True)
-ws.cell(2,9,"G-Total").font=Fn(9,True)
+    x=ws.cell(2,11+i,s);x.font=Fn(9,True,"000000");x.fill=PatternFill("solid",fgColor="D3D3D3");x.border=BORDER;x.alignment=Alignment(horizontal="center")
 gtot=0;gsz=[0]*len(SIZES);rr=3;alt=0
 for r in rows:
     alt^=1
@@ -39,9 +37,6 @@ for r in rows:
         if alt:x.fill=PatternFill("solid",fgColor=ALT)
         gsz[i]+=v
     gtot+=num(r.get("TOT"));rr+=1
-ws.cell(2,10,gtot).font=Fn(9,True)
-for i in range(len(SIZES)):
-    if gsz[i]:ws.cell(2,11+i,gsz[i]).font=Fn(9,True)
 for c,w in zip("ABCDEFGHIJ",[8,8,6,20,20,14,14,11,9,8]):ws.column_dimensions[c].width=w
 for c in range(11,NC+1):ws.column_dimensions[get_column_letter(c)].width=5
 ws.freeze_panes="K3";ws.sheet_view.showGridLines=False

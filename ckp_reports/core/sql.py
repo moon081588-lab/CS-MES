@@ -12,32 +12,19 @@ OCI 재현. 색상은 MSPD_BATCH_PLAN BOM 인라인(EXACT + STYLE fallback).
 
 [마감 필터 토글]
   loose=True  : NOT EXISTS(CLOSING_YN='Y')  — OCI 미동기화 임시(현재 운영값).
+                실측 2026-07-21: CKP 카드 5,095,818건 중 MSPD_PROD_GROUP 매칭 1,533건뿐
+                (마스터 CKP 그룹 64개, Y 31/N 33), 마감 Y에 걸리는 카드 0 → 이 필터 실효 제외 0건.
+                마스터 동기화 재개 시 대량 마감분이 걸러질 수 있으니 그때 수치 급변 주의.
   loose=False : (PROD_GROUP_NO,PLANT_CD) IN (CLOSING_YN='N') — GMES 정식(동기화 후).
 
-공식 번호 매핑  ※ 아래 표는 이 파일의 REPORTS 딕셔너리와 반드시 일치시킬 것.
-   (2026-07-27: 이 주석이 REPORTS 와 어긋나 있어 "No.3 필터가 비대칭이라 버그"라는
-    오판을 유발했다. 진실의 출처는 REPORTS 표이고, 주석은 그 사본일 뿐이다.)
-
-  No.  리포트                            생성기     ITEM_CLASS_TYPE  DIV         END_ROUTING
-  ---- --------------------------------- ---------- ---------------- ----------- -----------
-  2    3-1. Balance IP Production        by-date    II               Production  Y
-  3    3-2. Balance IP Prod. by size     by-size    II               Production  Y
-  4    3-2. Balance IP Outgoing by size  by-size    II, IP           Outgoing    Y
-  7    3-1. Balance CMP                  by-date    CP               Production  Y
-  8    3-1. Balance Outgoing PH          by-date    PH, PP           Outgoing    Y
-  9    3-1. Balance PH before UV         by-date    PH, PP           Production  N  ← 공정 진행중
-  10   3-1. Balance PH after UV          by-date    PH, PP           Production  Y
-  11   3-2. Balance PH in Market PH by   by-size    PH, PP           Production  Y
-
-  ICT 범위는 2026-07-07 에 원본 수기 시트의 Item Class 계열과 대조해 확정한 값이다.
-  No.3 이 II 만 쓰고 No.4 가 II+IP 를 쓰는 것은 의도된 차이다(둘은 DIV 도 다르다 —
-  Production 은 PROD_DATE, Outgoing 은 OUT_DATE 로 미완료를 판정).
-
-  이 파일 밖에서 만드는 리포트:
-  No.1  1. DAILY REPORT SCAN             = scan_daily_sql()          (POP_PCARD_SCAN, PHH)
-  No.5  3-3. Balance IP Outgoing Market  = outgoing_market_sheet_sql() / balance_outgoing_mailer.fetch_sheet
-  No.6  3-4. Balance External OS&D IPPH  = osnd_balance_sql()        (MSPQ_EX_OSND)
-  No.2 의 존(zone) 양식은 no2_zone.py 가 원본 워크북에서 복사(DB 불필요).
+공식 번호 매핑 (완료 7종):
+  No.2  3-1. Balance IP Production        = by-date  ICT(II,IP)  DIV=Production
+  No.3  3-2. Balance IP Prod. by size     = by-size  ICT(II,IP)  DIV=Production
+  No.4  3-2. Balance IP Outgoing by size  = by-size  ICT(II,IP)  DIV=Outgoing
+  No.5  3-3. Balance IP Outgoing Market   = outgoing_market_sheet_sql / _dickp_sql / _scan_sql (이 파일)
+  No.7  3-1. Balance CMP                  = by-date  ICT(CP)     DIV=Production
+  No.8  3-1. Balance Outgoing PH          = by-date  ICT(PH,PP)  DIV=Outgoing
+  No.11 3-2. Balance PH in Market PH by   = by-size  ICT(PH,PP)  DIV=Production
 
 사용:
   python balance_sql.py 3 20260628 20260709          # No.3 SQL 출력
@@ -83,14 +70,28 @@ _COLOR_JOINS = ("LEFT JOIN GC_EXACT E ON E.PROD_GROUP_NO=F.PROD_GROUP_NO AND E.P
                 "LEFT JOIN GC_STYLE ST ON ST.STYLE_NOHYPHEN=REPLACE(F.STYLE_CD,'-','')")
 
 def _filt(ict_list, div, d_from, d_to, loose, with_size, er="Y"):
-    cols = "R.FA_WC_CD,R.STYLE_CD,R.ITEM_CD,R.PROD_GROUP_NO,R.ITEM_CLASS,R.ITEM_CLASS_TYPE,R.FA_DATE,R.PCARD_QTY"
+    # [변경 2026-07] END_ROUTING 조건 미사용, ROUTING_SEQ dedup 채택.
+    #   실측(2026-07-21, PLANT_CD=3120 PROD): END_ROUTING_YN 은 값이 존재(Y 2,654,599 / N 1,431,275).
+    #   최신 SEQ행의 99.65%가 'Y'지만 한 (PCARD_NAME·ITEM_CLASS·SIZE_CD) 그룹에 'Y'가 복수 존재해
+    #   (비최신 행 351,265건이 'Y') dedup 유일키로 부적합. → END_ROUTING 대신 SEQ 최대 1행으로 중복 제거.
+    #   대신 (PCARD_NAME·ITEM_CLASS·SIZE_CD)별 ROUTING_SEQ 최대(=최신 공정) 1행만 남겨 공정 중복 제거.
+    #   그룹내 PCARD_QTY 상수(변동 0건 검증)라 어느 행을 남겨도 합계 동일. 생산=PROD_DATE, 출고=OUT_DATE 미완료.
+    #   (검증: CP 38,289 → 23,255)
+    outcols = "FA_WC_CD,STYLE_CD,ITEM_CD,PROD_GROUP_NO,ITEM_CLASS,ITEM_CLASS_TYPE,FA_DATE,PCARD_QTY"
     if with_size:
-        cols = "R.FA_WC_CD,R.STYLE_CD,R.ITEM_CD,R.PROD_GROUP_NO,R.ITEM_CLASS,R.ITEM_CLASS_TYPE,R.FA_DATE,R.SIZE_CD,R.PCARD_QTY"
+        outcols = "FA_WC_CD,STYLE_CD,ITEM_CD,PROD_GROUP_NO,ITEM_CLASS,ITEM_CLASS_TYPE,FA_DATE,SIZE_CD,PCARD_QTY"
+    date_pred = "R.OUT_DATE='19991231'" if div == "Outgoing" else "R.PROD_DATE='19991231'"
     return (
-        f"FILT AS (SELECT {cols} FROM OCI.MSPD_PCARD_RESULT R "
+        "FILT AS (SELECT " + outcols + " FROM ("
+        "SELECT R.FA_WC_CD,R.STYLE_CD,R.ITEM_CD,R.PROD_GROUP_NO,R.ITEM_CLASS,R.ITEM_CLASS_TYPE,"
+        "R.FA_DATE,R.SIZE_CD,R.PCARD_QTY,"
+        "ROW_NUMBER() OVER (PARTITION BY R.PCARD_NAME,R.ITEM_CLASS,R.SIZE_CD "
+        "ORDER BY R.ROUTING_SEQ DESC NULLS LAST) rn "
+        "FROM OCI.MSPD_PCARD_RESULT R "
         f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD='{PLANT}' "
-        f"AND R.PROD_MOVE_TYPE='PROD' AND {_date_pred(div, er)} "
-        f"AND R.ITEM_CLASS_TYPE IN ({_inlist(ict_list)}) AND {_closing_pred(loose)})"
+        f"AND R.PROD_MOVE_TYPE='PROD' AND {date_pred} "
+        f"AND R.ITEM_CLASS_TYPE IN ({_inlist(ict_list)}) AND {_closing_pred(loose)}"
+        ") WHERE rn=1)"
     )
 
 def shortage_bysize_sql(ict_list, div, d_from, d_to, loose=True, er="Y"):
@@ -115,13 +116,41 @@ def shortage_bydate_sql(ict_list, div, d_from, d_to, loose=True, er="Y"):
         "HAVING SUM(F.PCARD_QTY)>0 ORDER BY FA_WC,STYLE_CD,F.FA_DATE"
     )
 
-# 공식 번호 → (설명, 함수, ICT, DIV, END_ROUTING)   ※ 파일 상단 표와 같이 고칠 것
-# [원본 item class 범위 검증 2026-07-07] 원본 수기 시트의 Item Class 계열과 대조해 확정:
-#   IP Prod=II 만, IP Outgoing=II+IP, CMP=CP, Outgoing PH=PH+PP, PH in Market=PH+PP.
+def ip_production_zone_sql(d_from, d_to, loose=True):
+    """No.2 존 양식용 — II+IP 미생산 부족분 + GEN + MCS + 조립공장(FA_PLANT→JJ/RJ).
+    CKP(3120) 생산분을 조립공장(FA_PLANT_CD) JJ(3110)/RJ(3210)로 분리. routing_seq dedup.
+    반환: ITEM_CLASS,FA_WC,STYLE_CD,STYLE_NAME,MCS_COLOR,FA_DATE,QTY,GEN,MCS,FAPLANT"""
+    mcs_cte = ("GC_MCS AS (SELECT style_cd, MAX(mcs_cd) MCS_CD FROM OCI.MSPD_BATCH_PLAN "
+               "WHERE mcs_cd IS NOT NULL GROUP BY style_cd)")
+    filt = (
+        "FILT AS (SELECT FA_WC_CD,STYLE_CD,ITEM_CD,PROD_GROUP_NO,ITEM_CLASS,ITEM_CLASS_TYPE,FA_DATE,PCARD_QTY,FA_PLANT_CD FROM ("
+        "SELECT R.FA_WC_CD,R.STYLE_CD,R.ITEM_CD,R.PROD_GROUP_NO,R.ITEM_CLASS,R.ITEM_CLASS_TYPE,R.FA_DATE,R.PCARD_QTY,R.FA_PLANT_CD,R.SIZE_CD,"
+        "ROW_NUMBER() OVER (PARTITION BY R.PCARD_NAME,R.ITEM_CLASS,R.SIZE_CD ORDER BY R.ROUTING_SEQ DESC NULLS LAST) rn "
+        "FROM OCI.MSPD_PCARD_RESULT R "
+        f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD='{PLANT}' "
+        "AND R.PROD_MOVE_TYPE='PROD' AND R.PROD_DATE='19991231' "
+        "AND R.ITEM_CLASS_TYPE IN ('II','IP') AND R.FA_PLANT_CD IN ('3110','3210') "
+        f"AND {_closing_pred(loose)}"
+        ") WHERE rn=1)"
+    )
+    return (
+        "WITH " + filt + ", " + _COLOR_CTES + ", " + mcs_cte + " "
+        "SELECT F.ITEM_CLASS,F.FA_WC_CD FA_WC,F.STYLE_CD,S.MODEL_NAME STYLE_NAME," + _COLOR_EXPR + " MCS_COLOR,"
+        "F.FA_DATE,SUM(F.PCARD_QTY) QTY,NVL(S.GENDER,' ') GEN,MX.MCS_CD MCS,"
+        "CASE F.FA_PLANT_CD WHEN '3110' THEN 'JJ' WHEN '3210' THEN 'RJ' ELSE F.FA_PLANT_CD END FAPLANT "
+        "FROM FILT F LEFT JOIN OCI.MSBS_ITEM_STYLE S ON S.STYLE_CD=F.STYLE_CD " + _COLOR_JOINS + " "
+        "LEFT JOIN GC_MCS MX ON MX.style_cd=F.STYLE_CD "
+        "GROUP BY F.ITEM_CLASS,F.FA_WC_CD,F.STYLE_CD,S.MODEL_NAME," + _COLOR_EXPR + ",F.FA_DATE,NVL(S.GENDER,' '),MX.MCS_CD,F.FA_PLANT_CD "
+        "HAVING SUM(F.PCARD_QTY)>0 ORDER BY FAPLANT,FA_WC,STYLE_CD,F.FA_DATE"
+    )
+
+# 공식 번호 → (설명, 함수, ICT, DIV)
+# [원본 item class 범위 검증 2026-07-07] 원본 시트 Item Class 계열 대조 결과 반영:
+#   IP Prod(#7)=II만, IP Outgoing(#8)=II+IP, CMP(#11)=CP, Outgoing PH(#12)=PH+PP, PH in Market(#15)=PH+PP.
 # 튜플: (이름, 함수, ICT, DIV, END_ROUTING). before UV=END_ROUTING 'N'(공정중), after UV/기타='Y'.
 REPORTS = {
     "2":  ("3-1. Balance IP Production",       shortage_bydate_sql, ["II"],       "Production", "Y"),
-    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II"],       "Production", "Y"),
+    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II", "IP"], "Production", "Y"),
     "4":  ("3-2. Balance IP Outgoing by size", shortage_bysize_sql, ["II", "IP"], "Outgoing",   "Y"),
     "7":  ("3-1. Balance CMP",                 shortage_bydate_sql, ["CP"],       "Production", "Y"),
     "8":  ("3-1. Balance Outgoing PH",         shortage_bydate_sql, ["PH", "PP"], "Outgoing",   "Y"),
@@ -129,8 +158,8 @@ REPORTS = {
     "10": ("3-1. Balance PH after UV",         shortage_bydate_sql, ["PH", "PP"], "Production", "Y"),
     "11": ("3-2. Balance PH in Market PH by",  shortage_bysize_sql, ["PH", "PP"], "Production", "Y"),
 }
-# No.5 (3-3. Balance IP Outgoing Market) 의 SQL 은 balance_outgoing_mailer.fetch_sheet /
-# report_only_mcp._sheet_sql 에 있음(동일 엔진, 동(棟)·라인·일자버킷 양식).
+# No.5 (3-3. Balance IP Outgoing Market) 의 SQL 은 이 파일의 outgoing_market_sheet_sql /
+# outgoing_market_dickp_sql / outgoing_market_scan_sql 에 있음(엔진은 core/market_engine.py).
 
 def build(report_no, d_from, d_to, loose=True):
     name, fn, ict, div, er = REPORTS[report_no]
@@ -145,7 +174,7 @@ def scan_daily_sql(dates, plant=PLANT):
     ncols = ",".join(f"SUM(CASE WHEN scan_ymd='{d}' THEN prod_qty ELSE 0 END) N{i+1}" for i, d in enumerate(dates))
     return (
         "WITH SC AS (SELECT s.fa_wc_cd LINE, s.style_cd STYLE, s.scan_ymd, s.prod_qty "
-        f"FROM OCI.POP_PCARD_SCAN s WHERE s.op_cd='PHH' AND NVL(s.cancel_flag,'N')<>'Y' AND s.plant_cd='{plant}' "
+        f"FROM OCI.POP_PCARD_SCAN s WHERE s.op_cd IN ('PHH','PHM') AND NVL(s.cancel_flag,'N')<>'Y' AND s.plant_cd='{plant}' "
         f"AND s.scan_ymd IN ({dlist})) "
         "SELECT sc.LINE, NVL(it.model_name,' ') MODELV, NVL(cc.color,' ') COLORV, sc.STYLE, NVL(cc.mcs,' ') MCS, "
         + ncols + ", SUM(prod_qty) WTOT "
@@ -188,11 +217,35 @@ _OM_COLOR_JOIN = (
     "ROW_NUMBER() OVER (PARTITION BY style_cd ORDER BY CASE WHEN mcs_color_cd='NONE' THEN 1 ELSE 0 END, COUNT(*) DESC) rn "
     "FROM OCI.MSPD_BATCH_PLAN WHERE mcs_color_cd IS NOT NULL GROUP BY style_cd, mcs_color_cd) WHERE rn=1) cc ON cc.style_cd=o.style_cd"
 )
-OM_FAMILIES = {"IP": ["II", "IP"], "PH": ["PH", "PP", "CP"], "OS": ["OS"]}
+OM_FAMILIES = {"IP": ["II", "IP"], "PH": ["PH", "PP"], "OS": ["OS"]}   # No.5(Outgoing Market) 계열 단일 출처 — market_engine.SHEETS 가 이걸 파생(계열 변경은 여기 한 곳만). PH 는 CP 제외(현업).
 
-def outgoing_market_sheet_sql(families, plants, d_from, d_to):
-    """No.5 시트(IP/PH/OS)용 미출고 SQL(loose). 반환 10컬럼: WCG,PLANT_CD,ITEM_CLASS,FA_WC_CD,MODEL,GEN,STYLE_CD,FA_DATE,QTY,COLOR."""
+def outgoing_market_sheet_sql(families, plants, d_from, d_to, strict=False):
+    """No.5 시트(IP/PH/OS)용 미출고 SQL. 반환 10컬럼: WCG,PLANT_CD,ITEM_CLASS,FA_WC_CD,MODEL,GEN,STYLE_CD,FA_DATE,QTY,COLOR.
+    strict=False : OCI 미동기화 임시(느슨한 마감 NOT EXISTS, MOVE 게이트 생략) — 기존 운영값.
+    strict=True  : GMES 정식 P_MSPD90000S_Q_V14 'O'(Outgoing) 로직 — 엄격 CLOSING_YN='N' +
+                   '같은 생산그룹/부품이 다른 창고(BASE_WH)로 나가는 MOVE 실적 존재' EXISTS.
+                   [반영] 현업이 MSPD_PCARD_RESULT 에 PROD 만 적재하던 것을 MOVE 도 적재(2026-07)한 뒤 사용 가능.
+                   MOVE 실적이 없으면 정식 판정이 0건이 되므로, MOVE 적재 확인 후에만 켤 것."""
     F = _inlist(families); P = _inlist(plants)
+    if strict:
+        return (
+            "SELECT NVL(w2.wc_group_cd,' ') wcg, o.plant_cd, o.item_class, o.fa_wc_cd, NVL(i.model_name,' ') model, "
+            "NVL(i.gender,' ') gen, o.style_cd, o.fa_date, SUM(o.out_qty) qty, MAX(cc.mcs_color_cd) color "
+            "FROM (SELECT R.FA_WC_CD, R.ITEM_CLASS, R.FA_DATE, R.STYLE_CD, R.PLANT_CD, R.PLAN_PROD_WC_CD, R.PROD_GROUP_NO, SUM(R.PCARD_QTY) out_qty "
+            "FROM OCI.MSPD_PCARD_RESULT R "
+            f"WHERE R.FA_DATE BETWEEN '{d_from}' AND '{d_to}' AND R.PLANT_CD IN ({P}) AND R.PROD_MOVE_TYPE='PROD' "
+            f"AND R.ITEM_CLASS_TYPE IN ({F}) AND R.END_ROUTING_YN='Y' AND R.OUT_DATE='19991231' "
+            "AND (R.PROD_GROUP_NO,R.PLANT_CD) IN (SELECT PROD_GROUP_NO,PLANT_CD FROM OCI.MSPD_PROD_GROUP WHERE CLOSING_YN='N') "
+            "GROUP BY R.FA_WC_CD,R.ITEM_CLASS,R.FA_DATE,R.STYLE_CD,R.PLANT_CD,R.PLAN_PROD_WC_CD,R.PROD_GROUP_NO HAVING SUM(R.PCARD_QTY)>0) o "
+            "JOIN OCI.MSBS_WORK_CENTER w ON o.plant_cd=w.plant_cd AND o.plan_prod_wc_cd=w.wc_cd "
+            "LEFT JOIN OCI.MSBS_ITEM_STYLE i ON i.style_cd=o.style_cd "
+            "LEFT JOIN OCI.MSBS_WORK_CENTER w2 ON w2.plant_cd=o.plant_cd AND w2.wc_cd=o.fa_wc_cd " + _OM_COLOR_JOIN + " "
+            "WHERE EXISTS (SELECT 1 FROM OCI.MSPD_PCARD_RESULT I "
+            "JOIN OCI.MSBS_WORK_CENTER WC ON I.PLANT_CD=WC.PLANT_CD AND I.PLAN_PROD_WC_CD=WC.WC_CD "
+            "WHERE I.PROD_GROUP_NO=o.PROD_GROUP_NO AND I.ITEM_CLASS=o.ITEM_CLASS "
+            "AND I.PROD_MOVE_TYPE='MOVE' AND I.END_ROUTING_YN='Y' AND WC.BASE_WH_CD<>w.BASE_WH_CD) "
+            "GROUP BY NVL(w2.wc_group_cd,' '), o.plant_cd, o.item_class, o.fa_wc_cd, NVL(i.model_name,' '), NVL(i.gender,' '), o.style_cd, o.fa_date"
+        )
     return (
         "SELECT NVL(w.wc_group_cd,' ') wcg, o.plant_cd, o.item_class, o.fa_wc_cd, NVL(i.model_name,' ') model, "
         "NVL(i.gender,' ') gen, o.style_cd, o.fa_date, SUM(o.out_qty) qty, MAX(cc.mcs_color_cd) color "
@@ -213,6 +266,19 @@ def outgoing_market_scan_sql(plants, d_from, d_to):
         "SELECT plant_cd, fa_wc_cd, style_cd, SUM(prod_qty) q FROM OCI.POP_PCARD_SCAN "
         "WHERE op_cd IN ('BEM','BEP') AND NVL(cancel_flag,'N')<>'Y' "
         f"AND plant_cd IN ({_inlist(plants)}) AND scan_ymd BETWEEN '{d_from}' AND '{d_to}' GROUP BY plant_cd, fa_wc_cd, style_cd"
+    )
+
+def outgoing_market_dickp_sql(plants, d_from, d_to):
+    """No.5 SCAN DI CKP — CKP 출고 스캔(현업 확인: MSPD_PCARD_RESULT 에 존재, SCAN_PSID 미사용).
+    생산 출고 스캔(PROD·OUT_DATE) + MOVE 이동 스캔(MOVE·IN_DATE = 현업이 새로 적재한 분) 합산.
+    반환: PLANT_CD,FA_WC_CD,STYLE_CD,Q  (outgoing_market_scan_sql 과 동일 포맷 → read_scan_map 재사용)."""
+    P = _inlist(plants)
+    return (
+        "SELECT plant_cd, fa_wc_cd, style_cd, SUM(pcard_qty) q FROM OCI.MSPD_PCARD_RESULT "
+        f"WHERE plant_cd IN ({P}) AND result_type='SCAN' AND end_routing_yn='Y' "
+        f"AND ((prod_move_type='PROD' AND out_date BETWEEN '{d_from}' AND '{d_to}') "
+        f"OR (prod_move_type='MOVE' AND in_date BETWEEN '{d_from}' AND '{d_to}')) "
+        "GROUP BY plant_cd, fa_wc_cd, style_cd"
     )
 
 
