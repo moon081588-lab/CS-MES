@@ -17,7 +17,11 @@ import os, sys, csv, datetime, subprocess, configparser
 
 CORE_DIR = os.path.dirname(os.path.abspath(__file__))          # .../ckp_reports/core
 PKG_DIR  = os.path.dirname(CORE_DIR)                           # .../ckp_reports
-ROOT_DIR = os.path.dirname(PKG_DIR)                            # 번들 루트
+ROOT_DIR = os.path.dirname(PKG_DIR)                            # 코드가 놓인 폴더
+
+# 사용자가 보는 최상위 폴더. 코드는 program\ 안에 몰아넣고 지갑·결과만 위로 꺼내
+# 두었기 때문에, 그 경우 한 단계 위가 '사람이 여는 폴더' 다.
+USER_ROOT = os.path.dirname(ROOT_DIR) if os.path.basename(ROOT_DIR).lower() == "program" else ROOT_DIR
 
 def _find_sqlcl():
     """SQLcl 실행파일 탐색. env SQLCL > PATH > 흔한 설치 위치 순.
@@ -72,7 +76,8 @@ def wallet_dir(cfg=None):
     d = cfg.get("db", "wallet_dir", fallback="").strip()
     if _valid_wallet(d):
         return os.path.abspath(d)
-    for c in (os.path.join(ROOT_DIR, "wallet"),
+    for c in (os.path.join(USER_ROOT, "wallet"),                            # 배포본 배치
+              os.path.join(ROOT_DIR, "wallet"),
               os.path.join(ROOT_DIR, "balance_outgoing_mailer", "wallet"),   # 저장소 배치
               os.path.join(PKG_DIR, "wallet")):
         got = find_wallet(c)          # zip 째·하위폴더째 넣어도 찾아낸다

@@ -21,12 +21,16 @@ from core import db, health, market_engine as ME
 from core.context import Ctx
 import reports
 
-OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
+# 결과는 사람이 여는 최상위 폴더에 쌓는다(코드 폴더 안이 아니라).
+_UP1   = os.path.abspath(os.path.join(HERE, ".."))
+_TOP   = os.path.dirname(_UP1) if os.path.basename(_UP1).lower() == "program" else _UP1
+OUTDIR = os.path.join(_TOP, "report", "CKP_official")
 SQLDIR = os.path.join(HERE, "sql")
 DEFAULT_SRC = os.environ.get("CKP_SRC", "")
 _SRC_CANDIDATES = [
-    os.path.join(HERE, "..", "CKP Manual Report (종합).xlsx"),
-    os.path.join(HERE, "..", "report", "CKP Manual Report (종합).xlsx"),
+    os.path.join(_UP1, "CKP Manual Report (종합).xlsx"),
+    os.path.join(_TOP, "CKP Manual Report (종합).xlsx"),
+    os.path.join(_TOP, "report", "CKP Manual Report (종합).xlsx"),
 ]
 
 
@@ -37,7 +41,7 @@ def _find_src():
     # 파일명이 깨져 전달되는 일이 실제로 있었다(압축 해제 시 한글 손상).
     # 이름이 정확하지 않아도 같은 자리에 있으면 찾아 쓴다.
     import glob
-    for d in (os.path.join(HERE, ".."), os.path.join(HERE, "..", "report")):
+    for d in (_UP1, _TOP, os.path.join(_TOP, "report")):
         for c in sorted(glob.glob(os.path.join(d, "CKP Manual Report*.xlsx"))):
             if not os.path.basename(c).startswith("~$"):
                 return c

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Claude 데스크톱에 이 폴더를 연결한다 — connect_claude.bat 이 호출한다.
+"""Claude 데스크톱에 이 폴더를 연결한다 — CKP.bat 의 4 번이 호출한다.
 
 왜 필요한가.
   스킬(SKILL.md)만 올려서는 Claude 가 리포트를 못 만든다. 스킬은 '어떻게 시킬지'만
@@ -49,7 +49,7 @@ def main():
     if not os.path.isdir(os.path.dirname(cfgp)):
         print(" ❌ Claude 데스크톱이 설치돼 있지 않은 것 같습니다.")
         print("    Claude 를 먼저 설치·실행한 뒤 다시 돌려 주세요.")
-        print("    (Claude 없이 run.bat 만 써도 리포트는 똑같이 나옵니다.)")
+        print("    (Claude 없이 CKP.bat 의 1 번만 써도 리포트는 똑같이 나옵니다.)")
         return 1
 
     data = {}

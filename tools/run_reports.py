@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""리포트 11종 생성 — run.bat 이 호출한다.
+"""리포트 11종 생성 — CKP.bat 의 1 번이 호출한다.
 
 날짜를 인자로 주지 않으면 물어본다(그냥 Enter 치면 오늘).
 실제 생성은 ckp_reports/run_all.py 가 한다. 이 파일은 안내와 오류 해설만 맡는다.
@@ -11,9 +11,10 @@ for _s in (sys.stdout, sys.stderr):
     try: _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception: pass
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # program\
+TOP  = os.path.dirname(ROOT) if os.path.basename(ROOT).lower() == "program" else ROOT
 PKG  = os.path.join(ROOT, "ckp_reports")
-OUT  = os.path.join(ROOT, "report", "CKP_official")
+OUT  = os.path.join(TOP,  "report", "CKP_official")
 
 def line(c="="): print(c * 62)
 
@@ -41,7 +42,7 @@ def main():
 
     env = dict(os.environ)
     env["PYTHONUTF8"] = "1"; env["PYTHONIOENCODING"] = "utf-8"
-    wallet = os.path.join(ROOT, "wallet")
+    wallet = os.path.join(TOP, "wallet")
     if os.path.isfile(os.path.join(wallet, "tnsnames.ora")):
         env.setdefault("TNS_ADMIN", wallet)
 
@@ -70,10 +71,10 @@ def main():
         print(" 실패 — 위 메시지를 확인하세요.")
         line()
         print(" 자주 나오는 원인")
-        print("   · 접속 수단 없음      → setup.bat 을 실행해 어떤 경로로 붙는지 확인하세요.")
+        print("   · 접속 수단 없음      → CKP.bat 의 2 번을 실행해 어떤 경로로 붙는지 확인하세요.")
         print("   · ORA-12154 / 28759   → 지갑 파일이 wallet 폴더에 다 들어있는지 확인하세요.")
         print("   · ORA-01017           → DB 계정/비밀번호가 틀렸습니다 (config.ini).")
-        print("   · 지갑 비밀번호 요구   → config.ini [db] wallet_password 를 채우세요.")
+        print("   · 지갑 비밀번호 요구   → CKP.bat 의 2 번에서 지갑 비밀번호를 입력하세요.")
         print("   · 폴더 경로에 한글/공백 → C:\\CKP-Report 처럼 영문 경로로 옮기세요.")
     print()
 

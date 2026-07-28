@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""CKP 리포트 폴더 준비 — setup.bat 이 호출한다.
+"""CKP 리포트 폴더 준비 — CKP.bat 의 2 번이 호출한다.
 
 이 파일 하나로 '새 PC 에 처음 까는 일' 이 끝나야 한다. 그래서 순서가 이렇다.
   경로 점검 → 라이브러리(오프라인) → 지갑 찾기 → 계정·비밀번호 입력 → 실제 접속 시험
@@ -14,10 +14,11 @@ for _s in (sys.stdout, sys.stderr):
     try: _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception: pass
 
-ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # program\
+TOP    = os.path.dirname(ROOT) if os.path.basename(ROOT).lower() == "program" else ROOT
 PKG    = os.path.join(ROOT, "ckp_reports")
 VENDOR = os.path.join(ROOT, "vendor")
-WALLET = os.path.join(ROOT, "wallet")
+WALLET = os.path.join(TOP,  "wallet")      # 지갑은 사람이 여는 최상위 폴더에 둔다
 CFG    = os.path.join(PKG, "config.ini")
 sys.path.insert(0, PKG)
 
@@ -35,17 +36,17 @@ def ask(prompt, default="", secret=False):
 
 def main():
     head("CKP 리포트 폴더 준비")
-    print(f" 위치   : {ROOT}")
+    print(f" 위치   : {TOP}")
     print(f" 파이썬 : {sys.version.split()[0]}  ({sys.executable})")
 
     # ---------------------------------------------------------- 1) 경로
     head("[1/5] 폴더 위치")
     bad = []
-    if " " in ROOT: bad.append("공백")
-    if any(ord(c) > 127 for c in ROOT): bad.append("한글 등 비ASCII")
-    if "OneDrive" in ROOT or "Google Drive" in ROOT: bad.append("클라우드 동기화 폴더")
+    if " " in TOP: bad.append("공백")
+    if any(ord(c) > 127 for c in TOP): bad.append("한글 등 비ASCII")
+    if "OneDrive" in TOP or "Google Drive" in TOP: bad.append("클라우드 동기화 폴더")
     if bad:
-        print(f"  ⚠ 경로에 {' / '.join(bad)} 가 있습니다 → {ROOT}")
+        print(f"  ⚠ 경로에 {' / '.join(bad)} 가 있습니다 → {TOP}")
         print("    지갑을 읽을 때 문제가 생깁니다. C:\\CKP-Report 로 옮기고 다시 실행하세요.")
     else:
         print("  OK")
@@ -133,7 +134,7 @@ def main():
             db.save_cfg({"user": user, "password": pw, "wallet_password": wpw, "backend": "auto"})
             print(f"  저장했습니다 → {CFG}")
         else:
-            print("  건너뛰었습니다. 나중에 setup.bat 을 다시 실행하면 됩니다.")
+            print("  건너뛰었습니다. 나중에 CKP.bat 의 2 번을 다시 실행하면 됩니다.")
 
     # ---------------------------------------------------------- 5) 접속 시험
     head("[5/5] 실제 접속 시험")
@@ -162,9 +163,10 @@ def main():
             print(f"     {str(e)[:700]}")
 
     head("준비 끝")
-    print("  · 리포트를 만들려면          run.bat")
-    print("  · DB 만 빠르게 점검하려면    check.bat")
-    print("  · Claude 스킬로 쓰려면       connect_claude.bat 을 한 번 실행하고 Claude 재시작")
+    print("  CKP.bat 을 다시 실행해서")
+    print("    1 번 → 리포트 11개 만들기")
+    print("    3 번 → DB 연결만 점검")
+    print("    4 번 → Claude 에 연결 (그 뒤 Claude 완전 종료 후 재시작)")
     print()
 
 if __name__ == "__main__":

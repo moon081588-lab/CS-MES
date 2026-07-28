@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""DB 접속 점검 — check.bat 이 호출한다. 리포트를 만들지 않고 연결만 확인한다.
+"""DB 접속 점검 — CKP.bat 의 3 번이 호출한다. 리포트를 만들지 않고 연결만 확인한다.
 
 수시로 돌려도 되도록 가볍게(질의 3개) 만들었다. 리포트가 이상할 때
 'DB 문제인가 코드 문제인가' 를 먼저 가르는 용도.
@@ -39,7 +39,7 @@ def main():
         from core import db
     except Exception as e:
         print(f" ❌ 코드를 불러오지 못했습니다: {e}")
-        print("    setup.bat 을 먼저 실행하세요."); return 1
+        print("    CKP.bat 의 2 번(처음 설정)을 먼저 실행하세요."); return 1
 
     cfg = db.load_cfg()
     backend, why = db.choose_backend(cfg)
@@ -88,7 +88,7 @@ def main():
         print()
         print(" 참고 — SQLcl 을 못 찾는다는 메시지면, config.ini [db] 에")
         print("        user / password / wallet_password 를 채우면 SQLcl 없이 접속합니다.")
-        print("        (setup.bat 을 다시 실행하면 물어봅니다)")
+        print("        (CKP.bat 의 2 번을 다시 실행하면 물어봅니다)")
         return 1
     took = (datetime.datetime.now() - t0).total_seconds()
 
