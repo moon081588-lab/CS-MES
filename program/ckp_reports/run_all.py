@@ -61,7 +61,8 @@ def _parse_ids(only):
 
 def run(date, only="", conn="changshinincaipoc", mode="sqlcl", src="", reqdate=""):
     _cfgp = os.path.join(HERE, "config.ini")
-    date = date or health.site_today(cfg_path=_cfgp).isoformat()   # 실행 PC 가 아니라 한국시간 기준
+    print(health.clock_line(cfg_path=_cfgp))   # 어느 시계로 날짜를 정했는지 먼저 밝힌다
+    date = date or health.site_today(cfg_path=_cfgp).isoformat()
     reqdate = reqdate or health.site_today(cfg_path=_cfgp).isoformat()
     outdir = os.path.join(OUTDIR, f"기준{date}_요청{reqdate}")   # 기준날짜_요청날짜 하위폴더 → CKP_official/기준YYYY-MM-DD_요청YYYY-MM-DD/
     os.makedirs(outdir, exist_ok=True)
