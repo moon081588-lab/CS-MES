@@ -1,0 +1,4 @@
+# .bat 은 반드시 CRLF 로 유지한다 — LF 면 cmd.exe 파서가 깨진다(2026-07-28 현장 확인)
+*.bat text eol=crlf
+*.sh  text eol=lf
+*.py  text eol=lf
