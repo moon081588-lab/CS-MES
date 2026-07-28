@@ -78,7 +78,7 @@ program/       프로그램 본체
   CKP Manual Report (종합).xlsx   서식·항목의 원본 수기 리포트
   사용법.txt
 skill/         Claude skill 원본 (v12.7)
-docs/          설계 · 조사 문서
+docs/          리포트별 DB 다이어그램 (테이블 · 조인 · 필터, 2026-07-21)
 report/        결과 엑셀 (커밋 안 함)
 ```
 
