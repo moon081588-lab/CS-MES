@@ -90,7 +90,7 @@ def main():
     line("-")
     print(" 다음 순서")
     print("   1) Claude 를 완전히 종료했다가 다시 켜세요 (창만 닫으면 안 됩니다).")
-    print("   2) 스킬 파일(CKP-skills-v12.6.skill)을 Claude 에 올리세요.")
+    print("   2) 스킬 파일(CKP-skills-v12.7.skill)을 Claude 에 올리세요.")
     print('   3) 채팅창에 "레포트 11개 작성해줘" 라고 치면 됩니다.')
     print()
     print(" ※ 이 폴더를 다른 곳으로 옮기면 이 파일을 옮긴 자리에서 한 번 더 실행하세요.")

@@ -18,8 +18,15 @@ OCI 재현. 색상은 MSPD_BATCH_PLAN BOM 인라인(EXACT + STYLE fallback).
   loose=False : (PROD_GROUP_NO,PLANT_CD) IN (CLOSING_YN='N') — GMES 정식(동기화 후).
 
 공식 번호 매핑 (완료 7종):
-  No.2  3-1. Balance IP Production        = by-date  ICT(II,IP)  DIV=Production
-  No.3  3-2. Balance IP Prod. by size     = by-size  ICT(II,IP)  DIV=Production
+  No.2  3-1. Balance IP Production        = by-date  ICT(II)     DIV=Production
+  No.3  3-2. Balance IP Prod. by size     = by-size  ICT(II)     DIV=Production
+        ↑ 2026-07-28 확정. 원본 수기 리포트("CKP Manual Report (종합).xlsx" 의
+          '3-2. Balance IP Prod. by size' 시트, 기준 2026-04-20)의 Item Class 열이
+          II01/02/03/04/05/91/92/93 여덟 종뿐이고 IP 는 257행 중 0행이었다.
+          같은 워크북의 No.4 시트는 반대로 IP01~05 가 대부분이다. 즉 비대칭은 실재한다.
+          DB 확인: ITEM_CLASS_TYPE = SUBSTR(ITEM_CLASS,1,2) 로 불일치 0건이므로
+          시트의 II* 표기는 곧 ITEM_CLASS_TYPE='II' 를 뜻한다.
+          그 전까지 코드는 II+IP 였다 — 2026-07-13 기준으로 G-Total 4,529 → 2,971 로 줄어든다.
   No.4  3-2. Balance IP Outgoing by size  = by-size  ICT(II,IP)  DIV=Outgoing
   No.5  3-3. Balance IP Outgoing Market   = outgoing_market_sheet_sql / _dickp_sql / _scan_sql (이 파일)
   No.7  3-1. Balance CMP                  = by-date  ICT(CP)     DIV=Production
@@ -150,7 +157,7 @@ def ip_production_zone_sql(d_from, d_to, loose=True):
 # 튜플: (이름, 함수, ICT, DIV, END_ROUTING). before UV=END_ROUTING 'N'(공정중), after UV/기타='Y'.
 REPORTS = {
     "2":  ("3-1. Balance IP Production",       shortage_bydate_sql, ["II"],       "Production", "Y"),
-    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II", "IP"], "Production", "Y"),
+    "3":  ("3-2. Balance IP Prod. by size",    shortage_bysize_sql, ["II"],       "Production", "Y"),
     "4":  ("3-2. Balance IP Outgoing by size", shortage_bysize_sql, ["II", "IP"], "Outgoing",   "Y"),
     "7":  ("3-1. Balance CMP",                 shortage_bydate_sql, ["CP"],       "Production", "Y"),
     "8":  ("3-1. Balance Outgoing PH",         shortage_bydate_sql, ["PH", "PP"], "Outgoing",   "Y"),

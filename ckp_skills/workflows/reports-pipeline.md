@@ -88,7 +88,16 @@
 
 `Production` 은 `PROD_DATE='19991231'`, `Outgoing` 은 `OUT_DATE='19991231'` 로 미완료를 판정한다.
 
-⚠️ **미확정**: No.3(IP Prod by size)의 품목범위가 코드는 `II+IP` 인데 같은 파일 주석은 "IP Prod=II 만" 이라고 적혀 있다. 원본 수기 리포트와 대조 전까지는 **어느 쪽이 맞다고 단정하지 말 것.**
+**No.3 품목범위 = `II` 만 (2026-07-28 확정).** 원본 수기 리포트 `CKP Manual Report (종합).xlsx` 의 `3-2. Balance IP Prod. by size` 시트(기준 2026-04-20)를 대조한 결과다.
+
+| 시트 | Item Class 열의 실제 값 | 판정 |
+|---|---|---|
+| No.3 (IP Prod. by size) | II01·02·03·04·05·91·92·93 만 **257행 / IP 0행** | `["II"]` |
+| No.4 (IP Outgoing by size) | IP01~05 가 213행, II01 17행 | `["II","IP"]` |
+
+즉 No.3 과 No.4 의 비대칭은 실수가 아니라 **원본 그대로**다. DB 확인 결과 `ITEM_CLASS_TYPE = SUBSTR(ITEM_CLASS,1,2)` 로 불일치 0건이므로, 시트의 `II*` 표기는 그대로 `ITEM_CLASS_TYPE='II'` 를 뜻한다.
+
+그 전까지 코드는 `II+IP` 였다 — 2026-07-13 기준 G-Total 이 4,529 → **2,971** 로 줄어든다. 옛 숫자와 다른 것이 정상이다.
 
 ## 5. 마감(CLOSING) 필터 — 프로그램이 자동으로 고른다
 
