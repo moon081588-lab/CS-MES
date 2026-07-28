@@ -1,4 +1,8 @@
-# .bat 은 반드시 CRLF 로 유지한다 — LF 면 cmd.exe 파서가 깨진다(2026-07-28 현장 확인)
-*.bat text eol=crlf
+# .bat 은 CRLF 로 저장소에 그대로 보관한다(-text = 줄바꿈 정규화 안 함).
+#   · cmd.exe 는 CRLF 를 요구한다. LF 면 파서가 깨져 한글 조각을 명령으로 실행한다
+#     (2026-07-28 현장 확인).
+#   · eol=crlf 는 'git 체크아웃' 에만 적용된다. GitHub 에서 zip 으로 내려받아
+#     현지에 전달하는 경로에서는 적용되지 않으므로, 아예 CRLF 로 저장한다.
+*.bat -text
 *.sh  text eol=lf
 *.py  text eol=lf
