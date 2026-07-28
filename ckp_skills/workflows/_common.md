@@ -44,16 +44,38 @@ SQLcl MCP 도구의 전체 이름은 실행 환경마다 다르다.
 
 ### 0-3. 붙은 직후 검증 — 1회 필수
 
-엉뚱한 DB 에 붙은 채로 20 개 쿼리를 돌리는 사고를 막는다. 접속 성공 직후 **반드시** 한 번 실행한다.
+엉뚱한 DB 에 붙은 채로 20 개 쿼리를 돌리는 사고, 그리고 **며칠 묵은 복제본을 최신인 줄 알고 보고하는 사고**를 막는다. 접속 성공 직후 **반드시** 한 번 실행한다.
 
 ```sql
-SELECT (SELECT COUNT(*) FROM ALL_TABLES WHERE OWNER='OCI') OCI_TABLES,
-       SYSTIMESTAMP DB_NOW
+SELECT (SELECT COUNT(*) FROM ALL_TABLES WHERE OWNER='OCI')            OCI_TABLES,
+       DBTIMEZONE                                                     DB_TZ,
+       TO_CHAR(SYSDATE,'YYYY-MM-DD HH24:MI')                          DB_SYSDATE,
+       TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Jakarta',
+               'YYYY-MM-DD HH24:MI')                                  WIB_NOW,
+       (SELECT MAX(SCAN_YMD) FROM OCI.POP_PCARD_SCAN)                 LAST_SCAN,
+       (SELECT TO_CHAR(MAX(UPDATE_DT),'YYYY-MM-DD HH24:MI')
+          FROM OCI.MSPD_PCARD_RESULT)                                 LAST_SYNC
 FROM DUAL
 ```
 
-- `OCI_TABLES = 0` → **잘못된 DB**. 연결을 바꾼다(0-2 의 다음 후보).
-- `DB_NOW` 의 타임존을 확인한다. 현지(인도네시아 WIB, UTC+7)와 DB 타임존이 다르면 "오늘"의 경계가 어긋난다 — §4-1 참조.
+읽는 법:
+
+| 항목 | 정상 | 이상하면 |
+|---|---|---|
+| `OCI_TABLES` | 40 개 이상 (2026-07 기준 43) | **0 이면 잘못된 DB** — 0-2 의 다음 후보로 |
+| `DB_TZ` | `+00:00` (UTC) | 값이 무엇이든 **현장 시간이 아니다** → §4-1 |
+| `LAST_SCAN` | 어제~오늘 | 며칠 전이면 **복제 지연**. 답변에 반드시 명시 |
+| `LAST_SYNC` | 최근 | `LAST_SCAN` 과 함께 데이터 신선도 판단 |
+
+**복제 지연을 발견하면 그대로 보고한다.** 예: "OCI 복제본의 마지막 스캔은 2026-07-24, 마지막 동기화는 07-25 07:00 입니다. 07-26 이후 데이터는 아직 없습니다." 지연을 모른 채 "최근 3일 실적"을 뽑으면 빈 결과를 실제 0 으로 오해한다.
+
+### 0-3-1. 연결은 끊긴다 — 재접속 규칙
+
+SQLcl MCP 연결은 **유휴 상태에서 끊긴다.** 앞 질문에서 붙었다고 다음 질문에서도 살아 있다고 가정하지 말 것.
+
+- `Connection not established` 또는 `ORA-03113` / `ORA-03114` 가 보이면 → **0-2 로 돌아가 다시 접속**하고, 실패한 쿼리를 재실행한다.
+- 재접속 후 0-3 검증을 **한 번 더** 한다. 다른 연결로 붙었을 수 있다.
+- 한 번 실패했다고 사용자에게 "DB 를 못 씁니다"라고 보고하지 말 것. 재접속은 조용히 처리하고, 두 번 이상 실패할 때만 알린다.
 
 ### 0-4. 지갑(Wallet)·TNS_ADMIN — 현장 1순위 실패 원인
 
@@ -265,16 +287,44 @@ Level 1(그룹) → Level 2(실제 OP_CD) 구조. 아래 표가 진실의 출처
 
 ## 4. 시간 처리
 
-### 4-1. "어제/오늘" 의 기준
+### 4-1. "어제/오늘" 의 기준 — 세 개의 오늘이 서로 다르다
 
-실데이터 최신일 기준. MSPD_PCARD_RESULT 의 최신 FA_DATE 가 며칠 전일 수 있음.
+이 시스템에는 서로 다른 "지금"이 **세 개** 있다. 2026-07-28 실측:
 
-```sql
--- 디폴트: 최신 일자 확인 후 그 기준으로
-SELECT MAX(FA_DATE) FROM OCI.MSPD_PCARD_RESULT;
-```
+| 기준 | 값 | 정체 |
+|---|---|---|
+| `SYSDATE` / `SYSTIMESTAMP` | `2026-07-28 00:19` | **DB 서버 = UTC** (`DBTIMEZONE = +00:00`) |
+| `CURRENT_DATE` | `2026-07-28 09:19` | 세션 타임존 — 접속한 PC 를 따라간다 (여기선 Asia/Seoul) |
+| 현장(CKP, Cikampek) | `2026-07-28 07:19` | **WIB = UTC+7. 공장이 실제로 일하는 시간** |
 
-이후 사용자가 명시적으로 "달력 기준"이라고 하면 `SYSDATE` 사용.
+**함정: `TRUNC(SYSDATE)` 는 현장의 오늘이 아니다.**
+UTC 와 WIB 는 7 시간 차이라, **현장 시각 00:00 ~ 07:00 구간에서는 `TRUNC(SYSDATE)` 가 현장 기준 전일(前日)** 을 가리킨다. 이 구간은 **야간 3 교대가 일하는 시간**이라 정확히 가장 중요한 때에 하루가 밀린다. `CURRENT_DATE` 는 접속 PC 에 따라 값이 달라지므로 더 나쁘다 — 한국에서 붙으면 +9, 현지에서 붙으면 +7 이 된다.
+
+**규칙**
+
+1. 달력 기준 "오늘/어제"가 필요하면 **현장 기준(WIB)** 으로 계산한다. `SYSDATE` 도 `CURRENT_DATE` 도 쓰지 않는다.
+
+   ```sql
+   -- 현장 기준 오늘 / 어제 (YYYYMMDD 문자열)
+   TO_CHAR(TRUNC(SYSTIMESTAMP AT TIME ZONE 'Asia/Jakarta'), 'YYYYMMDD')      -- 오늘
+   TO_CHAR(TRUNC(SYSTIMESTAMP AT TIME ZONE 'Asia/Jakarta') - 1, 'YYYYMMDD')  -- 어제
+   ```
+
+2. **하지만 실무 디폴트는 여전히 "실데이터 최신일"이다.** OCI 는 복제본이라 며칠 밀려 있을 수 있다(0-3 에서 확인). 달력상 오늘로 조회하면 빈 결과가 나오고, 그걸 실제 0 으로 오해하기 쉽다.
+
+   ```sql
+   -- 디폴트: 최신 일자를 먼저 확인하고 그 기준으로 간다
+   SELECT MAX(FA_DATE) FROM OCI.MSPD_PCARD_RESULT;
+   SELECT MAX(SCAN_YMD) FROM OCI.POP_PCARD_SCAN;
+   ```
+
+   ⚠️ `MSPD_PCARD_RESULT.FA_DATE` 에는 **미래 계획일**이 들어 있어 `MAX(FA_DATE)` 가 실적 최신일보다 앞선다. 실적 신선도는 `POP_PCARD_SCAN.MAX(SCAN_YMD)` 나 `MAX(UPDATE_DT)` 로 판단한다.
+
+3. **답변에 어느 기준을 썼는지 반드시 적는다.** 예: "현장(WIB) 기준 2026-07-24 — OCI 복제본의 최신 실적일. 달력상 오늘은 07-28 이나 07-25 이후 데이터는 아직 동기화되지 않았습니다."
+
+4. 사용자가 "달력 기준"이라고 명시하면 1번 식(WIB)을 쓴다. 그래도 데이터가 없으면 2번 사실을 함께 알린다.
+
+**시프트 경계와의 관계**: 야간 시프트(3 교대)의 스캔은 `RESULT_DATE` 가 전일자로 기록될 수 있다(`semantic_models/POP_PCARD_SCAN.yml` 참조). 위 타임존 문제와 겹치면 하루가 두 번 밀릴 수 있으니, 일자별 수치가 이상하면 두 원인을 모두 의심한다.
 
 ### 4-2. 날짜 형식 변환
 
