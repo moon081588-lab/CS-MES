@@ -50,6 +50,8 @@ SQLcl MCP 도구의 전체 이름은 실행 환경마다 다르다.
 SELECT (SELECT COUNT(*) FROM ALL_TABLES WHERE OWNER='OCI')            OCI_TABLES,
        DBTIMEZONE                                                     DB_TZ,
        TO_CHAR(SYSDATE,'YYYY-MM-DD HH24:MI')                          DB_SYSDATE,
+       TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul',
+               'YYYY-MM-DD HH24:MI')                                  KST_NOW,
        TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Jakarta',
                'YYYY-MM-DD HH24:MI')                                  WIB_NOW,
        (SELECT MAX(SCAN_YMD) FROM OCI.POP_PCARD_SCAN)                 LAST_SCAN,
@@ -63,7 +65,7 @@ FROM DUAL
 | 항목 | 정상 | 이상하면 |
 |---|---|---|
 | `OCI_TABLES` | 40 개 이상 (2026-07 기준 43) | **0 이면 잘못된 DB** — 0-2 의 다음 후보로 |
-| `DB_TZ` | `+00:00` (UTC) | 값이 무엇이든 **현장 시간이 아니다** → §4-1 |
+| `DB_TZ` | `+00:00` (UTC) | 기준은 `KST_NOW`. `WIB_NOW` 와 날짜가 다르면 §4-1 의 00~02시 구간 |
 | `LAST_SCAN` | 어제~오늘 | 며칠 전이면 **복제 지연**. 답변에 반드시 명시 |
 | `LAST_SYNC` | 최근 | `LAST_SCAN` 과 함께 데이터 신선도 판단 |
 
@@ -287,44 +289,49 @@ Level 1(그룹) → Level 2(실제 OP_CD) 구조. 아래 표가 진실의 출처
 
 ## 4. 시간 처리
 
-### 4-1. "어제/오늘" 의 기준 — 세 개의 오늘이 서로 다르다
+### 4-1. "어제/오늘" 의 기준 — 한국시간(KST)이 표준, 단 데이터는 현장시간
 
-이 시스템에는 서로 다른 "지금"이 **세 개** 있다. 2026-07-28 실측:
+**기준 타임존은 한국시간 `Asia/Seoul`(KST, UTC+9)** 이다 — 조직 표준. 어느 PC 에서 조회하든 같은 날짜가 나오게 하는 것이 목적이므로, **접속한 PC 의 로컬 날짜를 쓰지 않는다.**
+
+같은 순간에 세 시각이 존재한다 (2026-07-28 실측):
 
 | 기준 | 값 | 정체 |
 |---|---|---|
 | `SYSDATE` / `SYSTIMESTAMP` | `2026-07-28 00:19` | **DB 서버 = UTC** (`DBTIMEZONE = +00:00`) |
-| `CURRENT_DATE` | `2026-07-28 09:19` | 세션 타임존 — 접속한 PC 를 따라간다 (여기선 Asia/Seoul) |
-| 현장(CKP, Cikampek) | `2026-07-28 07:19` | **WIB = UTC+7. 공장이 실제로 일하는 시간** |
-
-**함정: `TRUNC(SYSDATE)` 는 현장의 오늘이 아니다.**
-UTC 와 WIB 는 7 시간 차이라, **현장 시각 00:00 ~ 07:00 구간에서는 `TRUNC(SYSDATE)` 가 현장 기준 전일(前日)** 을 가리킨다. 이 구간은 **야간 3 교대가 일하는 시간**이라 정확히 가장 중요한 때에 하루가 밀린다. `CURRENT_DATE` 는 접속 PC 에 따라 값이 달라지므로 더 나쁘다 — 한국에서 붙으면 +9, 현지에서 붙으면 +7 이 된다.
+| `CURRENT_DATE` | `2026-07-28 09:19` | 세션 타임존 — 접속 PC 를 따라가므로 신뢰 불가 |
+| 한국 (KST) | `2026-07-28 09:19` | **기준 타임존** |
+| 현장 CKP(Cikampek) | `2026-07-28 07:19` | WIB = UTC+7. **DB 날짜 컬럼이 쓰는 시계** |
 
 **규칙**
 
-1. 달력 기준 "오늘/어제"가 필요하면 **현장 기준(WIB)** 으로 계산한다. `SYSDATE` 도 `CURRENT_DATE` 도 쓰지 않는다.
+1. 달력 기준 "오늘/어제"는 **KST** 로 계산한다. `SYSDATE`(UTC) 도 `CURRENT_DATE`(접속 PC) 도 쓰지 않는다.
 
    ```sql
-   -- 현장 기준 오늘 / 어제 (YYYYMMDD 문자열)
-   TO_CHAR(TRUNC(SYSTIMESTAMP AT TIME ZONE 'Asia/Jakarta'), 'YYYYMMDD')      -- 오늘
-   TO_CHAR(TRUNC(SYSTIMESTAMP AT TIME ZONE 'Asia/Jakarta') - 1, 'YYYYMMDD')  -- 어제
+   -- 기준일 (YYYYMMDD 문자열)
+   TO_CHAR(TRUNC(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul'), 'YYYYMMDD')      -- 오늘
+   TO_CHAR(TRUNC(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul') - 1, 'YYYYMMDD')  -- 어제
    ```
 
-2. **하지만 실무 디폴트는 여전히 "실데이터 최신일"이다.** OCI 는 복제본이라 며칠 밀려 있을 수 있다(0-3 에서 확인). 달력상 오늘로 조회하면 빈 결과가 나오고, 그걸 실제 0 으로 오해하기 쉽다.
+2. ⚠️ **알고 쓸 것 — 데이터는 현장(WIB) 시계로 기록된다.** `FA_DATE`·`SCAN_YMD`·`CREATE_DT` 는 전부 공장 벽시계 기준이다. KST 와 WIB 는 **2시간** 차이라, **KST 00:00~01:59 구간에서만** 두 날짜가 어긋난다(그때 현장은 아직 전일 22~23시). 그 시간대의 조회 결과는 하루 밀린 것으로 보일 수 있으니, 해당 구간이면 답변에 그 사실을 적는다. 그 외 22시간은 두 날짜가 같다.
 
    ```sql
-   -- 디폴트: 최신 일자를 먼저 확인하고 그 기준으로 간다
-   SELECT MAX(FA_DATE) FROM OCI.MSPD_PCARD_RESULT;
-   SELECT MAX(SCAN_YMD) FROM OCI.POP_PCARD_SCAN;
+   -- 지금이 그 구간인지 확인
+   SELECT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD HH24:MI') KST_NOW,
+          TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Jakarta','YYYY-MM-DD HH24:MI') WIB_NOW FROM DUAL
    ```
 
-   ⚠️ `MSPD_PCARD_RESULT.FA_DATE` 에는 **미래 계획일**이 들어 있어 `MAX(FA_DATE)` 가 실적 최신일보다 앞선다. 실적 신선도는 `POP_PCARD_SCAN.MAX(SCAN_YMD)` 나 `MAX(UPDATE_DT)` 로 판단한다.
+3. **하지만 실무 디폴트는 여전히 "실데이터 최신일"이다.** OCI 는 복제본이라 며칠 밀려 있을 수 있다(§0-3 에서 확인). 달력상 오늘로 조회하면 빈 결과가 나오고, 그걸 실제 0 으로 오해하기 쉽다.
 
-3. **답변에 어느 기준을 썼는지 반드시 적는다.** 예: "현장(WIB) 기준 2026-07-24 — OCI 복제본의 최신 실적일. 달력상 오늘은 07-28 이나 07-25 이후 데이터는 아직 동기화되지 않았습니다."
+   ```sql
+   SELECT MAX(SCAN_YMD) FROM OCI.POP_PCARD_SCAN;      -- 실적 최신일
+   SELECT MAX(FA_DATE)  FROM OCI.MSPD_PCARD_RESULT;   -- ⚠️ 미래 계획일 포함
+   ```
 
-4. 사용자가 "달력 기준"이라고 명시하면 1번 식(WIB)을 쓴다. 그래도 데이터가 없으면 2번 사실을 함께 알린다.
+   ⚠️ `MSPD_PCARD_RESULT.FA_DATE` 에는 **미래 계획일**이 들어 있어 `MAX(FA_DATE)` 가 실적 최신일보다 앞선다. 신선도 판단은 `POP_PCARD_SCAN.MAX(SCAN_YMD)` 나 `MAX(UPDATE_DT)` 로 한다.
 
-**시프트 경계와의 관계**: 야간 시프트(3 교대)의 스캔은 `RESULT_DATE` 가 전일자로 기록될 수 있다(`semantic_models/POP_PCARD_SCAN.yml` 참조). 위 타임존 문제와 겹치면 하루가 두 번 밀릴 수 있으니, 일자별 수치가 이상하면 두 원인을 모두 의심한다.
+4. **답변에 어느 기준을 썼는지 적는다.** 예: "KST 2026-07-28 기준 조회. 단 OCI 복제본의 최신 실적일은 07-24 라 07-25 이후 데이터는 아직 없습니다."
+
+**시프트 경계와의 관계**: 야간 시프트(3 교대)의 스캔은 `RESULT_DATE` 가 전일자로 기록될 수 있다(`semantic_models/POP_PCARD_SCAN.yml` 참조). 일자별 수치가 이상하면 이 규칙과 위 2번(KST 00~02시)을 모두 의심한다.
 
 ### 4-2. 날짜 형식 변환
 

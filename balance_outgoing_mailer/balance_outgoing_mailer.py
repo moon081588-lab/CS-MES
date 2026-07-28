@@ -123,12 +123,21 @@ def report_dir(cfg):
     return d
 
 def site_today(cfg=None):
-    """현장(공장) 기준 '오늘'. 실행 PC 의 로컬 날짜(datetime.date.today())를 쓰면 안 된다.
+    """리포트 기준 '오늘'. 실행 PC 의 로컬 날짜(datetime.date.today())를 쓰면 안 된다.
 
-    같은 순간에 세 개의 날짜가 존재한다 (2026-07-28 실측):
-      DB(SYSDATE, UTC)  00:19 / 한국 PC(KST)  09:19 / 현장 CKP(WIB, UTC+7)  07:19
-    한국에서 돌리든 현지에서 돌리든 리포트 기준일이 같아야 하므로 현장 타임존으로 계산한다.
-    우선순위: config [report] site_timezone > 환경변수 CSMES_TZ > Asia/Jakarta.
+    **기준 타임존은 한국(Asia/Seoul, KST)이다** — 조직 표준. 어느 PC 에서 돌리든
+    같은 날짜가 나오게 하는 것이 목적이고, 실행 PC 로컬 날짜는 PC 마다 달라 못 쓴다.
+
+    같은 순간에 세 개의 시각이 존재한다 (2026-07-28 실측):
+      DB(SYSDATE, UTC) 00:19 / 한국(KST, UTC+9) 09:19 / 현장 CKP(WIB, UTC+7) 07:19
+
+    ⚠️ 알고 쓸 것: DB 의 날짜 컬럼(FA_DATE·SCAN_YMD·CREATE_DT)은 **현장(WIB) 기준**이다.
+       KST 와 WIB 는 2시간 차라 **KST 00:00~01:59 구간에서만** 두 날짜가 어긋난다
+       (그 시각 현장은 아직 전일 22~23시). 그 구간에 실행하지 말 것.
+       기본 스케줄 08:00 KST(=현장 06:00)는 안전하다.
+
+    우선순위: config [report] site_timezone > 학습된 site_utc_offset_hours >
+              환경변수 CSMES_TZ > Asia/Seoul.
     (Windows 에서 zoneinfo 를 쓰려면 `pip install tzdata` 필요 — 없으면 로컬 날짜로 폴백.)
     """
     tz = ""
@@ -147,7 +156,7 @@ def site_today(cfg=None):
         if off is not None:
             return (datetime.datetime.now(datetime.timezone.utc)
                     + datetime.timedelta(hours=off)).date()
-    tz = tz or os.environ.get("CSMES_TZ", "").strip() or "Asia/Jakarta"
+    tz = tz or os.environ.get("CSMES_TZ", "").strip() or "Asia/Seoul"
     try:
         from zoneinfo import ZoneInfo
         return datetime.datetime.now(ZoneInfo(tz)).date()
@@ -714,6 +723,9 @@ def _runner():
 
 def install_schedule(hour=8, minute=0):
     sysname=platform.system(); prog,arg=_runner(); logp=os.path.join(HERE,"cron.log")
+    if hour in (0, 1):
+        print(f"⚠️ {hour:02d}시는 피하세요. 기준일은 한국시간(KST)인데 DB 날짜 컬럼은 현장(WIB)"
+              f" 기준이라 KST 00:00~01:59 에는 현장이 아직 전일입니다(하루 어긋남).")
     if sysname=="Darwin":
         plist=os.path.expanduser(f"~/Library/LaunchAgents/{SCHED_LABEL}.plist")
         os.makedirs(os.path.dirname(plist),exist_ok=True)
