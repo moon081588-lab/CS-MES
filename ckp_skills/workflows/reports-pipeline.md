@@ -21,19 +21,18 @@
 > **CKP 리포트 11 개는 이 PC 에 프로그램이 설치되어 있어야 만들어집니다.**
 > 지금은 `ckp-reports` 도구가 보이지 않습니다. 아래 순서로 한 번만 설치하면 됩니다.
 >
-> 1. CS-MES 폴더를 **공백·한글이 없는 경로**에 풀어 둡니다. 예: `C:\CS-MES`
+> 1. 받으신 `CKP-Report` 폴더를 **공백·한글이 없는 경로**에 풀어 둡니다. 예: `C:\CKP-Report`
 >    (OneDrive·Google Drive 안은 피하세요. 자바가 지갑 경로를 못 읽습니다 — ORA-17956)
-> 2. OCI 지갑 zip 을 `C:\CS-MES\balance_outgoing_mailer\wallet` 에 풉니다.
-> 3. `C:\CS-MES\install_windows.bat` 을 실행합니다.
->    (파이썬 가상환경·라이브러리·config.ini·Claude 등록까지 한 번에 처리합니다)
-> 4. `config.ini` 의 `[db] password` 를 채웁니다.
+> 2. OCI 지갑 zip 을 그 안의 `wallet\` 폴더에 풉니다(파일 8 개).
+> 3. `setup.bat` 을 한 번 실행합니다. 라이브러리를 폴더 안에서 오프라인으로 설치하고
+>    무엇이 준비됐는지 알려 줍니다.
+> 4. `ckp_reports\config.ini` 의 `[db]` 에 계정을 채웁니다(SQLcl 없이 쓰려면 필요).
 > 5. **Claude Desktop 을 완전히 종료했다가**(트레이 아이콘까지) 다시 켭니다.
 > 6. 다시 "CKP 레포트 11 개 만들어줘" 라고 하시면 됩니다.
 >
-> 설치가 이미 되어 있는데도 도구가 안 보이면, 5 번(완전 종료 후 재시작)을 아직 안 한 경우가
-> 가장 많습니다. 그래도 안 되면 명령프롬프트에서
-> `C:\CS-MES\balance_outgoing_mailer\.venv\Scripts\python.exe C:\CS-MES\balance_outgoing_mailer\setup_env.py --check`
-> 를 실행해 결과를 알려 주세요.
+> 그냥 폴더에서 바로 만들고 싶으면 Claude 없이 **`run.bat` 을 더블클릭**해도 됩니다.
+> 연결만 확인하려면 **`check.bat`** 을 쓰세요.
+> 설치가 되어 있는데도 도구가 안 보이면 5 번(완전 종료 후 재시작)을 안 한 경우가 가장 많습니다.
 
 **DB 분석만 필요한 경우**(부족분이 얼마인지, 라인별로 어떤지 등)는 `ckp-reports` 가 없어도
 `_common.md` §0 의 SQL 경로로 답할 수 있다. 없다고 무조건 멈추지 말고, 사용자가 원한 것이
@@ -43,30 +42,29 @@
 
 ## 1. 사용할 도구
 
-| MCP 서버 | 도구 | 하는 일 |
-|---|---|---|
-| `ckp-reports` | `ckp_make_all(date, wait=False)` | 공식 11 개 엑셀 생성 (백그라운드) |
-| `ckp-reports` | `ckp_status(tail)` | 진행 상황·완료 여부·산출 파일 목록 |
-| `ckp-reports` | `ckp_mail(date)` | 생성된 11 개를 ZIP 첨부로 발송 |
-| `ckp-reports` | `ckp_make_and_mail(date)` | 생성 + 발송 (백그라운드) |
-| `balance-outgoing` | `build_outgoing_report` / `make_demo_report` | BALANCE OUTGOING 단독 리포트 |
+| 도구 | 하는 일 |
+|---|---|
+| `…ckp_make_all(date, reports)` | 공식 11 개 엑셀 생성 (백그라운드). `reports="3,4"` 로 일부만도 가능 |
+| `…ckp_status(date)` | 진행 상황·완료 여부 |
+| `…list_report_dir(date)` | 만들어진 파일 목록과 저장 폴더 |
+| `…tail_ckp_log(date, lines)` | 실패했을 때 로그 끝부분 |
+| `…ckp_reset(date)` | 잡이 꼬였을 때 상태 초기화 |
 
 도구 이름의 접두어는 환경마다 다르다(`mcp__remote-devices__ckp-reports__…` 등). `_common.md` §0-1 과 같이 **접미사로 식별**한다.
 
 ## 2. 반드시 지킬 것 — 생성은 60 초 안에 안 끝난다
 
-`ckp_make_all` 은 **약 100 초** 걸린다. MCP 호출 제한(60 초)을 넘기므로 **백그라운드로 돌고 즉시 반환**한다.
+11 개 생성은 **1~2 분** 걸린다. MCP 호출 제한(60 초)을 넘기므로 **백그라운드로 돌고 즉시 반환**한다.
 
-1. `ckp_make_all(date="YYYY-MM-DD")` 호출 → `▶ ... pid NNNNN` 을 받는다.
-2. 잠시 뒤 `ckp_status()` 로 확인한다.
-3. **완료 판정은 `ckp_status` 의 `✅ 종료됨` 과 로그의 `<<< DONE`** 으로 한다.
-4. 호출이 타임아웃 에러를 반환해도 **실패가 아니다.** 프로세스는 계속 돈다. 다시 실행하지 말고 `ckp_status()` 를 볼 것.
+1. `ckp_make_all(date="YYYY-MM-DD")` 호출 → 시작했다는 응답을 받는다.
+2. 잠시 뒤 `ckp_status(date)` 로 확인한다.
+3. 호출이 타임아웃 에러를 반환해도 **실패가 아니다.** 프로세스는 계속 돈다. 다시 실행하지 말고 `ckp_status` 를 볼 것.
+4. 실패로 보이면 `tail_ckp_log` 로 실제 메시지를 확인한다. 잡이 멈춘 채로 남았으면 `ckp_reset` 후 재시도.
 
 ## 2-1. 다 되면 어디에 있는지 알려준다
 
 산출물은 채팅에 첨부되지 않는다. **사용자 PC 의 폴더**에 저장된다.
-`ckp_status()` 가 알려주는 경로(보통 `<설치폴더>\report\CKP_official\`)와 파일 11 개 목록을
-답변에 적어 준다. 메일로 보내려면 `ckp_mail(date)` 를 쓴다(수신자는 `config.ini [report] recipients`).
+`list_report_dir` 이 알려주는 경로(`report\CKP_official\기준<날짜>_요청<날짜>\`)와 파일 11 개 목록을 답변에 적어 준다.
 
 ## 3. 결과 해석 — 0 행이 곧 버그는 아니다
 
@@ -75,36 +73,30 @@
 - 스타일 행은 나오는데 수량·합계가 0 → 데이터가 그 리포트의 좁은 창 **밖**에 있다.
 - 시트가 헤더만 → 그 창에 해당 `ITEM_CLASS_TYPE` 이 실제로 0 건.
 
+또 **우리가 보는 DB 는 원장의 복사본**이라 최근 며칠이 비어 있는 것이 정상이다. 프로그램이 실행할 때마다 데이터 최신일을 `[health]` 줄로 알려 주므로, 0 행을 보고하기 전에 그 줄을 먼저 본다.
+
 **0 행을 보고하기 전 확인 순서**
-1. 같은 코드로 데이터가 있는 다른 기준일(예: 6 월 초)을 넣어 재현되는지 본다. 재현되면 코드 문제, 아니면 데이터 문제.
-2. 이 skill 로 `FA_DATE` 별 분포를 조회해 데이터가 그 창 안에 있는지 확인한다.
+1. `[health]` 줄의 데이터 최신일이 기준일을 덮는지 본다.
+2. 같은 코드로 데이터가 있는 다른 기준일(예: 6 월 초)을 넣어 재현되는지 본다.
+3. 이 skill 로 `FA_DATE` 별 분포를 조회해 데이터가 그 창 안에 있는지 확인한다.
 
 ## 4. 리포트별 필터의 진실의 출처
 
-공식 11 개의 `ITEM_CLASS_TYPE`·`DIV`·`END_ROUTING` 조합은 **`ckp_reports/balance_sql.py` 의 `REPORTS` 딕셔너리**가 유일한 기준이다. 같은 파일 상단 주석이나 이 문서가 아니라 그 표를 본다.
+공식 11 개의 `ITEM_CLASS_TYPE`·`DIV` 조합은 **`ckp_reports/core/sql.py` 의 `REPORTS` 딕셔너리**가 유일한 기준이다. 이 문서나 파일 상단 주석이 아니라 **그 표를 직접 읽는다.** (주석이 코드와 어긋나 있는 것이 실제로 발견된 적이 있다.)
 
-2026-07-27 현재 값 (원본 수기 시트와 대조 확정):
+**중복 제거 방식(2026-07 변경, 중요)**: 예전에는 `END_ROUTING_YN='Y'` 로 최종 공정을 골랐으나, 실측 결과 비최신 행에도 'Y' 가 351,265 건 있어 유일키로 부적합했다. 지금은 `(PCARD_NAME, ITEM_CLASS, SIZE_CD)` 별 **`ROUTING_SEQ` 최대 1 행**만 남긴다(검증: CP 38,289 → 23,255). 옛 방식으로 계산한 숫자와는 값이 다른 것이 정상이다.
 
-| No. | 리포트 | ITEM_CLASS_TYPE | DIV | END_ROUTING |
-|---|---|---|---|---|
-| 2 | Balance IP Production | II | Production | Y |
-| 3 | Balance IP Prod. by size | II | Production | Y |
-| 4 | Balance IP Outgoing by size | II, IP | Outgoing | Y |
-| 7 | Balance CMP | CP | Production | Y |
-| 8 | Balance Outgoing PH | PH, PP | Outgoing | Y |
-| 9 | Balance PH before UV | PH, PP | Production | **N** |
-| 10 | Balance PH after UV | PH, PP | Production | Y |
-| 11 | Balance PH in Market by size | PH, PP | Production | Y |
+`Production` 은 `PROD_DATE='19991231'`, `Outgoing` 은 `OUT_DATE='19991231'` 로 미완료를 판정한다.
 
-`Production` 은 `PROD_DATE='19991231'` 로, `Outgoing` 은 `OUT_DATE='19991231'` 로 미완료를 판정한다. No.3 이 `II` 만 쓰고 No.4 가 `II+IP` 를 쓰는 것은 **의도된 차이**다.
+⚠️ **미확정**: No.3(IP Prod by size)의 품목범위가 코드는 `II+IP` 인데 같은 파일 주석은 "IP Prod=II 만" 이라고 적혀 있다. 원본 수기 리포트와 대조 전까지는 **어느 쪽이 맞다고 단정하지 말 것.**
 
-## 5. 마감(CLOSING) 필터가 이 skill 과 다르다 — 알고 있을 것
+## 5. 마감(CLOSING) 필터 — 프로그램이 자동으로 고른다
 
 | | 필터 |
 |---|---|
-| 이 skill (`functions/shortage-management.md`) | `CLOSING_YN='N'` 인 그룹만 |
-| CS-MES 프로그램 (현재 운영값) | `NOT EXISTS(CLOSING_YN='Y')` — **loose** |
+| 이 skill (`functions/shortage-management.md`) | `CLOSING_YN='N'` 인 그룹만 (GMES 정식) |
+| CKP 프로그램 | 실행할 때마다 **자동 판정** |
 
-프로그램이 느슨한 쪽을 쓰는 것은 **의도된 임시 조치**다. OCI 쪽 `MSPD_PROD_GROUP` 동기화가 끝나지 않아 엄격 필터로는 0 행이 나오기 때문이다. 동기화 완료 후 프로그램의 `loose=False` 로 전환할 예정.
+프로그램은 매 실행 시 마감 마스터(`MSPD_PROD_GROUP`) 커버리지를 재서, 90% 이상이면 정식(strict), 미만이면 임시(loose = `NOT EXISTS(CLOSING_YN='Y')`)를 고른다. 2026-07-28 기준 커버리지는 **0%**(마스터가 04-27 이후 미동기화)라 loose 로 동작한다. 원장 동기화가 끝나면 설정을 바꾸지 않아도 정식 필터로 넘어간다.
 
-**따라서 이 skill 의 SQL 로 공식 리포트 숫자를 검산하면 값이 다르게 나오는 것이 정상이다.** 검산할 때는 어느 필터를 썼는지 답변에 명시한다.
+**따라서 이 skill 의 SQL 로 공식 리포트 숫자를 검산하면 값이 다르게 나오는 것이 정상이다.** 검산할 때는 어느 필터를 썼는지, 그리고 위 4 장의 중복 제거 방식을 맞췄는지 답변에 명시한다.
