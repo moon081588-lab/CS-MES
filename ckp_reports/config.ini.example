@@ -16,6 +16,14 @@ wallet_dir      =                ; 비우면 balance_outgoing_mailer\wallet 을 
 mode            = auto           ; Instant Client 있으면 thick, 없으면 thin 폴백
 oracle_client_lib =
 sqlcl_conn      = changshinincaipoc
+; --- 사내망이 특이할 때만 건드리세요 ---
+; preflight = auto | off   접속 전에 DB 포트가 열려 있는지 먼저 확인(기본 auto).
+;   방화벽이 막았을 때 1분 매달리는 대신 6초 만에 원인을 알려 줍니다.
+preflight       = auto
+; 프록시를 거쳐야만 바깥으로 나가는 망이면 아래 둘을 채우세요.
+;   채우면 사전 확인은 자동으로 건너뜁니다.
+https_proxy     =
+https_proxy_port =
 
 [report]
 ; 대상 공장 (CKP=3120). 코드에 박지 않고 여기서 정합니다.

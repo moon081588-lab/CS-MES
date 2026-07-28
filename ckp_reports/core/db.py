@@ -75,9 +75,114 @@ def wallet_dir(cfg=None):
     for c in (os.path.join(ROOT_DIR, "wallet"),
               os.path.join(ROOT_DIR, "balance_outgoing_mailer", "wallet"),   # 저장소 배치
               os.path.join(PKG_DIR, "wallet")):
-        if os.path.isfile(os.path.join(c, "tnsnames.ora")):
-            return os.path.abspath(c)
+        got = find_wallet(c)          # zip 째·하위폴더째 넣어도 찾아낸다
+        if got:
+            return got
     return TNS_ADMIN or ""
+
+
+def _unpack_wallet_zip(folder):
+    """wallet\\ 에 zip 을 그대로 넣어두는 일이 잦다. 있으면 그 자리에 풀어 준다."""
+    import glob as _g, zipfile
+    if not os.path.isdir(folder):
+        return
+    for z in sorted(_g.glob(os.path.join(folder, "*.zip"))):
+        try:
+            with zipfile.ZipFile(z) as zf:
+                if any(n.endswith("tnsnames.ora") for n in zf.namelist()):
+                    zf.extractall(folder)
+                    print(f"[db] 지갑 zip 을 풀었습니다: {os.path.basename(z)}")
+                    # 이름을 바꿔 둔다. 안 그러면 실행할 때마다 다시 풀고 같은 줄을 또 찍는다.
+                    try: os.rename(z, z + ".unpacked")
+                    except OSError: pass
+        except Exception:
+            pass
+
+
+def find_wallet(start):
+    """start 아래를 훑어 tnsnames.ora 가 있는 폴더를 찾는다.
+    담당자가 지갑을 하위 폴더째 넣거나(Wallet_XXX\\) zip 째 넣어도 동작하게 한다."""
+    if not start or not os.path.isdir(start):
+        return ""
+    _unpack_wallet_zip(start)
+    if _valid_wallet(start):
+        return os.path.abspath(start)
+    for root, dirs, files in os.walk(start):
+        dirs[:] = [d for d in dirs if not d.startswith(("__", "."))]
+        if "tnsnames.ora" in files:
+            return os.path.abspath(root)
+        if root.count(os.sep) - start.count(os.sep) >= 3:
+            dirs[:] = []
+    return ""
+
+
+def dsn_endpoint(wdir, dsn=""):
+    """tnsnames.ora 에서 (host, port) 를 뽑는다. 방화벽 점검용."""
+    import re
+    p = os.path.join(wdir or "", "tnsnames.ora")
+    if not os.path.isfile(p):
+        return ("", 0)
+    try:
+        txt = open(p, encoding="utf-8", errors="replace").read()
+    except Exception:
+        return ("", 0)
+    block = txt
+    if dsn:
+        m = re.search(re.escape(dsn) + r"\s*=\s*(.+)", txt, re.I)
+        if m:
+            block = m.group(1)
+    h = re.search(r"host\s*=\s*([^\s)]+)", block, re.I)
+    q = re.search(r"port\s*=\s*(\d+)", block, re.I)
+    return (h.group(1) if h else "", int(q.group(1)) if q else 0)
+
+
+def preflight(host, port, timeout=6.0):
+    """DB 포트가 이 PC 에서 열려 있는지 먼저 본다.
+    방화벽/프록시 문제를 '계정이 틀렸다' 로 오해하지 않게 하려는 것."""
+    import socket
+    if not (host and port):
+        return (None, "접속 주소를 tnsnames.ora 에서 찾지 못했습니다")
+    try:
+        s = socket.create_connection((host, port), timeout=timeout)
+        s.close()
+        return (True, f"{host}:{port} 열림")
+    except socket.gaierror as e:
+        return (False, f"주소를 못 찾습니다({host}) — DNS/인터넷 연결 문제: {e}")
+    except Exception as e:
+        return (False, f"{host}:{port} 로 연결되지 않습니다 — 사내 방화벽에서 이 포트를 열어야 합니다: {e}")
+
+
+def save_cfg(updates, section="db"):
+    """config.ini 를 주석을 지키면서 갱신한다(키=값 줄만 갈아끼움)."""
+    import re
+    path = os.path.join(PKG_DIR, "config.ini")
+    if not os.path.exists(path):
+        ex = path + ".example"
+        if os.path.exists(ex):
+            import shutil; shutil.copy(ex, path)
+    lines = open(path, encoding="utf-8").read().splitlines(True) if os.path.exists(path) else []
+    cur, left = "", dict(updates)
+    for i, ln in enumerate(lines):
+        st = ln.strip()
+        if st.startswith("[") and st.endswith("]"):
+            cur = st[1:-1].lower(); continue
+        if cur != section.lower() or st.startswith((";", "#")) or "=" not in ln:
+            continue
+        k = ln.split("=", 1)[0].strip()
+        if k in left:
+            v = str(left.pop(k))
+            tail = ""
+            m = re.search(r"\s;.*$", ln.rstrip("\n"))
+            # 값에 ';' 가 들어 있으면(비밀번호에 흔하다) 뒤의 설명 주석을 지운다.
+            # 안 그러면 설정을 읽을 때 주석 시작점을 잘못 잡아 비밀번호가 잘린다.
+            if m and ";" not in v: tail = m.group(0)
+            lines[i] = f"{k:<15} = {v}{tail}\n"
+    if left:
+        lines.append(f"\n[{section}]\n" if not lines else "")
+        for k, v in left.items():
+            lines.append(f"{k:<15} = {v}\n")
+    open(path, "w", encoding="utf-8").write("".join(lines))
+    return path
 
 
 def sync_sqlnet(wdir):
@@ -145,9 +250,32 @@ def _ora_connect(cfg):
     wpw  = cfg.get("db", "wallet_password", fallback="").strip()
     lib  = cfg.get("db", "oracle_client_lib", fallback="").strip() or None
     mode = (cfg.get("db", "mode", fallback="auto") or "auto").strip().lower()
-    base = dict(user=user, password=pw, dsn=dsn)
+    base = dict(user=user, password=pw, dsn=dsn, tcp_connect_timeout=8.0)
     if wdir:
         base["config_dir"] = wdir
+
+    # 사내망이 HTTP 프록시를 통해서만 나가는 곳이 있다. 그때는 직접 TCP 가 막힌 것이
+    # 정상이므로 프록시를 넘겨 주고 사전점검은 건너뛴다.
+    prx  = cfg.get("db", "https_proxy", fallback="").strip()
+    prxp = cfg.get("db", "https_proxy_port", fallback="").strip()
+    if prx:
+        base["https_proxy"] = prx
+        if prxp.isdigit():
+            base["https_proxy_port"] = int(prxp)
+
+    # 포트가 막혀 있으면 여기서 끝낸다. tnsnames.ora 의 retry_count=20·retry_delay=3 때문에
+    # 그냥 두면 1분 넘게 매달린 뒤에야 실패한다 — 현장에서 '멈췄다' 로 보인다.
+    _pf = (cfg.get("db", "preflight", fallback="") or "auto").strip().lower()
+    _h, _p = dsn_endpoint(wdir, dsn)
+    if _h and _pf != "off" and not prx:
+        _ok, _why = preflight(_h, _p, timeout=6.0)
+        if _ok is False:
+            raise RuntimeError(
+                f"DB 포트에 닿지 못했습니다 — {_why}\n"
+                f"[원인] 사내 방화벽/프록시에서 '{_h} {_p} 아웃바운드' 를 열어야 합니다.\n"
+                f"       (계정·지갑 문제가 아닙니다. 네트워크를 먼저 푸세요.)\n"
+                f"       프록시를 거쳐야만 나가는 망이면 config.ini [db] 에\n"
+                f"       https_proxy / https_proxy_port 를 적으면 그쪽으로 붙습니다.")
 
     def _thick():
         try:
@@ -169,15 +297,40 @@ def _ora_connect(cfg):
                     "  (지갑의 ewallet.pem 이 암호화되어 있어 드라이버가 열 수 없습니다)")
         return oracledb.connect(**kw)
 
-    order = {"thick": [_thick], "thin": [_thin]}.get(mode, [_thick, _thin])
+    # auto 는 thin 우선. 현장 PC 에 Instant Client 가 없는 것이 기본값이고,
+    # thick 을 먼저 때리면 실패를 기다리는 시간만 늘어난다.
+    order = {"thick": [_thick], "thin": [_thin]}.get(mode, [_thin, _thick])
     errs = []
     for fn in order:
         try:
             return fn()
         except Exception as e:
             errs.append(f"{fn.__name__.strip('_')}: {str(e)[:200]}")
+    blob = " ".join(errs)
+    host, port = dsn_endpoint(wdir, dsn)
+    hint = classify(blob, wdir, host, port)
     raise RuntimeError("DB 접속 실패\n  · " + "\n  · ".join(errs) +
-                       f"\n  · 지갑 폴더: {wdir or '(없음)'}")
+                       f"\n  · 지갑 폴더: {wdir or '(없음)'}\n\n[원인] " + hint)
+
+
+def classify(blob, wdir="", host="", port=0):
+    """오류 문자열을 보고 네트워크/지갑/비밀번호/계정 중 무엇인지 한 줄로 말해 준다."""
+    b = (blob or "").upper()
+    if "ORA-01017" in b or "INVALID USERNAME" in b:
+        return "DB 계정 또는 비밀번호가 틀렸습니다 → setup.bat 을 다시 돌려 입력하세요."
+    if "DPY-4027" in b or "WALLET_PASSWORD" in b or "지갑 비밀번호" in (blob or ""):
+        return "지갑 비밀번호가 없거나 틀렸습니다 → setup.bat 을 다시 돌려 입력하세요."
+    if "ORA-12154" in b or "DPY-4000" in b or "CANNOT CONNECT" in b:
+        return f"접속 이름을 못 찾습니다. 지갑 폴더에 tnsnames.ora 가 있는지 보세요 → {wdir or '(지갑 없음)'}"
+    if "ORA-28759" in b or "ORA-29024" in b or "SSL" in b or "CERT" in b:
+        return f"지갑 파일을 읽지 못했습니다. wallet 폴더에 8개 파일이 다 있는지 확인하세요 → {wdir or '(없음)'}"
+    if "ORA-17956" in b:
+        return "폴더 경로에 한글·공백이 있습니다 → C:\\CKP-Report 처럼 영문 경로로 옮기세요."
+    if "TIMEOUT" in b or "TIMED OUT" in b or "REFUSED" in b or "DPY-6005" in b or "ORA-12170" in b:
+        ok, why = preflight(host, port)
+        return ("사내 방화벽에서 DB 포트가 막혀 있습니다 — " + why) if ok is False else \
+               "DB 서버 응답이 없습니다. 잠시 후 다시 시도하거나 네트워크를 확인하세요."
+    return "위 메시지를 그대로 담당자에게 보내 주세요."
 
 
 def _ora_batch(items, cfg):

@@ -1,34 +1,31 @@
-report/
-balance_outgoing_mailer/wallet/
-balance_outgoing_mailer/config.ini
-balance_outgoing_mailer/.venv/
-balance_outgoing_mailer/*.log
-balance_outgoing_mailer/BALANCE_OUTGOING_*.xlsx
-**/__pycache__/
-.DS_Store
-**/.DS_Store
 
 # CKP 리포트 데이터(커밋 제외, 코드만 관리)
+# MCP 백그라운드 실행 로그/상태(런타임 산출물)
+# 생성 SQL/CSV(코드에서 재생성)
+# 전달용 임시 묶음
+# 통합 정리(2026-07-28)
+**/.DS_Store
+**/__pycache__/
+*.tgz
+.DS_Store
+_audit/
+_incoming/
+_legacy/
+_to_delete/
+balance_outgoing_mailer/*.log
+balance_outgoing_mailer/.venv/
+balance_outgoing_mailer/BALANCE_OUTGOING_*.xlsx
+balance_outgoing_mailer/config.ini
+balance_outgoing_mailer/wallet/
 ckp_reports/*.csv
 ckp_reports/*.xlsx
-
-# 생성 SQL/CSV(코드에서 재생성)
-ckp_reports/sql/
-
-# MCP 백그라운드 실행 로그/상태(런타임 산출물)
-ckp_reports/last_run.log
+ckp_reports/config.ini
 ckp_reports/last_run.json
-
-# 전달용 임시 묶음
-*.tgz
-_to_delete/
-_audit/
-
-# 통합 정리(2026-07-28)
-_legacy/
-_incoming/
-dist/*.zip
-dist/python/
+ckp_reports/last_run.log
+ckp_reports/sql/
 ckp_reports/sql/*.csv
 ckp_reports/sql/*.sql
-ckp_reports/config.ini
+dist/
+dist/*.zip
+dist/python/
+report/
