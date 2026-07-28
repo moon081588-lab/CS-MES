@@ -49,7 +49,8 @@ from     = balance-outgoing@changshininc.com
 
 [report]
 ; --- 리포트 범위·수신자 ---
-plants          = 3110,3120,3210      ; 포함할 공장 코드 (쉼표구분)
+plant           = 3120                ; CKP 공식 11개 리포트의 대상 공장 (한 개)
+plants          = 3110,3120,3210      ; No.5 Outgoing Market 에 포함할 공장들 (쉼표구분)
 window_before   = 3                    ; D+3 (납기 경과 며칠까지)
 window_after    = 7                    ; D-7 (선행 며칠까지)
 recipients      = name1@changshininc.com, name2@changshininc.com   ; 받는사람 (쉼표구분, 여러 명 가능)

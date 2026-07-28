@@ -11,6 +11,12 @@ report/CKP_official/*.xlsx 를 ZIP으로 묶어 [smtp] 설정으로 발송한다
 import os, sys, ssl, smtplib, zipfile, glob, configparser, datetime
 from email.message import EmailMessage
 
+# Windows 에서 stdout 이 파일/파이프면 ANSI 코드페이지로 인코딩되어 한글·기호 출력이
+# UnicodeEncodeError 로 죽는다. 진입점에서 한 번 UTF-8 로 고정한다.
+for _s in (sys.stdout, sys.stderr):
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 CFG = os.path.join(HERE, "..", "balance_outgoing_mailer", "config.ini")
 OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))

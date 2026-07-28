@@ -19,6 +19,13 @@ import os, sys, ssl, re, smtplib, argparse, configparser, logging, datetime, get
 from email.message import EmailMessage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Windows 에서 stdout 이 파일/파이프면 ANSI 코드페이지로 인코딩되어 한글·기호 출력이
+# UnicodeEncodeError 로 죽는다. 진입점에서 한 번 UTF-8 로 고정한다.
+for _s in (sys.stdout, sys.stderr):
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass
+
 VERSION = "1.1"
 
 def retry(fn, tries=3, delay=5, label="작업"):

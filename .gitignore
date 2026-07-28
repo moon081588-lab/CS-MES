@@ -21,3 +21,5 @@ ckp_reports/last_run.json
 
 # 전달용 임시 묶음
 *.tgz
+_to_delete/
+_audit/

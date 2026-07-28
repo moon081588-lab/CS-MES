@@ -41,7 +41,7 @@ def _settings():
     return cp, plants, before, after
 
 def _today(s):
-    return datetime.datetime.strptime(s, "%Y-%m-%d").date() if s else datetime.date.today()
+    return datetime.datetime.strptime(s, "%Y-%m-%d").date() if s else bo.site_today()
 
 def _inlist(vals):
     return ",".join("'" + v + "'" for v in vals)

@@ -17,6 +17,12 @@
 """
 import os, re, sys, json, shutil, configparser
 
+# Windows 에서 stdout 이 파일/파이프면 ANSI 코드페이지로 인코딩되어 한글·기호 출력이
+# UnicodeEncodeError 로 죽는다. 진입점에서 한 번 UTF-8 로 고정한다.
+for _s in (sys.stdout, sys.stderr):
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass
+
 HERE   = os.path.dirname(os.path.abspath(__file__))          # .../balance_outgoing_mailer
 REPO   = os.path.abspath(os.path.join(HERE, ".."))           # 저장소 루트
 WALLET = os.path.join(HERE, "wallet")
@@ -29,7 +35,7 @@ DEFAULTS = {
                "wallet_dir": "", "wallet_password": "", "mode": "auto",
                "oracle_client_lib": "", "sqlcl_conn": ""},
     "smtp":   {"host": "", "port": "587", "use_tls": "true", "user": "", "password": "", "from": ""},
-    "report": {"plants": "3110,3120,3210", "window_before": "3", "window_after": "7",
+    "report": {"plant": "3120", "plants": "3110,3120,3210", "window_before": "3", "window_after": "7",
                "recipients": "", "output_dir": "", "share_link": "", "site_timezone": "Asia/Jakarta",
                "strict_outgoing": "false", "src_workbook": ""},
 }
@@ -155,6 +161,45 @@ def fix_claude(check=False):
     return changes
 
 
+def init_claude(check=False):
+    """claude_desktop_config.json 에 이 저장소의 MCP 서버를 **새로 등록**한다.
+
+    fix_claude() 는 '이미 있는 항목의 경로를 고치는' 함수라, 항목이 아예 없는 새 PC
+    에서는 아무 일도 하지 않는다. 그런데도 진단이 '최신 ✅' 로 보였다(거짓 초록불).
+    이 함수가 없는 항목을 만들어 준다. 설정 파일 자체가 없으면 새로 만든다.
+    """
+    p = claude_config_path()
+    cfg = {}
+    if os.path.exists(p):
+        try:
+            cfg = json.load(open(p, encoding="utf-8"))
+        except Exception as e:
+            return [f"설정 파일 JSON 파싱 실패 — 손대지 않음 ({e})"]
+    servers = cfg.setdefault("mcpServers", {})
+    vp = venv_python()
+    want = {
+        "ckp-reports":      os.path.join(REPO, "ckp_reports", "ckp_mcp.py"),
+        "balance-outgoing": os.path.join(HERE, "report_only_mcp.py"),
+    }
+    changes = []
+    for name, script in want.items():
+        if not os.path.exists(script):
+            continue
+        entry = {"command": vp, "args": [script], "env": {"TNS_ADMIN": WALLET}}
+        if servers.get(name) != entry:
+            changes.append(f"[{name}] {'경로 갱신' if name in servers else '신규 등록'} -> {script}")
+            if not check:
+                servers[name] = entry
+    if changes and not check:
+        d = os.path.dirname(p)
+        if d: os.makedirs(d, exist_ok=True)
+        if os.path.exists(p):
+            shutil.copy(p, p + ".bak")
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    return changes
+
+
 def diagnose():
     print("=" * 60)
     print(" CS-MES 환경 점검")
@@ -183,14 +228,31 @@ def diagnose():
         except Exception:
             print(f" {mod:11s}: 없음 ❌  → pip install {mod}")
     print(f" sqlnet.ora  : {fix_sqlnet(check=True)}")
+    unreg = init_claude(check=True)
     pending = fix_claude(check=True)
-    print(f" Claude 설정 : {'최신 ✅' if not pending else f'❌ {len(pending)}건 불일치 → --fix-claude 실행'}")
-    for c in pending: print("   " + c.replace("\n", "\n   "))
+    if unreg:
+        print(f" Claude MCP  : ❌ 미등록/경로불일치 {len(unreg)}건 → --init-claude 실행")
+        for c in unreg: print("   " + c)
+    else:
+        print(" Claude MCP  : 등록됨 ✅ (ckp-reports / balance-outgoing)")
+    if pending:
+        print(f" Claude 기타 : ❌ {len(pending)}건 불일치 → --fix-claude 실행")
+        for c in pending: print("   " + c.replace("\n", "\n   "))
     print("=" * 60)
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    if "--init-claude" in args:
+        ch = init_claude()
+        if ch:
+            print("Claude Desktop MCP 등록 (백업: claude_desktop_config.json.bak)")
+            for c in ch: print("  " + c)
+            print("\n→ Claude Desktop 을 완전히 종료(트레이/메뉴막대 아이콘까지)했다가 다시 켜야 반영됩니다.")
+        else:
+            print("Claude Desktop MCP: 이미 등록되어 있습니다 ✅")
+        sys.exit(0)
+
     if "--fix-claude" in args:
         ch = fix_claude()
         if ch:

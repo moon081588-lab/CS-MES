@@ -28,6 +28,12 @@ import balance_sql as BS
 import balance_bydate as BD
 import balance_outgoing_mailer as BO
 
+# Windows 에서 stdout 이 파일/파이프면 ANSI 코드페이지로 인코딩되어 한글·기호 출력이
+# UnicodeEncodeError 로 죽는다. 진입점에서 한 번 UTF-8 로 고정한다.
+for _s in (sys.stdout, sys.stderr):
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass
+
 OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
 SQLDIR = os.path.join(HERE, "sql")
 def _find_sqlcl():
@@ -230,6 +236,9 @@ def main():
     global TNS_ADMIN
     if not TNS_ADMIN: TNS_ADMIN = BO.wallet_dir(cfg) or None      # config 비어 있으면 mailer 폴더의 wallet/ 자동
     if not conn: conn = cfg.get("db", "sqlcl_conn", fallback="").strip()
+    # 공장 코드를 코드에 박아두면 다른 공장·법인 PC 에서 에러 없이 0행 리포트가 나온다.
+    BS.PLANT = (cfg.get("report", "plant", fallback="") or "").strip() or BS.PLANT
+    print(f"[plant] 대상 공장: {BS.PLANT}")
     if not src: src = cfg.get("report", "src_workbook", fallback="").strip() or _find_src()
     if src and not os.path.exists(src):
         print(f"[주의] src_workbook 경로가 존재하지 않습니다 → 후보경로로 대체 시도: {src}")

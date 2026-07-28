@@ -9,6 +9,7 @@
 # ============================================================
 set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8   # 로그 파일로 리다이렉트돼도 UTF-8
 cd "$DIR"
 
 # 1) 가상환경(.venv)
@@ -64,6 +65,12 @@ s=open(p,encoding="utf-8").read()
 s=re.sub(r'DIRECTORY\s*=\s*"[^"]*"', f'DIRECTORY="{wd}"', s)
 open(p,"w",encoding="utf-8").write(s)
 PY
+fi
+
+# 4.5) config.ini 가 없으면 example 을 복사 (값·주석이 있는 유일한 문서)
+if [ ! -f "$DIR/config.ini" ] && [ -f "$DIR/config.ini.example" ]; then
+  cp "$DIR/config.ini.example" "$DIR/config.ini"
+  echo "[setup] config.ini 생성(config.ini.example 복사) — DB/SMTP/수신자를 채우세요: $DIR/config.ini"
 fi
 
 # 5) config.ini 기본값 보강 (기존 SMTP·비밀번호 보존, mode=thick 자동로그인)

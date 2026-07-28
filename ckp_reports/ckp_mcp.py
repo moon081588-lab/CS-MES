@@ -60,11 +60,26 @@ mcp = FastMCP("ckp-reports")
 
 
 # ---------------------------------------------------------------- 공통 실행
+def _child_env():
+    """자식 프로세스는 반드시 UTF-8 로 출력하게 한다.
+
+    Windows 에서 stdout 이 콘솔이 아니라 **파일/파이프**로 가면 Python 은 콘솔
+    코드페이지가 아닌 ANSI 코드페이지(한국 cp949, 인니 cp1252)로 인코딩한다.
+    우리 스크립트는 한글과 ✅/❌/⏳ 를 출력하므로 그 순간 UnicodeEncodeError 로
+    죽는다 — 백그라운드 실행·작업 스케줄러 실행이 바로 이 경우다.
+    (csmes.bat 의 `chcp 65001` 은 콘솔에만 적용되어 이 경로를 못 막는다.)"""
+    e = dict(os.environ)
+    e["PYTHONUTF8"] = "1"
+    e["PYTHONIOENCODING"] = "utf-8"
+    return e
+
+
 def _run(script, date):
     """동기 실행. 짧게 끝나는 작업(메일 등)에만 쓴다."""
     args = [sys.executable, os.path.join(HERE, script)]
     if date: args.append(date)
-    p = subprocess.run(args, capture_output=True, text=True, cwd=HERE)
+    p = subprocess.run(args, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", cwd=HERE, env=_child_env())
     out = p.stdout or ""
     if p.returncode != 0:
         out += "\n[오류]\n" + (p.stderr or "")[-1500:]
@@ -99,7 +114,8 @@ def _start(scripts, date, label):
         kw["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     p = subprocess.Popen([sys.executable, "-u", "-c", runner,
                           json.dumps(scripts), HERE, date or ""],
-                         stdout=logf, stderr=subprocess.STDOUT, cwd=HERE, **kw)
+                         stdout=logf, stderr=subprocess.STDOUT, cwd=HERE,
+                         env=_child_env(), **kw)
     _PROCS[p.pid] = p
     _write_state({"pid": p.pid, "date": date, "label": label,
                   "started": time.time(), "scripts": scripts})
