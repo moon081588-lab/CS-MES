@@ -219,14 +219,50 @@ def _read_scan_map(csvp):
         m[(d.get("PLANT_CD"), d.get("FA_WC_CD"), d.get("STYLE_CD"))] = _int(d.get("Q"))
     return m
 
+def probe_site_offset(cfg, conn):
+    """현장 타임존을 DB 에서 스스로 알아내 config.ini 에 캐시한다.
+
+    POP_PCARD_SCAN.CREATE_DT 는 현장 벽시계로, DB 서버 시계는 UTC 로 돌아간다.
+    둘의 차이가 곧 현장 UTC 오프셋인데, 복제 지연이 섞이면 낮게 나온다.
+    그래서 실행할 때마다 관측해 **더 큰 값일 때만** 올린다(BO.learn_site_offset).
+    [report] site_timezone 을 명시했으면 학습하지 않는다 — 사람이 지정한 값이 우선.
+    """
+    if cfg.get("report", "site_timezone", fallback="").strip():
+        print("[tz] site_timezone 이 지정되어 있어 자동 학습을 건너뜁니다.")
+        return
+    csvp = os.path.join(SQLDIR, "site_tz.csv")
+    try:
+        fetch(BO.SITE_TZ_PROBE_SQL, csvp, conn, "sqlcl")
+        row = next(csv.DictReader(io.StringIO(open(csvp, encoding="utf-8").read())), {})
+        row = {(k or "").strip().upper(): v for k, v in row.items()}
+        diff = float(row.get("DIFF_H"))
+        last = row.get("PLANT_LAST") or "?"
+    except Exception as e:
+        print(f"[tz] 현장 오프셋 측정 건너뜀: {str(e)[:140]}")
+        return
+    cur = None
+    try:
+        v = cfg.get("report", "site_utc_offset_hours", fallback="").strip()
+        cur = float(v) if v else None
+    except Exception:
+        cur = None
+    off, msg = BO.learn_site_offset(diff, cur)
+    print(f"[tz] 현장 최신 스캔 {last} / 관측 {diff:+.2f}시간 → {msg}")
+    if off is not None:
+        BO.save_site_offset(off, os.path.join(BOM_DIR, "config.ini"))
+        if not cfg.has_section("report"): cfg.add_section("report")
+        cfg.set("report", "site_utc_offset_hours", f"{off:g}")
+
+
 def main():
     a=list(sys.argv[1:]); src=DEFAULT_SRC; conn=os.environ.get("CKP_CONN","").strip(); mode="sqlcl"
     if "--src" in a:   i=a.index("--src");   src=a[i+1];  del a[i:i+2]
     if "--conn" in a:  i=a.index("--conn");  conn=a[i+1]; del a[i:i+2]
     if "--plan" in a:  mode="plan";  a.remove("--plan")
     if "--build" in a: mode="build"; a.remove("--build")
-    date = a[0] if a else BO.site_today().isoformat()   # 실행 PC 가 아니라 현장 기준
-    today = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+    tz_only = "--tz-probe" in a
+    if tz_only: a.remove("--tz-probe")
+    date_arg = a[0] if a else ""
     os.makedirs(OUTDIR, exist_ok=True); os.makedirs(SQLDIR, exist_ok=True)
     out = lambda n, name: os.path.join(OUTDIR, f"{n}) {name}.xlsx")
     BUILD = (mode != "plan")
@@ -239,6 +275,16 @@ def main():
     # 공장 코드를 코드에 박아두면 다른 공장·법인 PC 에서 에러 없이 0행 리포트가 나온다.
     BS.PLANT = (cfg.get("report", "plant", fallback="") or "").strip() or BS.PLANT
     print(f"[plant] 대상 공장: {BS.PLANT}")
+    # 기준일을 우리가 정해야 할 때(=날짜 인자 없음)만 DB 에 현장 타임존을 물어본다.
+    # 날짜 인자가 있어도 관측한다 — 학습이 '최댓값 누적'이라 관측이 잦을수록 정확해지고,
+    # MCP 경로는 언제나 날짜를 넘기므로 여기서 막으면 영영 학습하지 못한다.
+    if mode == "sqlcl":
+        probe_site_offset(cfg, conn)
+    if tz_only:
+        print(f"[tz] 현재 기준으로 본 현장 오늘: {BO.site_today(cfg).isoformat()}")
+        return
+    date = date_arg or BO.site_today(cfg).isoformat()   # 실행 PC 가 아니라 현장 기준
+    today = datetime.datetime.strptime(date, "%Y-%m-%d").date()
     if not src: src = cfg.get("report", "src_workbook", fallback="").strip() or _find_src()
     if src and not os.path.exists(src):
         print(f"[주의] src_workbook 경로가 존재하지 않습니다 → 후보경로로 대체 시도: {src}")

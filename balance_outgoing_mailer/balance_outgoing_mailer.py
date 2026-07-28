@@ -141,6 +141,12 @@ def site_today(cfg=None):
             tz = c.get("report", "site_timezone", fallback="").strip()
     except Exception:
         tz = ""
+    if not tz:
+        # 2순위: DB 에서 학습해 캐시해 둔 오프셋(learn_site_offset 이 기록)
+        off = _cfg_get_float(cfg, "report", "site_utc_offset_hours")
+        if off is not None:
+            return (datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(hours=off)).date()
     tz = tz or os.environ.get("CSMES_TZ", "").strip() or "Asia/Jakarta"
     try:
         from zoneinfo import ZoneInfo
@@ -149,6 +155,75 @@ def site_today(cfg=None):
         LOG.warning(f"타임존 {tz} 을 쓸 수 없어 실행 PC 로컬 날짜를 씁니다"
                     f"(Windows 는 pip install tzdata 필요): {e}")
         return datetime.date.today()
+
+
+def _cfg_get_float(cfg, sec, key):
+    try:
+        if cfg is None:
+            cfg = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";",))
+            cfg.read(os.path.join(HERE, "config.ini"), encoding="utf-8")
+        v = cfg.get(sec, key, fallback="").strip()
+        return float(v) if v else None
+    except Exception:
+        return None
+
+
+# --- 현장 타임존 자동 학습 -------------------------------------------------
+# 원리: POP_PCARD_SCAN.CREATE_DT 는 **현장 시각(공장 벽시계)** 으로 기록된다
+#       (SCAN_YMD+SCAN_HMS 와 몇 분 차이. 2026-07-28 실측 확인).
+#       DB 서버 시계는 UTC 다. 따라서 두 시계의 차이가 곧 현장 UTC 오프셋이다.
+# 단, OCI 는 복제본이라 데이터가 밀리면 이 차이에 지연이 섞인다. 그래서
+# **지연이 작을 때만** 신뢰하고, 신뢰할 때만 config 에 적어 둔다(그 뒤로는 캐시 사용).
+SITE_TZ_PROBE_SQL = (
+    "SELECT ROUND((MAX(CREATE_DT) - CAST(SYS_EXTRACT_UTC(SYSTIMESTAMP) AS DATE))*24, 3) DIFF_H, "
+    "TO_CHAR(MAX(CREATE_DT),'YYYY-MM-DD HH24:MI') PLANT_LAST "
+    "FROM OCI.POP_PCARD_SCAN"
+)
+SITE_TZ_MAX_LAG_H = 12.0      # 복제 지연이 이보다 크면 측정값을 버린다
+
+
+def learn_site_offset(diff_h, current=None):
+    """probe 결과로 현장 UTC 오프셋을 갱신한다. **관측 최댓값 누적** 방식.
+
+    왜 최댓값인가:
+      diff_h = (현장시계 최신 스캔) - (UTC 지금) = 오프셋 - 복제지연
+      복제지연은 항상 0 이상이라 diff_h 는 **참 오프셋 이하**로만 나온다.
+      지연을 독립적으로 측정할 방법이 없으므로(복제본에 UTC 기준 적재시각이 없다),
+      한 번의 관측으로 단정하면 지연 3시간일 때 +7 을 +4 로 잘못 배운다.
+      대신 실행할 때마다 관측해 **더 큰 값이 나올 때만** 갱신하면,
+      복제가 한 번이라도 건강할 때 참값에 도달하고 그 뒤로는 내려가지 않는다.
+
+    반환 (저장할 오프셋 또는 None, 사람이 읽을 설명).
+    """
+    if diff_h is None:
+        return None, "probe 결과 없음(스캔 데이터 없음)"
+    off = round(diff_h * 4) / 4                      # 표준시 오프셋은 15분 단위
+    if not (-12.0 <= off <= 14.0):
+        return None, f"측정값 {diff_h:.2f}시간이 정상 범위를 벗어남 — 무시"
+    if current is None:
+        return off, f"현장 UTC 오프셋 {off:+g}시간 학습(첫 관측)"
+    if off > current:
+        return off, f"현장 UTC 오프셋 {current:+g} → {off:+g}시간 상향(더 신선한 관측)"
+    behind = current - diff_h
+    return None, (f"현재값 {current:+g}시간 유지 — 이번 관측은 {off:+g}시간"
+                  f"(복제가 약 {behind:.1f}시간 밀려 낮게 나온 것으로 봄)")
+
+
+def save_site_offset(offset, path=None):
+    """학습한 오프셋을 config.ini [report] site_utc_offset_hours 에 적어 둔다."""
+    path = path or os.path.join(HERE, "config.ini")
+    try:
+        cp = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";",))
+        cp.read(path, encoding="utf-8")
+        if not cp.has_section("report"): cp.add_section("report")
+        cp.set("report", "site_utc_offset_hours", f"{offset:g}")
+        with open(path, "w", encoding="utf-8") as f: cp.write(f)
+        try: os.chmod(path, 0o600)
+        except Exception: pass
+        return True
+    except Exception as e:
+        LOG.warning(f"오프셋 저장 실패(무시하고 진행): {e}")
+        return False
 
 
 def wallet_dir(cfg):
