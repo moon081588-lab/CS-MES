@@ -1,31 +1,25 @@
+# ── 비밀 (절대 커밋 금지) ───────────────────────────────
+**/wallet/
+**/config.ini
 
-# CKP 리포트 데이터(커밋 제외, 코드만 관리)
-# MCP 백그라운드 실행 로그/상태(런타임 산출물)
-# 생성 SQL/CSV(코드에서 재생성)
-# 전달용 임시 묶음
-# 통합 정리(2026-07-28)
-**/.DS_Store
-**/__pycache__/
-*.tgz
-.DS_Store
-_audit/
-_incoming/
+# ── 산출물 · 런타임 ────────────────────────────────────
+report/
+program/ckp_reports/sql/
+program/ckp_reports/*.csv
+program/ckp_reports/*.xlsx
+program/ckp_reports/last_run.*
+program/mailer/BALANCE_OUTGOING_*.xlsx
+*.log
+
+# ── 배포·임시 ──────────────────────────────────────────
+dist/
+vendor/
 _legacy/
 _to_delete/
-balance_outgoing_mailer/*.log
-balance_outgoing_mailer/.venv/
-balance_outgoing_mailer/BALANCE_OUTGOING_*.xlsx
-balance_outgoing_mailer/config.ini
-balance_outgoing_mailer/wallet/
-ckp_reports/*.csv
-ckp_reports/*.xlsx
-ckp_reports/config.ini
-ckp_reports/last_run.json
-ckp_reports/last_run.log
-ckp_reports/sql/
-ckp_reports/sql/*.csv
-ckp_reports/sql/*.sql
-dist/
-dist/*.zip
-dist/python/
-report/
+*.tgz
+
+# ── 잡동사니 ───────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+**/__pycache__/
+**/.venv/
