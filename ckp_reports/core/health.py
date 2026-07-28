@@ -74,12 +74,13 @@ def check(db, cfg, conn, d_from, d_to, plant, sqldir, base_date):
     if last:
         try:
             d = datetime.datetime.strptime(last, "%Y-%m-%d").date()
-            gap = (base_date - d).days
+            gap = (base_date - d).days          # 양수 = 데이터가 기준일에 못 미침
             if gap >= 2:
-                msgs.append(f"[health] 데이터 최신일 {last} (기준일보다 {gap}일 이전). "
-                            f"복사본이라 최근 날짜는 아직 안 들어와 있습니다 — 그 구간이 비면 정상입니다.")
+                msgs.append(f"[health] ⚠ 데이터 최신일 {last} — 기준일({base_date})보다 {gap}일 이전입니다. "
+                            f"복사본이라 최근 날짜는 아직 안 들어와 있습니다. "
+                            f"기준일을 {last} 이전으로 잡으면 데이터가 정상적으로 나옵니다.")
             else:
-                msgs.append(f"[health] 데이터 최신일 {last} — 기준일과 거의 같습니다.")
+                msgs.append(f"[health] 데이터 최신일 {last} — 기준일({base_date})까지 데이터가 들어와 있습니다.")
         except ValueError:
             pass
 

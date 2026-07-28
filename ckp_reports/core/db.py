@@ -40,8 +40,22 @@ def _find_sqlcl():
 
 
 SQLCL = _find_sqlcl()
-# 지갑(TNS_ADMIN)·자바(JAVA_HOME): 환경변수 우선. 없으면 run_all 이 config[db].wallet_dir 로 보완 주입.
-TNS_ADMIN = os.environ.get("TNS_ADMIN") or None
+
+
+def _valid_wallet(d):
+    """지갑 폴더로 쓸 수 있는지. tnsnames.ora 가 실제로 있어야 인정한다."""
+    return bool(d) and os.path.isfile(os.path.join(d, "tnsnames.ora"))
+
+
+# 환경변수 TNS_ADMIN 은 **실제로 존재할 때만** 쓴다.
+# 셸이나 예전 설치에서 남은 경로가 박혀 있으면(폴더 이동·OneDrive 이관 등) 그게 자동탐색을
+# 이겨서 접속이 조용히 실패한다. 2026-07-28 현장에서 정확히 이 일이 일어났다 —
+# TNS_ADMIN 이 사라진 OneDrive 경로를 가리키고 있었다.
+_ENV_TNS = os.environ.get("TNS_ADMIN") or ""
+if _ENV_TNS and not _valid_wallet(_ENV_TNS):
+    print(f"[db] 환경변수 TNS_ADMIN 이 가리키는 곳에 지갑이 없어 무시합니다: {_ENV_TNS}")
+    _ENV_TNS = ""
+TNS_ADMIN = _ENV_TNS or None
 JAVA_HOME = os.environ.get("JAVA_HOME") or None
 
 
@@ -56,7 +70,7 @@ def wallet_dir(cfg=None):
     """지갑 폴더. config 가 비면 번들 안의 wallet/ 을 자동으로 찾는다."""
     cfg = cfg or load_cfg()
     d = cfg.get("db", "wallet_dir", fallback="").strip()
-    if d and os.path.isdir(d):
+    if _valid_wallet(d):
         return os.path.abspath(d)
     for c in (os.path.join(ROOT_DIR, "wallet"),
               os.path.join(ROOT_DIR, "balance_outgoing_mailer", "wallet"),   # 저장소 배치
