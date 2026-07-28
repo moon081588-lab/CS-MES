@@ -51,7 +51,7 @@ def main():
         print("  OK")
 
     # ---------------------------------------------------------- 2) 라이브러리
-    head("[2/5] 라이브러리 (인터넷 불필요)")
+    head("[2/5] 라이브러리")
     # vendor 에 담아 둔 것은 64비트 윈도우 · 파이썬 3.11~3.14 용이다.
     # 여기서 먼저 걸러 주지 않으면 pip 이 뱉는 긴 영어 오류만 보게 된다.
     import struct
@@ -72,18 +72,24 @@ def main():
         except ImportError:
             need.append(name)
     if need:
-        if not whls:
-            print(f"  ❌ vendor 폴더에 설치 파일이 없습니다: {VENDOR}")
+        # vendor/ 가 있으면 인터넷 없이(현장 배포본), 없으면 인터넷으로(GitHub 에서 받은 경우).
+        if whls:
+            print(f"  설치 중: {', '.join(need)}  (vendor/ 의 {len(whls)}개 파일 사용, 인터넷 불필요)")
+            cmd = [sys.executable, "-m", "pip", "install", "--quiet",
+                   "--no-index", f"--find-links={VENDOR}"] + need
         else:
-            print(f"  설치 중: {', '.join(need)}  (vendor/ 의 {len(whls)}개 파일 사용)")
-            r = subprocess.run([sys.executable, "-m", "pip", "install", "--quiet",
-                                "--no-index", f"--find-links={VENDOR}"] + need)
-            if r.returncode == 0:
-                print("  완료")
-            else:
-                print("  ⚠ 설치 실패 — 아래를 직접 실행해 보세요:")
-                print(f'     "{sys.executable}" -m pip install --no-index '
-                      f'--find-links="{VENDOR}" ' + " ".join(need))
+            print(f"  설치 중: {', '.join(need)}  (vendor 폴더가 없어 인터넷에서 받습니다)")
+            cmd = [sys.executable, "-m", "pip", "install", "--quiet"] + need
+        r = subprocess.run(cmd)
+        if r.returncode != 0 and "--no-index" not in cmd:
+            # 회사 PC 는 pip 이 시스템 파이썬을 건드리지 못하게 막혀 있는 경우가 있다.
+            print("  전역 설치가 막혀 있어 사용자 영역으로 다시 시도합니다...")
+            r = subprocess.run(cmd + ["--user"])
+        if r.returncode == 0:
+            print("  완료")
+        else:
+            print("  ⚠ 설치 실패 — 아래를 직접 실행해 보세요:")
+            print("     " + " ".join(f'"{c}"' if " " in c else c for c in cmd))
 
     from core import db   # 위에서 설치한 뒤에 불러야 한다
 
