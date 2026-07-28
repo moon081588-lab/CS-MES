@@ -30,7 +30,7 @@ DEFAULTS = {
                "oracle_client_lib": "", "sqlcl_conn": ""},
     "smtp":   {"host": "", "port": "587", "use_tls": "true", "user": "", "password": "", "from": ""},
     "report": {"plants": "3110,3120,3210", "window_before": "3", "window_after": "7",
-               "recipients": "", "output_dir": "", "share_link": "",
+               "recipients": "", "output_dir": "", "share_link": "", "site_timezone": "Asia/Jakarta",
                "strict_outgoing": "false", "src_workbook": ""},
 }
 

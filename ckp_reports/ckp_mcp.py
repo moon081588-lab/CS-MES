@@ -44,6 +44,17 @@ OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
 LOG   = os.path.join(HERE, "last_run.log")
 STATE = os.path.join(HERE, "last_run.json")
 
+def _today_iso():
+    """현장(공장) 기준 오늘. 실행 PC 의 로컬 날짜가 아니다 — 한국에서 돌리든 현지에서
+    돌리든 같은 날짜가 나와야 한다. 정의는 balance_outgoing_mailer.site_today() 한 곳."""
+    try:
+        sys.path.insert(0, os.path.join(HERE, "..", "balance_outgoing_mailer"))
+        import balance_outgoing_mailer as _BO
+        return _BO.site_today().isoformat()
+    except Exception:
+        return datetime.date.today().isoformat()
+
+
 from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("ckp-reports")
 
@@ -89,6 +100,7 @@ def _start(scripts, date, label):
     p = subprocess.Popen([sys.executable, "-u", "-c", runner,
                           json.dumps(scripts), HERE, date or ""],
                          stdout=logf, stderr=subprocess.STDOUT, cwd=HERE, **kw)
+    _PROCS[p.pid] = p
     _write_state({"pid": p.pid, "date": date, "label": label,
                   "started": time.time(), "scripts": scripts})
     return (f"▶ {label} 시작 (기준일 {date}, pid {p.pid})\n"
@@ -121,17 +133,39 @@ def _finished():
         return False
 
 
+_PROCS = {}          # pid -> Popen (같은 서버 프로세스 안에서만 유효)
+
+
 def _alive(pid):
+    """프로세스 생존 확인.
+
+    ⚠️ Windows 에서 os.kill(pid, 0) 을 쓰면 안 된다 — CPython 은 Windows 에서
+       CTRL_*_EVENT 가 아닌 신호값을 받으면 TerminateProcess() 를 호출하므로,
+       '살아있는지 확인'하려던 호출이 **돌고 있는 리포트 생성을 죽인다.**
+       그래서 순서를 이렇게 둔다: 로그 완료표시 > Popen.poll() > OS 별 조회.
+    """
     if not pid: return False
+    if _finished(): return False                  # 로그가 가장 믿을 만한 근거
+    proc = _PROCS.get(int(pid))
+    if proc is not None:
+        return proc.poll() is None
+    if os.name == "nt":
+        try:
+            out = subprocess.run(["tasklist", "/FI", f"PID eq {int(pid)}", "/NH"],
+                                 capture_output=True, text=True, timeout=5,
+                                 encoding="utf-8", errors="replace").stdout or ""
+            return str(int(pid)) in out
+        except Exception:
+            return False
     try:
-        os.waitpid(int(pid), os.WNOHANG)      # 좀비 수확(자식인 경우)
+        os.waitpid(int(pid), os.WNOHANG)          # 좀비 수확(자식인 경우)
     except Exception:
         pass
     try:
-        os.kill(int(pid), 0)
+        os.kill(int(pid), 0)                      # POSIX 에서만 안전
     except Exception:
         return False
-    return not _finished()
+    return True
 
 
 # ---------------------------------------------------------------- 툴
@@ -142,7 +176,7 @@ def ckp_make_all(date: str = "", wait: bool = False) -> str:
     기본은 백그라운드 실행 후 즉시 반환한다(생성에 70~90초 걸려 MCP 60초 제한을 넘기 때문).
     진행 상황은 ckp_status() 로 확인할 것. wait=True 면 끝까지 기다리지만 타임아웃될 수 있다.
     양식(사이즈·날짜 D-offset 컬럼)은 원본 고정 구조라 데이터가 0행이어도 열이 유지된다."""
-    d = date or datetime.date.today().isoformat()
+    d = date or _today_iso()
     if wait:
         return f"[CKP 11개 생성] {d}\n{_run('make_all.py', d)}\n\n저장 위치: {OUTDIR}"
     return _start(["make_all.py"], d, "CKP 11개 생성")
@@ -188,7 +222,7 @@ def ckp_status(tail: int = 25) -> str:
 def ckp_mail(date: str = "") -> str:
     """생성된 11개 리포트를 ZIP으로 묶어 메일 첨부 발송한다(config.ini [smtp]/[report] 수신자).
     ckp_make_all 로 먼저 생성하고 ckp_status() 가 '종료됨' 인지 확인한 뒤 호출."""
-    d = date or datetime.date.today().isoformat()
+    d = date or _today_iso()
     return f"[CKP 메일 발송] {d}\n{_run('mail_reports.py', d)}"
 
 
@@ -196,7 +230,7 @@ def ckp_mail(date: str = "") -> str:
 def ckp_make_and_mail(date: str = "") -> str:
     """CKP 11개 생성 후 곧바로 메일 첨부 발송까지. 백그라운드로 돌고 즉시 반환하므로
     ckp_status() 로 진행을 확인할 것."""
-    d = date or datetime.date.today().isoformat()
+    d = date or _today_iso()
     return _start(["make_all.py", "mail_reports.py"], d, "CKP 11개 생성 + 메일 발송")
 
 

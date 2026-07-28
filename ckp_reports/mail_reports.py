@@ -6,7 +6,7 @@ CKP Manual Report — 11개 리포트를 메일 첨부(ZIP)로 발송
 report/CKP_official/*.xlsx 를 ZIP으로 묶어 [smtp] 설정으로 발송한다(첨부).
 사용:  python mail_reports.py [YYYY-MM-DD]
 전제:  balance_outgoing_mailer/config.ini 의 [smtp](Gmail 앱비번)·[report] recipients 설정.
-       (Mac 로컬에서 실행 — SMTP 접속 필요. Claude 샌드박스에선 SMTP 차단됨.)
+       사내망/현지 PC 에서 실행 — SMTP 접속이 되는 곳이어야 한다.
 """
 import os, sys, ssl, smtplib, zipfile, glob, configparser, datetime
 from email.message import EmailMessage
@@ -15,8 +15,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CFG = os.path.join(HERE, "..", "balance_outgoing_mailer", "config.ini")
 OUTDIR = os.path.abspath(os.path.join(HERE, "..", "report", "CKP_official"))
 
+def _today_iso():
+    """현장 기준 오늘 (정의는 balance_outgoing_mailer.site_today() 한 곳)."""
+    try:
+        sys.path.insert(0, os.path.join(HERE, "..", "balance_outgoing_mailer"))
+        import balance_outgoing_mailer as _BO
+        return _BO.site_today().isoformat()
+    except Exception:
+        return datetime.date.today().isoformat()
+
+
 def main():
-    date = sys.argv[1] if len(sys.argv) > 1 else datetime.date.today().isoformat()
+    date = sys.argv[1] if len(sys.argv) > 1 else _today_iso()
     cp = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";",))
     cp.read(CFG, encoding="utf-8")
     files = sorted(glob.glob(os.path.join(OUTDIR, "*.xlsx")),

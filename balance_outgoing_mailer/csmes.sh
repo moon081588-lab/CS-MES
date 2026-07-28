@@ -17,10 +17,10 @@ if [ ! -x "$PY" ]; then echo "[setup] 가상환경(.venv) 생성..."; python3 -m
 if [ -x "$PY" ]; then PIPFLAGS=""; else PY="python3"; PIPFLAGS="--break-system-packages --user"; fi
 
 # 2) 라이브러리 (oracledb=SMTP경로 / openpyxl=엑셀 / mcp=Claude Desktop MCP서버)
-if ! "$PY" -c "import oracledb, openpyxl, mcp" 2>/dev/null; then
+if ! "$PY" -c "import oracledb, openpyxl, mcp; from zoneinfo import ZoneInfo; ZoneInfo('Asia/Jakarta')" 2>/dev/null; then
   echo "[setup] 라이브러리 설치 (oracledb, openpyxl, mcp)..."
   "$PY" -m pip install --quiet --upgrade pip $PIPFLAGS 2>/dev/null || true
-  "$PY" -m pip install --quiet $PIPFLAGS oracledb openpyxl mcp
+  "$PY" -m pip install --quiet $PIPFLAGS oracledb openpyxl mcp tzdata
 fi
 
 # 3) Oracle Instant Client (thick 자동로그인) — 없으면 brew 로 설치, lib 경로 탐지

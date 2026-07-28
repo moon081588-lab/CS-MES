@@ -115,6 +115,35 @@ def report_dir(cfg):
     os.makedirs(d,exist_ok=True)
     return d
 
+def site_today(cfg=None):
+    """현장(공장) 기준 '오늘'. 실행 PC 의 로컬 날짜(datetime.date.today())를 쓰면 안 된다.
+
+    같은 순간에 세 개의 날짜가 존재한다 (2026-07-28 실측):
+      DB(SYSDATE, UTC)  00:19 / 한국 PC(KST)  09:19 / 현장 CKP(WIB, UTC+7)  07:19
+    한국에서 돌리든 현지에서 돌리든 리포트 기준일이 같아야 하므로 현장 타임존으로 계산한다.
+    우선순위: config [report] site_timezone > 환경변수 CSMES_TZ > Asia/Jakarta.
+    (Windows 에서 zoneinfo 를 쓰려면 `pip install tzdata` 필요 — 없으면 로컬 날짜로 폴백.)
+    """
+    tz = ""
+    try:
+        if cfg is not None:
+            tz = cfg.get("report", "site_timezone", fallback="").strip()
+        else:
+            c = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";",))
+            c.read(os.path.join(HERE, "config.ini"), encoding="utf-8")
+            tz = c.get("report", "site_timezone", fallback="").strip()
+    except Exception:
+        tz = ""
+    tz = tz or os.environ.get("CSMES_TZ", "").strip() or "Asia/Jakarta"
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.datetime.now(ZoneInfo(tz)).date()
+    except Exception as e:
+        LOG.warning(f"타임존 {tz} 을 쓸 수 없어 실행 PC 로컬 날짜를 씁니다"
+                    f"(Windows 는 pip install tzdata 필요): {e}")
+        return datetime.date.today()
+
+
 def wallet_dir(cfg):
     """월렛 폴더. config 값이 비어 있으면 스크립트와 같은 폴더의 wallet/ 을 쓴다.
     (절대경로를 config 에 박지 않아야 폴더를 옮기거나 다른 PC 로 배포해도 그대로 동작한다.)"""
@@ -697,7 +726,7 @@ def main():
     if a.demo:
         # DB 없이 전 과정 시연: 샘플 데이터 → 실제 양식 엑셀 → 메일 발송
         before=cfg.getint("report","window_before",fallback=3); after=cfg.getint("report","window_after",fallback=7)
-        today=datetime.date.today(); today_str=today.strftime("%Y-%m-%d")
+        today=site_today(cfg); today_str=today.strftime("%Y-%m-%d")
         buckets=build_buckets(today,before,after)
         data=make_demo_data(buckets)
         body="[DEMO 데이터] DB 미연동 상태에서 전체 흐름(리포트 생성→메일 발송)을 시연합니다.\n\n"+build_body_summary(data)
@@ -715,7 +744,7 @@ def main():
         try: today=datetime.datetime.strptime(a.date,"%Y-%m-%d").date()
         except ValueError: sys.exit("[옵션오류] --date 형식은 YYYY-MM-DD")
     else:
-        today=datetime.date.today()
+        today=site_today(cfg)
     today_str=today.strftime("%Y-%m-%d")
     before=cfg.getint("report","window_before",fallback=3); after=cfg.getint("report","window_after",fallback=7)
     plants=[x.strip() for x in cfg.get("report","plants").split(",") if x.strip()]

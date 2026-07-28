@@ -37,14 +37,14 @@ if not exist "%DIR%\.venv\Scripts\python.exe" (
 if exist "%DIR%\.venv\Scripts\python.exe" set "PY=%DIR%\.venv\Scripts\python.exe"
 
 REM ---- 3) 라이브러리 -----------------------------------------
-"%PY%" -c "import oracledb, openpyxl, mcp" >nul 2>&1
+"%PY%" -c "import oracledb, openpyxl, mcp; from zoneinfo import ZoneInfo; ZoneInfo('Asia/Jakarta')" >nul 2>&1
 if errorlevel 1 (
-  echo [setup] 라이브러리 설치 ^(oracledb, openpyxl, mcp^)...
+  echo [setup] 라이브러리 설치 ^(oracledb, openpyxl, mcp, tzdata^)...
   "%PY%" -m pip install --quiet --upgrade pip
-  "%PY%" -m pip install --quiet oracledb openpyxl mcp
+  "%PY%" -m pip install --quiet oracledb openpyxl mcp tzdata
   if errorlevel 1 (
     echo [주의] 라이브러리 설치에 실패했습니다. 사내 프록시/방화벽을 확인하세요.
-    echo        수동 설치:  "%PY%" -m pip install oracledb openpyxl mcp
+    echo        수동 설치:  "%PY%" -m pip install oracledb openpyxl mcp tzdata
   )
 )
 

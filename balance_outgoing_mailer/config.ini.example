@@ -56,6 +56,9 @@ recipients      = name1@changshininc.com, name2@changshininc.com   ; 받는사�
 strict_outgoing = false                ; OCI 동기화 완료 후 true (GMES 정식 미출고 로직)
 
 ; 리포트 저장 폴더. **비우면 스크립트 상위의 report/ 를 자동 사용** (권장)
+; 현장(공장) 타임존. 리포트 기준일을 '실행 PC 의 오늘'이 아니라 이 타임존의 오늘로 잡습니다.
+; 한국에서 돌리든 현지에서 돌리든 같은 날짜가 나오게 하는 값입니다. (Windows 는 pip install tzdata 필요)
+site_timezone   = Asia/Jakarta
 output_dir      =
 ; 메일 본문에 넣을 공유 링크 (첨부 대신 링크로 보낼 때)
 share_link      =

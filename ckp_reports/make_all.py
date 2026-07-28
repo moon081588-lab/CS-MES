@@ -92,8 +92,11 @@ def _sqlcl_env():
 
 def _sqlcl_run(script):
     try:
+        # encoding 을 반드시 지정한다. 지정하지 않으면 Windows 에서 로캘 인코딩(cp949 등)으로
+        # 디코드해 한글 모델명·색상값에서 UnicodeDecodeError 가 나거나 글자가 깨진다.
         return subprocess.run([SQLCL, "-S", "/nolog"], input=script, capture_output=True,
-                              text=True, env=_sqlcl_env(), shell=(os.name == "nt" and SQLCL.lower().endswith((".bat", ".cmd"))))
+                              text=True, encoding="utf-8", errors="replace", env=_sqlcl_env(),
+                              shell=(os.name == "nt" and SQLCL.lower().endswith((".bat", ".cmd"))))
     except FileNotFoundError:
         raise RuntimeError(
             f"SQLcl 실행파일을 찾을 수 없습니다 (시도: {SQLCL}).\n"
@@ -216,7 +219,7 @@ def main():
     if "--conn" in a:  i=a.index("--conn");  conn=a[i+1]; del a[i:i+2]
     if "--plan" in a:  mode="plan";  a.remove("--plan")
     if "--build" in a: mode="build"; a.remove("--build")
-    date = a[0] if a else datetime.date.today().isoformat()
+    date = a[0] if a else BO.site_today().isoformat()   # 실행 PC 가 아니라 현장 기준
     today = datetime.datetime.strptime(date, "%Y-%m-%d").date()
     os.makedirs(OUTDIR, exist_ok=True); os.makedirs(SQLDIR, exist_ok=True)
     out = lambda n, name: os.path.join(OUTDIR, f"{n}) {name}.xlsx")
