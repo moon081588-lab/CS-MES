@@ -13,7 +13,7 @@
 
   폴더를 옮겼다면 옮긴 자리에서 이 파일을 한 번 더 실행하면 된다.
 """
-import os, sys, json, shutil, datetime
+import os, sys, io, json, shutil, datetime
 
 for _s in (sys.stdout, sys.stderr):
     try: _s.reconfigure(encoding="utf-8", errors="replace")
@@ -84,8 +84,72 @@ def pick_python(previous=None):
     return ""
 
 
-def main():
-    line(); print(" Claude 데스크톱 연결"); line()
+def read_config():
+    """(경로, 내용) — 못 읽으면 (경로, None)."""
+    cfgp = config_path()
+    if not os.path.isfile(cfgp):
+        return cfgp, None
+    try:
+        return cfgp, json.load(open(cfgp, encoding="utf-8"))
+    except Exception:
+        return cfgp, None
+
+
+def diagnose():
+    """지금 Claude 설정이 이 폴더를 제대로 가리키는지 본다. 고치지는 않는다.
+    반환: (문제없음?, 사람이 읽는 사유)"""
+    cfgp, data = read_config()
+    if not os.path.isdir(os.path.dirname(cfgp)):
+        return True, "Claude 데스크톱 없음(점검 안 함)"      # Claude 를 안 쓰는 PC 는 정상
+    if data is None:
+        return False, "설정 파일을 읽지 못함"
+    ent = (data.get("mcpServers") or {}).get("ckp-reports")
+    if not ent:
+        return False, "ckp-reports 가 등록돼 있지 않음"
+    args = ent.get("args") or []
+    if not args or os.path.abspath(args[0]) != os.path.abspath(MCP):
+        return False, f"옛 경로를 가리킴 → {args[0] if args else '(없음)'}"
+    if not os.path.isfile(args[0]):
+        return False, f"등록된 파일이 없음 → {args[0]}"
+    if not can_import_mcp(ent.get("command")):
+        return False, f"등록된 파이썬에 mcp 가 없음 → {ent.get('command')}"
+    return True, "정상"
+
+
+def check_and_repair(verbose=False):
+    """어긋나 있으면 조용히 고친다. CKP.bat 을 쓸 때마다 자동으로 불린다.
+    오늘 하루를 통째로 날린 원인(폴더 이동 → 옛 경로 잔존, 파이썬 교체 → mcp 없음)이
+    바로 이 두 가지라, 사람이 눈치채기 전에 프로그램이 먼저 맞춰 놓는다.
+    반환: (고쳤는가, 사유)"""
+    ok, why = diagnose()
+    if ok:
+        if verbose: print(f" [연결] {why}")
+        return False, why
+    print(f" [연결] Claude 설정이 어긋나 있어 고칩니다 — {why}")
+    buf = io.StringIO()
+    try:
+        import contextlib
+        with contextlib.redirect_stdout(buf):
+            rc = main(quiet=True)
+    except Exception as e:
+        print(f" [연결] 자동 복구 실패: {e}")
+        print("        CKP.bat 의 4 번을 직접 실행해 보세요.")
+        return False, why
+    if rc == 0:
+        print(" [연결] 고쳤습니다. Claude 를 완전히 종료했다 다시 켜면 붙습니다.")
+    else:
+        print(" [연결] 자동으로 고치지 못했습니다. 아래를 보세요.")
+        for ln in buf.getvalue().splitlines():
+            if ln.strip().startswith(("❌", "⚠")) or "pip install" in ln:
+                print("        " + ln.strip())
+    return (rc == 0), why
+
+
+def main(quiet=False):
+    if quiet:
+        print(" [연결] Claude 설정이 옛 경로를 가리키고 있어 지금 위치로 고칩니다...")
+    else:
+        line(); print(" Claude 데스크톱 연결"); line()
     print(f" 이 폴더 : {ROOT}")
 
     if not os.path.isfile(MCP):

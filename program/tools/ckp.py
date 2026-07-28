@@ -47,7 +47,20 @@ def choose(argv):
         print("  1 ~ 4 또는 0 중에서 골라 주세요.")
 
 
+def autoheal():
+    """CKP.bat 을 쓸 때마다 Claude 연결이 어긋났는지 보고 조용히 맞춰 놓는다.
+    폴더를 옮기거나 파이썬이 바뀌면 등록이 깨지는데, 그걸 사람이 알아채는 시점은
+    늘 '왜 안 되지' 하고 한참 헤맨 뒤였다. 그래서 여기서 먼저 본다.
+    실패해도 메뉴는 정상 진행한다 — 리포트 생성은 Claude 와 무관하게 되어야 하므로."""
+    try:
+        import register_mcp
+        register_mcp.check_and_repair()
+    except Exception:
+        pass
+
+
 def main():
+    autoheal()
     pick = choose(sys.argv[1:])
     if pick == "0":
         return 0

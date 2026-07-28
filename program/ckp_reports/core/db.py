@@ -13,7 +13,7 @@ CSV 출력 형식은 같다. 리포트 빌더는 무엇으로 조회했는지 �
 접속을 1회로 묶는 이유(원본 주석 유지): 리포트마다 SQLcl(JVM)·지갑 콜드 접속을
 반복하던 구조가 타임아웃 원인이었다. 드라이버 경로도 같은 이유로 접속 1회를 유지한다.
 """
-import os, sys, csv, datetime, subprocess, configparser
+import os, sys, csv, time, datetime, subprocess, configparser
 
 CORE_DIR = os.path.dirname(os.path.abspath(__file__))          # .../ckp_reports/core
 PKG_DIR  = os.path.dirname(CORE_DIR)                           # .../ckp_reports
@@ -456,17 +456,46 @@ def sqlcl_csv(sql, out_csv, conn):
     return len(rows) - 1
 
 
-def run_batch(items, conn):
-    """여러 쿼리를 접속 1회로 실행 → 각 CSV 저장. 경로는 자동 선택."""
+# 한 번 끊겼다고 실패로 끝내지 않는다. OCI Autonomous 는 유휴 상태에서 첫 접속이
+# 끊기거나 느린 일이 흔하고(resume), 사내망도 순간적으로 튄다. 아래 신호는
+# '설정이 틀렸다' 가 아니라 '지금 순간이 안 좋다' 는 뜻이라 다시 시도할 값이 있다.
+_TRANSIENT = ("ORA-03113", "ORA-03114", "ORA-12170", "ORA-12537", "ORA-12547",
+              "DPY-4011", "DPY-6005", "connection not established", "connection reset",
+              "timed out", "timeout", "broken pipe", "eof on communication channel")
+
+
+def _is_transient(err):
+    e = str(err).lower()
+    return any(t.lower() in e for t in _TRANSIENT)
+
+
+def run_batch(items, conn, _tries=3):
+    """여러 쿼리를 접속 1회로 실행 → 각 CSV 저장. 경로는 자동 선택.
+    일시적인 끊김이면 잠깐 쉬었다 스스로 다시 붙는다(최대 3회)."""
     if not items:
         return
     cfg = load_cfg()
     backend, why = choose_backend(cfg)
     print(f"[db] 접속 경로: {backend} — {why}")
-    if backend == "oracledb":
-        _ora_batch(items, cfg)
-    else:
-        _sqlcl_batch(items, conn)
+    last = None
+    for attempt in range(1, _tries + 1):
+        try:
+            if backend == "oracledb":
+                _ora_batch(items, cfg)
+            else:
+                _sqlcl_batch(items, conn)
+            if attempt > 1:
+                print(f"[db] {attempt}번째 시도에서 성공했습니다.")
+            return
+        except Exception as e:
+            last = e
+            if attempt >= _tries or not _is_transient(e):
+                raise
+            wait = 5 * attempt          # 5초 → 10초. DB 가 깨어날 시간을 준다.
+            print(f"[db] 연결이 끊겼습니다({str(e)[:120]}). {wait}초 뒤 다시 시도합니다 "
+                  f"({attempt}/{_tries - 1}회차)")
+            time.sleep(wait)
+    raise last
 
 
 def run_builder(script, *args):
