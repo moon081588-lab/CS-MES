@@ -99,6 +99,42 @@ def pick_python(previous=None):
     return ""
 
 
+def our_wallet():
+    """이 프로그램이 쓰는 지갑 폴더. 없으면 ""."""
+    try:
+        sys.path.insert(0, os.path.join(ROOT, "ckp_reports"))
+        from core import db
+        return db.wallet_dir() or ""
+    except Exception:
+        return ""
+
+
+def fix_sqlcl_tns(servers):
+    """sqlcl 서버의 TNS_ADMIN 이 없는 폴더를 가리키면 우리 지갑 폴더로 고친다.
+
+    이 값은 우리가 만든 게 아니라 사람이 설정 파일에 손으로 적어 넣은 것이라,
+    폴더를 옮기거나 지우면 그대로 남아 조용히 깨진다(2026-07-29 실제로 그랬다).
+    저장된 연결로 붙을 때는 멀쩡해 보여서 한참 뒤에야 드러난다."""
+    ent = servers.get("sqlcl")
+    if not isinstance(ent, dict):
+        return None
+    env = ent.get("env")
+    if not isinstance(env, dict):
+        return None
+    cur = (env.get("TNS_ADMIN") or "").strip()
+    if not cur or os.path.isfile(os.path.join(cur, "tnsnames.ora")):
+        return None                                   # 비었거나 멀쩡하면 그대로 둔다
+    w = our_wallet()
+    if not w:
+        print(f" ⚠ sqlcl 의 TNS_ADMIN 이 없는 폴더를 가리킵니다 → {cur}")
+        print("    (우리 지갑 폴더도 못 찾아 고치지 못했습니다)")
+        return None
+    env["TNS_ADMIN"] = w
+    print(f" 정리     : sqlcl 의 TNS_ADMIN 을 고쳤습니다")
+    print(f"            {cur}  →  {w}")
+    return w
+
+
 def read_config():
     """(경로, 내용) — 못 읽으면 (경로, None)."""
     cfgp = config_path()
@@ -120,6 +156,11 @@ def diagnose():
         return False, "설정 파일을 읽지 못함"
     servers = data.get("mcpServers") or {}
     bad = [f"{n}: 안 쓰는 서버가 남아 있음" for n in RETIRED if n in servers]
+    _sq = servers.get("sqlcl")
+    if isinstance(_sq, dict) and isinstance(_sq.get("env"), dict):
+        _t = (_sq["env"].get("TNS_ADMIN") or "").strip()
+        if _t and not os.path.isfile(os.path.join(_t, "tnsnames.ora")):
+            bad.append(f"sqlcl: TNS_ADMIN 이 없는 폴더 → {_t}")
     for name, script in SERVERS:
         if not os.path.isfile(script):
             continue                                    # 이 폴더에 없는 기능은 등록 대상이 아니다
@@ -197,11 +238,12 @@ def main(quiet=False):
             pass
 
     servers = data.setdefault("mcpServers", {})
-    before = json.dumps([servers.get(n) for n, _ in SERVERS] + [servers.get(n) for n in RETIRED],
-                        ensure_ascii=False)
+    before = json.dumps([servers.get(n) for n, _ in SERVERS] + [servers.get(n) for n in RETIRED]
+                        + [servers.get("sqlcl")], ensure_ascii=False)
     for name in RETIRED:
         if servers.pop(name, None) is not None:
             print(f" 정리     : {name} 등록을 지웠습니다(더 이상 쓰지 않는 기능)")
+    fixed_tns = fix_sqlcl_tns(servers)
 
     py = pick_python((servers.get("ckp-reports") or {}).get("command"))
     if not py:
@@ -225,8 +267,8 @@ def main(quiet=False):
             "env": {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
         }
         wrote.append((name, script))
-    after = json.dumps([servers.get(n) for n, _ in SERVERS] + [servers.get(n) for n in RETIRED],
-                       ensure_ascii=False)
+    after = json.dumps([servers.get(n) for n, _ in SERVERS] + [servers.get(n) for n in RETIRED]
+                       + [servers.get("sqlcl")], ensure_ascii=False)
 
     os.makedirs(os.path.dirname(cfgp), exist_ok=True)
     with open(cfgp, "w", encoding="utf-8") as f:
