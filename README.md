@@ -4,6 +4,14 @@
 (OCI Autonomous) 에서 그대로 뽑아 엑셀로 만드는 프로그램입니다.
 같은 일을 Claude 채팅으로 시킬 수 있는 skill 도 함께 들어 있습니다.
 
+> ### 현장 PC 에 설치할 파일은 여기 하나입니다
+> **[Releases → Latest](https://github.com/moon081588-lab/CS-MES/releases/latest)** 의
+> `CKP-현장배포_v<날짜>.zip`
+>
+> 프로그램 + 오프라인 설치용 라이브러리 + Claude skill + 설치순서가 한 파일에 들어 있습니다.
+> 메신저나 메일로 돌아다니는 zip 은 옛날 것일 수 있으니 쓰지 마세요.
+> 이 저장소를 clone 하는 것은 **코드를 고칠 때**만입니다.
+
 ---
 
 ## 빠른 시작
@@ -122,14 +130,21 @@ Claude 를 쓰지 않아도 `CKP.bat` 1 번만으로 리포트는 똑같이 나�
 
 ## 배포 경로 두 가지
 
-| | 이 저장소 | 배포 zip (`CKP-현장배포.zip`) |
+| | 이 저장소 (clone) | 배포 zip (Releases) |
 |---|---|---|
+| 받는 곳 | `git clone` | [Releases → Latest](https://github.com/moon081588-lab/CS-MES/releases/latest) |
 | 라이브러리 | 인터넷에서 받음 | `vendor/` 동봉 — **인터넷 불필요** |
-| skill | `skill/` 폴더 | 업로드용 `.skill` 파일 하나 |
-| 용도 | 코드 관리 | 현장 PC 설치 |
+| skill | `skill/` 폴더 (직접 압축) | 업로드용 zip 이 이미 들어 있음 |
+| 용도 | 코드 수정 | **현장 PC 설치** |
 
 `CKP.bat` 은 두 배치를 모두 인식합니다(`program/` 아래든, 저장소 루트든).
 현장 PC 가 PyPI 에 못 나가면 저장소 방식은 거기서 멈추므로 **현장에는 zip** 을 쓰세요.
+
+zip 은 저장소에 커밋하지 않고 Releases 에만 둡니다. 26MB 짜리를 커밋하면 고칠 때마다
+git 히스토리에 영구히 쌓여 clone 이 느려지기 때문입니다. 그래서 **최신본이 어느 것인지는
+Releases 페이지가 유일한 답**입니다 — 로컬 `dist/` 폴더에 남아 있는 zip 은 믿지 마세요.
+
+새 배포본을 낼 때: Releases → Draft a new release → 태그 `v<날짜>` → zip 을 끌어다 놓기.
 
 ---
 
