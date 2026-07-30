@@ -6,7 +6,7 @@
 
 > ### 현장 PC 에 설치할 파일은 여기 하나입니다
 > **[Releases → Latest](https://github.com/moon081588-lab/CS-MES/releases/latest)** 의
-> `CKP-현장배포_v<날짜>.zip`
+> `CKP-Report-field-v<날짜>.zip`  (파일 이름은 영문입니다 — GitHub 가 자산 이름의 한글을 지웁니다)
 >
 > 프로그램 + 오프라인 설치용 라이브러리 + Claude skill + 설치순서가 한 파일에 들어 있습니다.
 > 메신저나 메일로 돌아다니는 zip 은 옛날 것일 수 있으니 쓰지 마세요.
