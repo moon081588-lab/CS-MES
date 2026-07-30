@@ -57,7 +57,7 @@ def _sqlcl_path():
     except Exception:
         return os.environ.get("SQLCL", "sql")
 
-SQLCL         = os.environ.get("SQLCL") or _sqlcl_path()             # SQLcl 실행파일
+SQLCL         = None            # 기동을 막지 않으려고 여기서 찾지 않는다. 워밍업 스레드가 처음 쓸 때 찾는다.
 WARM_CONN     = os.environ.get("CKP_WARM_CONN", "changshinincaipoc")  # 저장된 연결명
 WARM_INTERVAL = int(os.environ.get("CKP_WARM_INTERVAL", "240"))       # 핑 주기(초)
 WARM_ENABLE   = os.environ.get("CKP_WARM_ENABLE", "1") != "0"         # '0' 이면 비활성
@@ -135,7 +135,10 @@ def _run(script, date, *extra):
     out = p.stdout or ""
     if p.returncode != 0:
         out += "\n[오류]\n" + (p.stderr or "")[-1500:]
-    return out.strip()
+    # 종료코드를 같이 돌려준다. 예전에는 로그에 [오류] 만 붙이고 '성공' 으로 넘겨서,
+    # run_all 이 중간에 죽어도 이전 실행에 남아 있던 파일 11개를 세어 [완료] 라고 답했다.
+    # (2026-07-30 시뮬레이션: 엑셀로 열어 둔 3번 파일 하나 때문에 8개가 옛 데이터인 채 '완료')
+    return out.strip(), p.returncode
 
 # --- DB 워밍업(keepalive) ------------------------------------------------------
 def _warm_ping():
@@ -143,6 +146,9 @@ def _warm_ping():
     script = (f"connect -name {WARM_CONN}\n"
               "set feedback off\nset pagesize 0\nset echo off\n"
               "SELECT 1 FROM DUAL;\nexit\n")
+    global SQLCL
+    if SQLCL is None:
+        SQLCL = os.environ.get("SQLCL") or _sqlcl_path()
     try:
         p = subprocess.run([SQLCL, "-S", "/nolog"], input=script,
                            capture_output=True, text=True, env=dict(os.environ),
@@ -179,11 +185,45 @@ def _dated(date, reqdate=""):
 def _status_path(date):
     return os.path.join(OUTDIR, f"_ckp_status_{date}.json")   # 상태 json 은 상위(CKP_official)에 유지 → 날짜 몰라도 조회 가능
 
-def _list_reports(date, reqdate=""):
+def _list_reports(date, reqdate="", since=None):
+    """since 를 주면 그 시각 이후에 실제로 쓰인 파일만 센다.
+    폴더에 파일이 있다는 것과 '이번 실행이 만들었다' 는 것은 다르다. 이전 실행 결과가
+    남아 있는 폴더에 다시 돌리면, 중간에 실패해도 파일 개수는 11개 그대로다."""
     try:
-        return sorted(f for f in os.listdir(_dated(date, reqdate)) if f.lower().endswith(".xlsx"))
+        names = sorted(f for f in os.listdir(_dated(date, reqdate)) if f.lower().endswith(".xlsx"))
     except FileNotFoundError:
         return []
+    if since is None:
+        return names
+    d = _dated(date, reqdate)
+    fresh = []
+    for f in names:
+        try:
+            if os.path.getmtime(os.path.join(d, f)) >= since - 2:   # 2초는 파일시스템 시각 오차 여유
+                fresh.append(f)
+        except OSError:
+            pass
+    return fresh
+
+
+def _cause(out):
+    """로그를 보고 사람이 할 일을 한 줄로 짚어 준다. 실패 화면은 이 한 줄이 전부다."""
+    low = (out or "").lower()
+    if "permissionerror" in low or "operation not permitted" in low or "access is denied" in low \
+       or "errno 13" in low or "[errno 1]" in low:
+        return ("결과 폴더에 쓸 수 없습니다 — 엑셀에서 열어 둔 리포트 파일을 모두 닫고, "
+                "결과 폴더가 읽기 전용인지(속성 → 읽기 전용) 확인한 뒤 다시 실행하세요.")
+    if "no space left" in low or "errno 28" in low or "디스크" in (out or ""):
+        return "디스크 공간이 부족합니다 — 여유 공간을 확보한 뒤 다시 실행하세요."
+    if "sqlcl" in low and ("찾을 수 없" in (out or "") or "not found" in low):
+        return "SQLcl 을 찾지 못했습니다 → CKP.bat 의 3 번으로 접속 경로를 확인하세요."
+    if "ora-01017" in low:
+        return "DB 계정 또는 비밀번호가 틀렸습니다 → CKP.bat 의 2 번에서 다시 입력하세요."
+    if "지갑" in (out or "") or "ora-12154" in low or "ora-28759" in low:
+        return "지갑을 읽지 못했습니다 → wallet 폴더에 파일 8개가 다 있는지 확인하세요."
+    if "timed out" in low or "timeout" in low or "12170" in (out or ""):
+        return "DB 로 나가지 못했습니다 → 사내 방화벽에서 1522 포트를 열어야 합니다."
+    return "로그의 [오류] 부분을 보세요."
 
 def _save_status(job):
     try:
@@ -198,9 +238,14 @@ def _worker(date, only):
     job = _JOBS[date]
     rq = job.get("reqdate", "")
     try:
-        job["output"] = _run("run_all.py", date, "--reqdate", rq, *only)
-        job["files"] = _list_reports(date, rq)
-        job["state"] = "done"
+        job["output"], rc = _run("run_all.py", date, "--reqdate", rq, *only)
+        # 이번 실행이 실제로 쓴 파일만 센다(옛 파일을 성과로 세지 않는다).
+        job["files"] = _list_reports(date, rq, since=job["_t0"])
+        if rc != 0:
+            job["state"] = "error"
+            job["error"] = _cause(job["output"])
+        else:
+            job["state"] = "done"
     except subprocess.TimeoutExpired as e:
         job["state"] = "error"
         job["error"] = (f"시간초과: run_all.py 가 {RUN_TIMEOUT}초 안에 끝나지 않아 중단했습니다. "
@@ -216,6 +261,7 @@ def _worker(date, only):
 def _start_job(date, reports):
     only = ("--only", reports) if reports.strip() else ()
     scope = f"선택({reports.strip()})" if reports.strip() else "11개 전체"
+    expected = len([x for x in reports.replace(",", " ").split()]) if reports.strip() else 11
     reqdate = datetime.date.today().isoformat()   # 요청(실행) 날짜 — 잡 생성 시점에 고정
     with _JOBS_LOCK:
         cur = _JOBS.get(date)
@@ -226,7 +272,8 @@ def _start_job(date, reports):
                         f"ckp_status(date='{date}') 로 확인하세요. "
                         f"(멈춘 것 같으면 ckp_reset(date='{date}') 로 초기화)")
             # STALE_AFTER 초과 → 이전 잡은 죽은 것으로 간주하고 새로 시작(아래로 진행)
-        job = {"date": date, "reqdate": reqdate, "scope": scope, "state": "running",
+        job = {"date": date, "reqdate": reqdate, "scope": scope, "expected": expected,
+               "state": "running",
                "started_at": datetime.datetime.now().isoformat(timespec="seconds"),
                "finished_at": None, "elapsed_sec": 0, "output": "", "files": [],
                "error": "", "_t0": time.time()}
@@ -244,6 +291,39 @@ def _start_job(date, reports):
 #   5 IP Outgoing Market · 6 External OS&D · 7 Balance CMP · 8 Outgoing PH ·
 #   9 PH before UV · 10 PH after UV · 11 PH in Market by size
 
+def _valid_date(v):
+    """기준일 검증. 이 값이 그대로 폴더 이름이 되므로 형식을 어기면 여기서 끊는다.
+    (2026-07-30 시험: '에러/../../' 가 그대로 통과해 엉뚱한 곳에 폴더를 만들었다.)"""
+    v = (v or "").strip()
+    if not v:
+        return datetime.date.today().isoformat(), ""
+    try:
+        d = datetime.date.fromisoformat(v)
+    except ValueError:
+        return "", (f"[입력 오류] 기준일 '{v[:40]}' 은 날짜 형식이 아닙니다.\n"
+                    "  YYYY-MM-DD 로 주세요. 예: 2026-07-25")
+    today = datetime.date.today()
+    if d.year < 2000 or d > today + datetime.timedelta(days=365):
+        return "", f"[입력 오류] 기준일 {v} 은 범위를 벗어났습니다."
+    return d.isoformat(), ""
+
+
+def _valid_reports(v):
+    """리포트 번호 검증. 1~11 만 허용."""
+    v = (v or "").strip()
+    if not v:
+        return "", ""
+    got, bad = [], []
+    for x in v.replace(",", " ").split():
+        x = x.strip().lower()
+        x = x[2:] if x.startswith("no") else x
+        (got if x in {str(i) for i in range(1, 12)} else bad).append(x)
+    if bad:
+        return "", (f"[입력 오류] 리포트 번호 {', '.join(bad[:5])} 은 없습니다.\n"
+                    "  1~11 중에서 골라 주세요. 예: 3,4  또는 비워두면 전체 11개.")
+    return ",".join(got), ""
+
+
 @mcp.tool()
 @_safe
 def ckp_make_all(date: str = "", reports: str = "") -> str:
@@ -255,7 +335,12 @@ def ckp_make_all(date: str = "", reports: str = "") -> str:
       6 External OS&D · 7 CMP · 8 Outgoing PH · 9 PH before UV · 10 PH after UV · 11 PH in Market by size.
     저장된 SQLcl 연결로 DB 조회(접속 1회 일괄) → report/CKP_official/기준<날짜>_요청<오늘>/ 에 xlsx 생성.
     양식(사이즈·날짜 D-offset 컬럼)은 원본 고정 구조라 데이터가 0행이어도 열이 유지된다."""
-    d = date or datetime.date.today().isoformat()
+    d, why = _valid_date(date)
+    if why:
+        return why                      # 폴더 이름으로 그대로 쓰이므로 반드시 막는다
+    reports, why = _valid_reports(reports)
+    if why:
+        return why
     start_msg = _start_job(d, reports)
     if "[이미 진행 중]" in start_msg:
         return start_msg
@@ -283,13 +368,54 @@ def _status_text(d):
     el = job.get("elapsed_sec") or (round(time.time() - job["_t0"], 1) if "_t0" in job else 0)
     if state == "running":
         return f"[진행 중] {d} — {job.get('scope')} · 생성 중 · 경과 {el}초. 잠시 후 다시 확인하세요."
-    if state == "error":
-        return f"[오류] {d} — {job.get('scope')} · 경과 {el}초\n{job.get('error')}\n{(job.get('output') or '')[-800:]}"
     rq = job.get("reqdate", "")
-    files = job.get("files") or _list_reports(d, rq)
+    out = job.get("output", "")
+    exp = job.get("expected")
+    if not exp:      # 구버전 상태파일에는 expected 가 없다 → scope('선택(3,4)') 에서 복원
+        sc = job.get("scope") or ""
+        exp = len([x for x in sc[sc.find("(") + 1:sc.find(")")].replace(",", " ").split()]) if "(" in sc else 11
+        exp = exp or 11
+    files = job.get("files")
+    if files is None:
+        files = _list_reports(d, rq)
+    if state == "error":
+        # 중간에 죽었으면 몇 개가 나왔든 실패다. 개수를 같이 보여 줘야 사람이 폴더를 믿지 않는다.
+        return (f"[실패] {d} — {job.get('scope')} · 소요 {el}초 · "
+                f"이번 실행이 만든 파일 {len(files)}/{exp}개\n"
+                f"  {job.get('error') or _cause(out)}\n"
+                f"  ※ 폴더에 남아 있는 파일은 이전 실행 결과일 수 있습니다. 그대로 쓰지 마세요.\n\n"
+                f"== 생성 로그 ==\n{out[-2000:]}\n\n확인할 폴더: {_dated(d, rq)}")
+    if not files:
+        # 파일이 하나도 없으면 성공이 아니다. 여기서 '완료' 라고 답하면
+        # 현장에서는 "만들어졌다는데 폴더가 비었다" 가 된다.
+        return (f"[실패] {d} — {job.get('scope')} · 소요 {el}초 · **생성된 파일이 없습니다**\n"
+                f"  {_cause(out)}\n\n== 생성 로그 ==\n{out[-2000:]}"
+                f"\n\n확인할 폴더: {_dated(d, rq)}")
+    if len(files) < exp:
+        # 종료코드가 0이어도 개수가 모자라면 성공이 아니다.
+        return (f"[실패] {d} — {job.get('scope')} · 소요 {el}초 · "
+                f"{exp}개 중 {len(files)}개만 만들어졌습니다\n"
+                f"  {_cause(out)}\n" + "\n".join(files)
+                + f"\n\n== 생성 로그 ==\n{out[-2000:]}\n\n확인할 폴더: {_dated(d, rq)}")
     return (f"[완료] {d} — {job.get('scope')} · 소요 {el}초 · 파일 {len(files)}개\n"
-            + "\n".join(files) + f"\n\n== 생성 로그 ==\n{job.get('output', '')}"
+            + "\n".join(files) + f"\n\n== 생성 로그 ==\n{out}"
             + f"\n\n저장 위치: {_dated(d, rq)}")
+
+@mcp.tool()
+@_safe
+def ckp_ping() -> str:
+    """연결 확인용. DB 도 파일도 건드리지 않고 즉시 답한다.
+    현장에서 '브릿지가 살아 있는가' 만 1초 안에 확인하려고 만든 것."""
+    import platform
+    return ("[ckp-reports] 연결 정상\n"
+            f"  프로그램 폴더 : {_TOP}\n"
+            f"  결과 폴더     : {OUTDIR}\n"
+            f"  파이썬        : {sys.version.split()[0]} ({sys.executable})\n"
+            f"  OS            : {platform.platform()}\n"
+            f"  지금          : {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n"
+            "  → 이 메시지가 보이면 Claude 와 프로그램이 붙어 있습니다. "
+            "이제 ckp_make_all 로 리포트를 만들 수 있습니다.")
+
 
 @mcp.tool()
 @_safe

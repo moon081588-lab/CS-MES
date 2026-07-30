@@ -65,8 +65,36 @@ def run(date, only="", conn="changshinincaipoc", mode="sqlcl", src="", reqdate="
     date = date or health.site_today(cfg_path=_cfgp).isoformat()
     reqdate = reqdate or health.site_today(cfg_path=_cfgp).isoformat()
     outdir = os.path.join(OUTDIR, f"기준{date}_요청{reqdate}")   # 기준날짜_요청날짜 하위폴더 → CKP_official/기준YYYY-MM-DD_요청YYYY-MM-DD/
-    os.makedirs(outdir, exist_ok=True)
-    os.makedirs(SQLDIR, exist_ok=True)
+    # 결과 폴더에 쓸 수 있는지 먼저 확인한다. DB 를 30초 긁고 나서 마지막에 '쓰기 실패' 를
+    # 보는 것만큼 허무한 일이 없다. 읽기전용 폴더·엑셀로 열어 둔 파일이 현장에서 가장 흔하다.
+    try:
+        os.makedirs(outdir, exist_ok=True)
+        os.makedirs(SQLDIR, exist_ok=True)
+        _probe = os.path.join(outdir, ".ckp_write_test")
+        with open(_probe, "w") as _f:
+            _f.write("ok")
+        os.remove(_probe)
+    except OSError as e:
+        sys.exit(f"[오류] 결과 폴더에 쓸 수 없습니다: {outdir}\n"
+                 f"  {type(e).__name__}: {e}\n"
+                 f"  → 엑셀에서 열어 둔 리포트 파일을 모두 닫고, 폴더 속성의 '읽기 전용' 을 해제한 뒤 다시 실행하세요.\n"
+                 f"  → 폴더가 OneDrive·네트워크 드라이브 안이면 C:\\CKP-Report 로 옮기는 편이 안전합니다.")
+
+    # 이미 있는 결과 파일 중 잠긴 것(엑셀에서 열려 있음)이 있으면 여기서 끊는다.
+    # 그대로 진행하면 앞의 몇 개만 새로 쓰이고 나머지는 옛 파일이 남아 '완료' 로 보인다.
+    _locked = []
+    for _f in sorted(os.listdir(outdir)):
+        if not _f.lower().endswith(".xlsx"):
+            continue
+        try:
+            with open(os.path.join(outdir, _f), "r+b"):
+                pass
+        except OSError:
+            _locked.append(_f)
+    if _locked:
+        sys.exit("[오류] 아래 파일이 열려 있거나 읽기 전용이라 덮어쓸 수 없습니다.\n"
+                 + "".join(f"    - {x}\n" for x in _locked)
+                 + "  → 엑셀에서 해당 파일을 닫은 뒤 다시 실행하세요.")
 
     # --- 리포트 선택: 기본 전체(1~11). --only "3,4" 지정 시 그것만 ---
     if only.strip():

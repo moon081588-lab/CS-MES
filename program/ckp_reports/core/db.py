@@ -30,7 +30,7 @@ def _is_real_sqlcl(path):
     if not path or not os.path.exists(path):
         return False
     try:
-        p = subprocess.run([path, "-V"], capture_output=True, text=True, timeout=60)
+        p = subprocess.run([path, "-V"], capture_output=True, text=True, timeout=5)
         out = ((p.stdout or "") + (p.stderr or "")).lower()
         return "sqlcl" in out
     except Exception:
@@ -68,7 +68,23 @@ def _find_sqlcl():
     return "sql"
 
 
-SQLCL = _find_sqlcl()
+# SQLcl 탐색은 외부 프로그램을 실제로 실행해 보므로 공짜가 아니다.
+# 이걸 import 시점에 하면, PATH 에 멈춰 있는 sql 이 있을 때 모듈 로딩이 통째로 지연되고
+# MCP 서버는 '기동 실패' 로 처리된다(2026-07-30 재현: 60.6초). 그래서 처음 쓸 때 한 번만 찾는다.
+_SQLCL_CACHE = None
+
+
+def sqlcl():
+    global _SQLCL_CACHE
+    if _SQLCL_CACHE is None:
+        _SQLCL_CACHE = _find_sqlcl()
+    return _SQLCL_CACHE
+
+
+def __getattr__(name):          # db.SQLCL 로 쓰던 곳을 그대로 두기 위한 지연 평가
+    if name == "SQLCL":
+        return sqlcl()
+    raise AttributeError(name)
 
 
 def _valid_wallet(d):
@@ -394,11 +410,11 @@ def _env():
 
 def _run_sqlcl(script):
     try:
-        return subprocess.run([SQLCL, "-S", "/nolog"], input=script, capture_output=True,
+        return subprocess.run([sqlcl(), "-S", "/nolog"], input=script, capture_output=True,
                               text=True, encoding="utf-8", errors="replace", env=_env())
     except FileNotFoundError:
         raise RuntimeError(
-            f"SQLcl 을 찾을 수 없습니다 (시도: {SQLCL}).\n"
+            f"SQLcl 을 찾을 수 없습니다 (시도: {sqlcl()}).\n"
             "  · SQLcl 을 설치하고 bin 폴더를 PATH 에 넣거나 환경변수 SQLCL 에 전체 경로를 지정하세요.\n"
             "  · 또는 config.ini [db] 에 user/password 를 채우면 SQLcl 없이 드라이버로 접속합니다.")
 
@@ -442,11 +458,16 @@ def _sqlcl_batch(items, conn):
     out_lines = p.stdout.splitlines()
     for i, (path, sql) in enumerate(items):
         b, e = f"SEGMARK_B_{i}", f"SEGMARK_E_{i}"
+        # 부분일치(in)로 찾으면 안 된다 — 'SEGMARK_E_1' 이 'SEGMARK_E_10' 에도 걸려서,
+        # 마커 하나가 빠졌을 때 엉뚱한 구간을 잘라 **틀린 데이터로 조용히 성공**한다.
+        # (2026-07-30 시뮬레이션에서 실제로 11개 파일이 187셀 틀린 채 '완료' 로 나왔다.)
         try:
-            si = next(k for k, l in enumerate(out_lines) if b in l)
-            ei = next(k for k, l in enumerate(out_lines) if e in l)
+            si = next(k for k, l in enumerate(out_lines) if l.strip() == b)
+            ei = next(k for k, l in enumerate(out_lines) if l.strip() == e)
         except StopIteration:
             raise RuntimeError(_conn_hint(os.path.basename(path), "세그먼트 마커 없음", p.stderr))
+        if ei <= si:
+            raise RuntimeError(_conn_hint(os.path.basename(path), "세그먼트 순서가 어긋남", p.stderr))
         rows = _parse_segment(out_lines[si + 1:ei], path)
         if not rows:
             raise RuntimeError(_conn_hint(os.path.basename(path), "헤더 없음", p.stderr))
