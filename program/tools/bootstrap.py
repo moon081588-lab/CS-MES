@@ -123,7 +123,7 @@ def main():
         print("     https://www.python.org/downloads/  (설치할 때 'Add python.exe to PATH' 체크)")
     whls = sorted(glob.glob(os.path.join(VENDOR, "*.whl")))
     need = []
-    for mod, name in (("openpyxl", "openpyxl"), ("oracledb", "oracledb")):
+    for mod, name in (("openpyxl", "openpyxl"), ("oracledb", "oracledb"), ("mcp", "mcp")):
         try:
             __import__(mod); print(f"  {name:10s} 이미 있음")
         except ImportError:

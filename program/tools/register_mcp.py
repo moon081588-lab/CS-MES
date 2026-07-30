@@ -96,6 +96,40 @@ def pick_python(previous=None):
                 print(f" 파이썬   : {c}")
                 print("            (지금 실행한 파이썬에는 mcp 가 없어 이쪽을 씁니다)")
             return c
+    return install_mcp()
+
+
+def install_mcp():
+    """mcp 가 깔린 파이썬이 하나도 없으면 직접 깔아 준다.
+
+    현장에선 사람이 명령창을 열어 pip 를 치는 것 자체가 큰 장벽이고,
+    원격으로 화면을 주고받을 수 없는 상황도 있다. 그래서 여기서 끝낸다.
+    vendor 폴더에 휠을 동봉해 두었으므로 인터넷도 필요 없다."""
+    import subprocess, glob as _g
+    vendor = os.path.join(ROOT, "vendor")
+    tgt = sys.executable
+    off = bool(_g.glob(os.path.join(vendor, "mcp-*.whl")))
+    print(" mcp 라이브러리가 없어 지금 설치합니다"
+          + (" (동봉된 파일 사용, 인터넷 불필요)" if off else " (인터넷에서 받습니다)"))
+    tries = []
+    if off:
+        tries.append([tgt, "-m", "pip", "install", "--quiet", "--no-index",
+                      f"--find-links={vendor}", "mcp"])
+        tries.append([tgt, "-m", "pip", "install", "--quiet", "--no-index",
+                      f"--find-links={vendor}", "--user", "mcp"])
+    tries.append([tgt, "-m", "pip", "install", "--quiet", "mcp"])
+    tries.append([tgt, "-m", "pip", "install", "--quiet", "--user", "mcp"])
+    for cmd in tries:
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=300)
+        except Exception:
+            continue
+        _MCP_CACHE.pop(tgt, None)
+        if can_import_mcp(tgt):
+            print("   설치 완료")
+            return tgt
+    print(" ❌ 설치하지 못했습니다. 아래를 명령 프롬프트에 붙여넣어 주세요.")
+    print(f'    "{tgt}" -m pip install --no-index --find-links="{vendor}" mcp')
     return ""
 
 

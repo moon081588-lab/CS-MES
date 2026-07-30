@@ -16,6 +16,9 @@ wallet_dir      =                ; 비우면 balance_outgoing_mailer\wallet 을 
 mode            = auto           ; Instant Client 있으면 thick, 없으면 thin 폴백
 oracle_client_lib =
 sqlcl_conn      = changshinincaipoc
+; SQLcl 실행파일을 직접 지정하고 싶을 때 (비우면 자동 탐색)
+;   예: C:\sqlcl\bin\sql.exe
+sqlcl_path      =
 ; --- 사내망이 특이할 때만 건드리세요 ---
 ; preflight = auto | off   접속 전에 DB 포트가 열려 있는지 먼저 확인(기본 auto).
 ;   방화벽이 막았을 때 1분 매달리는 대신 6초 만에 원인을 알려 줍니다.

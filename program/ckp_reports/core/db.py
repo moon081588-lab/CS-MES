@@ -23,23 +23,48 @@ ROOT_DIR = os.path.dirname(PKG_DIR)                            # 코드가 놓�
 # 두었기 때문에, 그 경우 한 단계 위가 '사람이 여는 폴더' 다.
 USER_ROOT = os.path.dirname(ROOT_DIR) if os.path.basename(ROOT_DIR).lower() == "program" else ROOT_DIR
 
+def _is_real_sqlcl(path):
+    """이름이 sql 이라고 다 SQLcl 이 아니다.
+    2026-07-29 현장: 오라클 클라이언트 12.2 의 bin\\sql.bat 이 PATH 에서 먼저 잡혀
+    'The system cannot find the path specified' 만 뱉었다. 그래서 실제로 실행해 본다."""
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        p = subprocess.run([path, "-V"], capture_output=True, text=True, timeout=60)
+        out = ((p.stdout or "") + (p.stderr or "")).lower()
+        return "sqlcl" in out
+    except Exception:
+        return False
+
+
 def _find_sqlcl():
-    """SQLcl 실행파일 탐색. env SQLCL > PATH > 흔한 설치 위치 순.
-    macOS 는 로그인 셸 PATH 에 없는 경우가 잦아(Homebrew·수동 압축해제) 직접 뒤진다."""
+    """SQLcl 실행파일 탐색. env SQLCL > config > 흔한 설치 위치 > PATH.
+    PATH 를 마지막에 두는 이유는 위 _is_real_sqlcl 주석 참고."""
     import shutil, glob as _g
     v = os.environ.get("SQLCL")
-    if v: return v
-    for n in (("sql.exe", "sql.cmd", "sql.bat", "sql") if os.name == "nt" else ("sql",)):
-        p = shutil.which(n)
-        if p: return p
+    if v:
+        return v                                   # 사람이 명시했으면 그대로 믿는다
+    try:
+        v = load_cfg().get("db", "sqlcl_path", fallback="").strip()
+        if v:
+            return v
+    except Exception:
+        pass
     cands = [os.path.join(ROOT_DIR, "sqlcl", "bin", "sql"),
              "/opt/homebrew/bin/sql", "/usr/local/bin/sql",
              os.path.expanduser("~/sqlcl/bin/sql"), "/opt/sqlcl/bin/sql",
-             r"C:\sqlcl\bin\sql.exe", r"C:\Program Files\sqlcl\bin\sql.exe"]
+             r"C:\sqlcl\bin\sql.exe", r"C:\sqlcl\bin\sql.bat",
+             r"C:\Program Files\sqlcl\bin\sql.exe"]
     cands += sorted(_g.glob("/opt/homebrew/Cellar/sqlcl/*/bin/sql"))
     cands += sorted(_g.glob(os.path.expanduser("~/Applications/sqlcl*/bin/sql")))
+    cands += sorted(_g.glob(r"C:\**\sqlcl\bin\sql.exe"), key=len)[:5]
     for c in cands:
-        if os.path.exists(c): return c
+        if os.path.exists(c):
+            return c
+    for n in (("sql.exe", "sql.cmd", "sql.bat", "sql") if os.name == "nt" else ("sql",)):
+        p = shutil.which(n)
+        if p and _is_real_sqlcl(p):                # PATH 의 것은 진짜인지 확인하고 쓴다
+            return p
     return "sql"
 
 

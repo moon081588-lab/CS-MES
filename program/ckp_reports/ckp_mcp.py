@@ -14,6 +14,27 @@ claude_desktop_config.json 에 아래처럼 등록:
 """
 import os, sys, subprocess, datetime, threading, time, json
 
+# ── MCP 프로토콜 보호 ────────────────────────────────────────────────────────
+# 이 서버는 stdout 으로 JSON-RPC 를 주고받는다. 여기에 단 한 글자라도 다른 것이 섞이면
+# 클라이언트는 "Server disconnected" 만 띄우고 이유는 알려주지 않는다.
+#  (1) 윈도우는 텍스트 모드에서 \n 을 \r\n 으로 바꾼다 → 프레이밍이 깨진다. newline="" 로 막는다.
+#  (2) 우리 코드의 모든 출력은 stderr 로 보낸다. stdout 은 MCP 전용으로 비워 둔다.
+#      ※ sys.stdout 을 stderr 로 바꿔치기하면 안 된다 — MCP 가 응답을 그리로 보내 버려
+#        클라이언트가 영원히 기다린다(2026-07-30 시험 중 확인).
+try:
+    sys.stdout.reconfigure(encoding="utf-8", newline="")
+except Exception:
+    pass
+try:
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
+def log(*a):
+    """서버 로그는 무조건 stderr 로. 실수로 print() 를 쓰지 않도록 이 함수만 쓴다."""
+    print(*a, file=sys.stderr, flush=True)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 결과는 run_all.py 와 같은 곳을 봐야 한다 — 코드가 program\ 안에 있으면 결과는 그 한 단계 위.
 _UP1   = os.path.abspath(os.path.join(HERE, ".."))
@@ -26,7 +47,17 @@ OUTDIR = os.path.join(_TOP, "report", "CKP_official")
 # 그리고 일정 주기로 가벼운 'SELECT 1 FROM DUAL' 을 실행해 DB 를 항상 웜 상태로 유지한다.
 # → 사용자가 리포트를 부르는 시점엔 콜드 스타트 비용이 이미 지불돼 있어 첫 호출부터 통과한다.
 # (make_all.py 안에 인라인 워밍업을 넣어도 같은 호출 안에서 콜드 비용을 치르므로 소용이 없다.)
-SQLCL         = os.environ.get("SQLCL", "sql")                        # SQLcl 실행파일
+def _sqlcl_path():
+    """core/db.py 와 같은 방식으로 찾는다(가짜 sql.bat 을 걸러낸 결과).
+    실패하면 워밍업만 포기하고 서버는 정상 기동한다."""
+    try:
+        sys.path.insert(0, HERE)
+        from core import db as _db
+        return _db.SQLCL
+    except Exception:
+        return os.environ.get("SQLCL", "sql")
+
+SQLCL         = os.environ.get("SQLCL") or _sqlcl_path()             # SQLcl 실행파일
 WARM_CONN     = os.environ.get("CKP_WARM_CONN", "changshinincaipoc")  # 저장된 연결명
 WARM_INTERVAL = int(os.environ.get("CKP_WARM_INTERVAL", "240"))       # 핑 주기(초)
 WARM_ENABLE   = os.environ.get("CKP_WARM_ENABLE", "1") != "0"         # '0' 이면 비활성
@@ -71,6 +102,20 @@ except ModuleNotFoundError:
 
 mcp = FastMCP("ckp-reports")
 
+
+def _safe(fn):
+    """도구 안에서 터진 예외가 연결을 흔들지 않게 한다.
+    사용자에게는 한국어 한 줄로 무엇이 잘못됐는지 돌려준다."""
+    import functools
+    @functools.wraps(fn)
+    def wrap(*a, **k):
+        try:
+            return fn(*a, **k)
+        except Exception as e:
+            return (f"[오류] {type(e).__name__}: {str(e)[:400]}\n"
+                    f"CKP.bat 의 3 번(DB 연결 점검)을 실행해 원인을 확인하세요.")
+    return wrap
+
 def _child_env():
     """자식(run_all.py)도 같은 라이브러리를 보게 한다. 위에서 빌려온 경로를 넘겨준다."""
     env = dict(os.environ)
@@ -101,12 +146,11 @@ def _warm_ping():
     try:
         p = subprocess.run([SQLCL, "-S", "/nolog"], input=script,
                            capture_output=True, text=True, env=dict(os.environ),
-                           timeout=180)
+                           timeout=90)
         ok = ("ORA-" not in (p.stdout or "")) and p.returncode == 0
-        print(f"[ckp warmup] {WARM_CONN} {'ok' if ok else 'warn'} (rc={p.returncode})",
-              file=sys.stderr, flush=True)
+        log(f"[ckp warmup] {WARM_CONN} {'ok' if ok else 'warn'} (rc={p.returncode})")
     except Exception as e:
-        print(f"[ckp warmup] skip: {e}", file=sys.stderr, flush=True)
+        log(f"[ckp warmup] skip: {e}")
 
 def _keepalive_loop():
     while True:
@@ -148,7 +192,7 @@ def _save_status(job):
         with open(_status_path(job["date"]), "w", encoding="utf-8") as f:
             json.dump(pub, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"[ckp job] 상태파일 저장 실패: {e}", file=sys.stderr, flush=True)
+        log(f"[ckp job] 상태파일 저장 실패: {e}")
 
 def _worker(date, only):
     job = _JOBS[date]
@@ -201,6 +245,7 @@ def _start_job(date, reports):
 #   9 PH before UV · 10 PH after UV · 11 PH in Market by size
 
 @mcp.tool()
+@_safe
 def ckp_make_all(date: str = "", reports: str = "") -> str:
     """CKP Manual Report 리포트를 생성한다(기본 공식 11개 전체).
     실행이 끝날 때까지 기다렸다가 결과(생성 파일 목록·로그)를 바로 반환한다 — 보통 2분 내 완료라 한 번의 호출로 끝(폴링 불필요).
@@ -247,6 +292,7 @@ def _status_text(d):
             + f"\n\n저장 위치: {_dated(d, rq)}")
 
 @mcp.tool()
+@_safe
 def ckp_status(date: str = "") -> str:
     """진행 중이거나 완료된 CKP 생성 잡의 상태를 조회한다.
     ckp_make_all 로 시작한 뒤, 완료 여부·소요시간·생성 파일 목록을 확인할 때 사용.
@@ -254,6 +300,7 @@ def ckp_status(date: str = "") -> str:
     return _status_text(date or datetime.date.today().isoformat())
 
 @mcp.tool()
+@_safe
 def list_report_dir(date: str = "") -> str:
     """생성 결과 폴더의 리포트 파일 목록(개수·크기·시각)을 조회한다. 탐색기 안 열고 채팅에서 바로 확인용.
     date: 'YYYY-MM-DD' (생략 시 오늘). 해당 기준일의 '기준<date>_요청*' 폴더들을 훑는다."""
@@ -275,6 +322,7 @@ def list_report_dir(date: str = "") -> str:
     return "\n".join(lines)
 
 @mcp.tool()
+@_safe
 def tail_ckp_log(date: str = "", lines: int = 40) -> str:
     """마지막 생성 실행 로그(run_all 출력)의 끝부분을 본다 — 오류 원인 빠른 확인용.
     date: 'YYYY-MM-DD' (생략 시 오늘). lines: 보여줄 줄 수(기본 40)."""
@@ -295,6 +343,7 @@ def tail_ckp_log(date: str = "", lines: int = 40) -> str:
     return head + (f"\n== 오류 ==\n{err}" if err else "") + f"\n== 로그(끝 {n}줄) ==\n{tail}"
 
 @mcp.tool()
+@_safe
 def ckp_reset(date: str = "") -> str:
     """멈춰 있는(진행 중으로 걸린) CKP 생성 작업을 강제로 해제한다.
     '[이미 진행 중]' 때문에 재실행이 막힐 때 사용. date 생략 시 오늘.
