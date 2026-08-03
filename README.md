@@ -14,6 +14,35 @@
 
 ---
 
+
+## Claude 에서 바로 돌리기 (MCP 등록이 안 보일 때도 됨)
+
+`CKP-Watch.bat` 을 더블클릭해 창을 켜 두면 끝이다. 그 창이 `_ckp_queue/` 폴더를
+지켜보다가 Claude 가 넣은 요청을 받아 `run_all.py` 를 돌리고 결과를 돌려준다.
+
+    Claude  →  _ckp_queue/requests/<id>.json
+    watcher →  run_all.py 실행 → report/CKP_official/기준…/*.xlsx
+    watcher →  _ckp_queue/status/<id>.json   (진행·파일목록·오류원인)
+    Claude  ←  결과 회수
+
+**왜 이게 필요한가.** MCP 로 등록하면 Claude 데스크톱 '대화' 에서는 도구가 보이지만,
+Cowork 작업이 클라우드에서 실행되면 그 세션은 이 PC 의 MCP 프로세스를 볼 수 없다.
+등록이 잘못된 게 아니라 세션이 다른 컴퓨터에 있어서다. 폴더는 어느 쪽에서도 열리므로
+이 방식은 클라우드·로컬·휴대폰 어디서 요청해도 똑같이 동작한다.
+
+**설치.** 저장소를 받으면 이미 들어 있다. 추가 설치 없음.
+처음 한 번만 `CKP.bat` 의 2 번(처음 설정)으로 파이썬·openpyxl·지갑을 맞춰 두면 된다.
+
+| 상황 | 어떻게 보이나 |
+|---|---|
+| 워처가 꺼져 있음 | `_ckp_queue/heartbeat.json` 이 없거나 오래됨 → Claude 가 켜 달라고 알림 |
+| 실패 | status 의 `state=error` + `hint` 에 원인 한 줄 |
+| 일부만 다시 뽑음 | `files` 는 이번에 쓴 것, `stale_files` 는 남아 있던 옛 파일 |
+| 옛 CSV 재활용 | `csv_asof` 에 원천 CSV 를 뽑은 시각이 찍힌다 |
+
+창을 두 번 켜면 두 번째는 스스로 물러난다. 창이 죽으면 `.bat` 이 5 초 뒤 다시 띄운다.
+
+
 ## 빠른 시작
 
 ```
